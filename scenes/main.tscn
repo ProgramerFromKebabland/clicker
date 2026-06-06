@@ -6,8 +6,9 @@
 [ext_resource type="AudioStream" uid="uid://b1gt4kn55vyhy" path="res://assets/cat_click.wav" id="4_cat_click"]
 [ext_resource type="AudioStream" uid="uid://yar7bup4ebkm" path="res://assets/ui_select.wav" id="5_ui_select"]
 [ext_resource type="AudioStream" uid="uid://bbd5sk53nfhf0" path="res://assets/cat_meow.wav" id="6_cat_meow"]
-[ext_resource type="AudioStream" path="res://assets/special_milestone.wav" id="7_special"]
-[ext_resource type="AudioStream" path="res://assets/bonus_chime.wav" id="8_bonus"]
+[ext_resource type="AudioStream" uid="uid://beqh07bxkxjp4" path="res://assets/special_milestone.wav" id="7_special"]
+[ext_resource type="AudioStream" uid="uid://dxvuttba7e65p" path="res://assets/bonus_chime.wav" id="8_bonus"]
+[ext_resource type="Texture2D" uid="uid://respuvmt6qj1" path="res://assets/coin.png" id="9_coin"]
 
 [node name="Main" type="Control" unique_id=1858517946]
 layout_mode = 3
@@ -51,7 +52,7 @@ theme_override_font_sizes/font_size = 42
 text = "Clicks: 0"
 horizontal_alignment = 1
 
-[node name="ComboLabel" type="Label" parent="GameLayer/GameBox"]
+[node name="ComboLabel" type="Label" parent="GameLayer/GameBox" unique_id=164903011]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.88, 1, 1)
@@ -59,7 +60,7 @@ theme_override_font_sizes/font_size = 24
 text = "Combo x1.0"
 horizontal_alignment = 1
 
-[node name="ComboTimerLabel" type="Label" parent="GameLayer/GameBox"]
+[node name="ComboTimerLabel" type="Label" parent="GameLayer/GameBox" unique_id=2056465341]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.62, 0.68, 0.78, 1)
@@ -80,42 +81,97 @@ ignore_texture_size = true
 stretch_mode = 5
 
 [node name="HintLabel" type="Label" parent="GameLayer/GameBox" unique_id=1690992318]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Tap the cat"
 horizontal_alignment = 1
 
-[node name="CoinsLabel" type="Label" parent="." unique_id=1187947586]
+[node name="HudWallet" type="PanelContainer" parent="." unique_id=876622432]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 24.0
-offset_top = -76.0
-offset_right = 328.0
+offset_top = -90.0
+offset_right = 324.0
 offset_bottom = -24.0
 grow_vertical = 0
-theme_override_font_sizes/font_size = 34
+
+[node name="WalletMargin" type="MarginContainer" parent="HudWallet" unique_id=73964489]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 8
+
+[node name="WalletRow" type="HBoxContainer" parent="HudWallet/WalletMargin" unique_id=1189621459]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="HudCoinIcon" type="TextureRect" parent="HudWallet/WalletMargin/WalletRow" unique_id=712190841]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+texture = ExtResource("9_coin")
+expand_mode = 3
+stretch_mode = 5
+
+[node name="CoinsLabel" type="Label" parent="HudWallet/WalletMargin/WalletRow" unique_id=1187947586]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.9, 0.58, 1)
+theme_override_font_sizes/font_size = 28
 text = "Coins: 0"
+vertical_alignment = 1
 
 [node name="UpgradeButton" type="Button" parent="." unique_id=1440675590]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 58)
+custom_minimum_size = Vector2(330, 66)
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -324.0
-offset_top = -82.0
+offset_left = -354.0
+offset_top = -90.0
 offset_right = -24.0
 offset_bottom = -24.0
 grow_horizontal = 0
 grow_vertical = 0
-theme_override_font_sizes/font_size = 20
-text = "Upgrades"
+theme_override_font_sizes/font_size = 21
+text = "UPGRADES"
+
+[node name="UpgradeAlertBadge" type="PanelContainer" parent="." unique_id=762823395]
+unique_name_in_owner = true
+visible = false
+z_index = 5
+custom_minimum_size = Vector2(46, 46)
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -66.0
+offset_top = -110.0
+offset_right = -20.0
+offset_bottom = -64.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="AlertLabel" type="Label" parent="UpgradeAlertBadge" unique_id=1890454595]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.08, 0.12, 1)
+theme_override_font_sizes/font_size = 27
+text = "!"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="MenuButton" type="TextureButton" parent="." unique_id=106497307]
 unique_name_in_owner = true
@@ -157,558 +213,949 @@ grow_vertical = 2
 
 [node name="MenuPanel" type="PanelContainer" parent="MenuOverlay/MenuCenter" unique_id=1694303529]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(440, 660)
+custom_minimum_size = Vector2(510, 760)
 layout_mode = 2
 
 [node name="MenuMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/MenuPanel" unique_id=59859693]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
 
 [node name="MenuItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin" unique_id=1743783517]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 14
 alignment = 1
 
-[node name="MenuTitle" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=810486742]
-layout_mode = 2
-theme_override_font_sizes/font_size = 34
-text = "Menu"
-horizontal_alignment = 1
-
-[node name="DailyRewardLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems"]
+[node name="MenuHeader" type="PanelContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=2114779255]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 21
+
+[node name="HeaderMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuHeader" unique_id=1424346707]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="HeaderItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuHeader/HeaderMargin" unique_id=1999723738]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="MenuTitle" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuHeader/HeaderMargin/HeaderItems" unique_id=810486742]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 34
+text = "GAME PAUSED"
+horizontal_alignment = 1
+
+[node name="MenuSubtitle" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuHeader/HeaderMargin/HeaderItems" unique_id=1489285099]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.64, 0.76, 1)
+theme_override_font_sizes/font_size = 14
+text = "Your click empire is waiting."
+horizontal_alignment = 1
+
+[node name="MenuWallet" type="PanelContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=1255514461]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="WalletMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuWallet" unique_id=1806096752]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 8
+
+[node name="WalletRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuWallet/WalletMargin" unique_id=774877967]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="MenuCoinIcon" type="TextureRect" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuWallet/WalletMargin/WalletRow" unique_id=2118581576]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+texture = ExtResource("9_coin")
+expand_mode = 3
+stretch_mode = 5
+
+[node name="MenuWalletCoinsLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/MenuWallet/WalletMargin/WalletRow" unique_id=2139649527]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.46, 1)
+theme_override_font_sizes/font_size = 24
+text = "0 COINS"
+vertical_alignment = 1
+
+[node name="DailyRewardCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=404648928]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="RewardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/DailyRewardCard" unique_id=1755852713]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="RewardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/DailyRewardCard/RewardMargin" unique_id=1971456962]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="DailyRewardLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/DailyRewardCard/RewardMargin/RewardItems" unique_id=1170041963]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.84, 0.36, 1)
+theme_override_font_sizes/font_size = 20
 text = "Daily reward streak: 0"
 horizontal_alignment = 1
 
-[node name="DailyRewardAlertLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems"]
+[node name="DailyRewardAlertLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/DailyRewardCard/RewardMargin/RewardItems" unique_id=1130074103]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.05, 0.05, 1)
 theme_override_font_sizes/font_size = 40
 text = "!"
 horizontal_alignment = 1
 
-[node name="DailyRewardButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems"]
+[node name="DailyRewardButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/DailyRewardCard/RewardMargin/RewardItems" unique_id=905173938]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 58)
+custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 20
 text = "Claim 100 coins"
+icon = ExtResource("9_coin")
+expand_icon = true
 
-[node name="DailyRewardTimerLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems"]
+[node name="DailyRewardTimerLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/DailyRewardCard/RewardMargin/RewardItems" unique_id=524872474]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.68, 1)
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 15
 text = "Next reward in 00:00:00"
 horizontal_alignment = 1
 
 [node name="SettingsButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=61001686]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 58)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "Settings"
+theme_override_font_sizes/font_size = 21
+text = "SETTINGS"
 
-[node name="AchievementsButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems"]
+[node name="AchievementsButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=2131690237]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(320, 58)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Achievements"
 
-[node name="StatsButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems"]
+[node name="StatsButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=1782024251]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 58)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "Stats"
-
-[node name="TutorialButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 58)
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "Tutorial"
+theme_override_font_sizes/font_size = 21
+text = "STATS"
 
 [node name="ResumeButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=1283971882]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 58)
+custom_minimum_size = Vector2(0, 62)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "Resume"
+theme_override_font_sizes/font_size = 22
+text = "RESUME GAME"
 
 [node name="ExitButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=133149255]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 58)
+custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "Exit"
+theme_override_font_sizes/font_size = 19
+text = "EXIT GAME"
 
 [node name="SettingsPanel" type="PanelContainer" parent="MenuOverlay/MenuCenter" unique_id=1540893940]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(470, 800)
+custom_minimum_size = Vector2(560, 920)
 layout_mode = 2
 
 [node name="SettingsMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/SettingsPanel" unique_id=1008871311]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
 
 [node name="SettingsItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin" unique_id=1521054987]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 12
+
+[node name="SettingsHeader" type="PanelContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=338131896]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HeaderMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsHeader" unique_id=2097464717]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 13
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 13
+
+[node name="HeaderItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsHeader/HeaderMargin" unique_id=959550366]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="SettingsTitle" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsHeader/HeaderMargin/HeaderItems" unique_id=1254542737]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "SETTINGS"
+horizontal_alignment = 1
+
+[node name="SettingsSubtitle" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsHeader/HeaderMargin/HeaderItems" unique_id=1394548333]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.64, 0.76, 1)
+theme_override_font_sizes/font_size = 14
+text = "Tune the game to your rhythm."
+horizontal_alignment = 1
+
+[node name="SettingsWallet" type="PanelContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=510771414]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="WalletMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsWallet" unique_id=332147846]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 7
+
+[node name="WalletRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsWallet/WalletMargin" unique_id=1448303885]
+layout_mode = 2
+theme_override_constants/separation = 10
 alignment = 1
 
-[node name="SettingsTitle" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1254542737]
+[node name="SettingsCoinIcon" type="TextureRect" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsWallet/WalletMargin/WalletRow" unique_id=230337958]
+custom_minimum_size = Vector2(38, 38)
 layout_mode = 2
-theme_override_font_sizes/font_size = 34
-text = "Settings"
-horizontal_alignment = 1
+texture = ExtResource("9_coin")
+expand_mode = 3
+stretch_mode = 5
 
-[node name="MenuCoinsLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=449419807]
+[node name="MenuCoinsLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsWallet/WalletMargin/WalletRow" unique_id=449419807]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.46, 1)
 theme_override_font_sizes/font_size = 22
 text = "Coins: 0"
-horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="ClickValueLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1219148480]
+[node name="ClickSettingsCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=2044367467]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "Click value: x1"
-horizontal_alignment = 1
 
-[node name="ClickPowerLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=839255026]
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/ClickSettingsCard" unique_id=1522701696]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/ClickSettingsCard/CardMargin" unique_id=2108644399]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="SectionTitle" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/ClickSettingsCard/CardMargin/CardItems" unique_id=831456525]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "CLICK POWER"
+
+[node name="ClickValueLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/ClickSettingsCard/CardMargin/CardItems" unique_id=1219148480]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "Use click value: x1"
-horizontal_alignment = 1
+text = "Click value: x1"
 
-[node name="ClickPowerSlider" type="HSlider" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1579943]
+[node name="ClickPowerLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/ClickSettingsCard/CardMargin/CardItems" unique_id=839255026]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(340, 34)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.74, 0.84, 1)
+theme_override_font_sizes/font_size = 17
+text = "Use click value: x1"
+
+[node name="ClickPowerSlider" type="HSlider" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/ClickSettingsCard/CardMargin/CardItems" unique_id=1579943]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 min_value = 1.0
 max_value = 1.0
 value = 1.0
 
-[node name="ClickVolumeLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=2117067300]
+[node name="AudioSettingsCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=2094168874]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/AudioSettingsCard" unique_id=1212271775]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/AudioSettingsCard/CardMargin" unique_id=1707819767]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="SectionTitle" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/AudioSettingsCard/CardMargin/CardItems" unique_id=1854154580]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.62, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "AUDIO"
+
+[node name="ClickVolumeLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/AudioSettingsCard/CardMargin/CardItems" unique_id=2117067300]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
 text = "Click sound: 100%"
-horizontal_alignment = 1
 
-[node name="ClickVolumeSlider" type="HSlider" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1671401183]
+[node name="ClickVolumeSlider" type="HSlider" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/AudioSettingsCard/CardMargin/CardItems" unique_id=1671401183]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(340, 34)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 value = 100.0
 
-[node name="UiVolumeLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1108128900]
+[node name="UiVolumeLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/AudioSettingsCard/CardMargin/CardItems" unique_id=1108128900]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 17
 text = "UI sound: 100%"
-horizontal_alignment = 1
 
-[node name="UiVolumeSlider" type="HSlider" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=2033636000]
+[node name="UiVolumeSlider" type="HSlider" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/AudioSettingsCard/CardMargin/CardItems" unique_id=2033636000]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(340, 34)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 value = 100.0
 
-[node name="SettingsPassiveGainLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems"]
+[node name="OfflineSettingsCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1737901609]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Offline gain: 1/min"
-horizontal_alignment = 1
 
-[node name="SettingsPassiveGainCostLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems"]
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/OfflineSettingsCard" unique_id=1407724792]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/OfflineSettingsCard/CardMargin" unique_id=1481418592]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="SectionTitle" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/OfflineSettingsCard/CardMargin/CardItems" unique_id=1715274384]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 1, 0.58, 1)
+theme_override_font_sizes/font_size = 17
+text = "OFFLINE INCOME"
+
+[node name="SettingsPassiveGainLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/OfflineSettingsCard/CardMargin/CardItems" unique_id=284902233]
 unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "Offline gain: 1/min"
+
+[node name="SettingsPassiveGainCostLabel" type="Label" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/OfflineSettingsCard/CardMargin/CardItems" unique_id=1749144440]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.74, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "Next offline gain: 1,000 coins"
+
+[node name="SettingsPassiveGainButton" type="Button" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/OfflineSettingsCard/CardMargin/CardItems" unique_id=211323818]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "Next offline gain: 1,000 coins"
-horizontal_alignment = 1
-
-[node name="SettingsPassiveGainButton" type="Button" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(340, 50)
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
 text = "Upgrade offline"
 
-[node name="OpenUpgradesButton" type="Button" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=2083552785]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(340, 58)
+[node name="SettingsActions" type="HBoxContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1863369366]
 layout_mode = 2
-theme_override_font_sizes/font_size = 23
-text = "Open Upgrades"
+theme_override_constants/separation = 10
 
-[node name="SettingsBackButton" type="Button" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=1256934517]
+[node name="OpenUpgradesButton" type="Button" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsActions" unique_id=2083552785]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(340, 58)
+custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
-theme_override_font_sizes/font_size = 23
-text = "Back"
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 19
+text = "UPGRADES"
+
+[node name="SettingsBackButton" type="Button" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsActions" unique_id=1256934517]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 19
+text = "BACK"
 
 [node name="UpgradesPanel" type="PanelContainer" parent="MenuOverlay/MenuCenter" unique_id=226920026]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(560, 1040)
+custom_minimum_size = Vector2(640, 1080)
 layout_mode = 2
 
 [node name="UpgradesMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel" unique_id=274954407]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
 
 [node name="UpgradesItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin" unique_id=219989880]
 layout_mode = 2
 theme_override_constants/separation = 12
-alignment = 1
 
-[node name="UpgradesTitle" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=1594089085]
+[node name="UpgradeHero" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=962611638]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HeroMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero" unique_id=122283979]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="HeroItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin" unique_id=789852290]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="UpgradesTitle" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems" unique_id=1594089085]
 layout_mode = 2
 theme_override_font_sizes/font_size = 34
-text = "Upgrades"
+text = "Build your click"
 horizontal_alignment = 1
 
-[node name="UpgradeCoinsLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=622211282]
+[node name="WalletChip" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems" unique_id=273039668]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(230, 54)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "Coins: 0"
-horizontal_alignment = 1
+size_flags_horizontal = 4
 
-[node name="UpgradeHeaderRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="WalletMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems/WalletChip" unique_id=1783814609]
 layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 7
+
+[node name="WalletRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems/WalletChip/WalletMargin" unique_id=258547510]
+layout_mode = 2
+theme_override_constants/separation = 10
 alignment = 1
 
-[node name="UpgradeInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHeaderRow"]
+[node name="WalletCoinIcon" type="TextureRect" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems/WalletChip/WalletMargin/WalletRow" unique_id=2033628707]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(38, 38)
+layout_mode = 2
+texture = ExtResource("9_coin")
+expand_mode = 3
+stretch_mode = 5
+
+[node name="WalletText" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems/WalletChip/WalletMargin/WalletRow" unique_id=1369928624]
+layout_mode = 2
+theme_override_constants/separation = -2
+
+[node name="UpgradeCoinsLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems/WalletChip/WalletMargin/WalletRow/WalletText" unique_id=622211282]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.5, 1)
+theme_override_font_sizes/font_size = 23
+text = "12,384"
+
+[node name="WalletCaption" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHero/HeroMargin/HeroItems/WalletChip/WalletMargin/WalletRow/WalletText" unique_id=739564202]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.62, 0.34, 1)
+theme_override_font_sizes/font_size = 11
+text = "COINS AVAILABLE"
+
+[node name="ClickUpgradeCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=1578405803]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard" unique_id=1006475449]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 11
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin" unique_id=2147205981]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems" unique_id=1465542021]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems/Header" unique_id=1426269063]
+custom_minimum_size = Vector2(62, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "TAP"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Name" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems/Header" unique_id=448150525]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+text = "CLICK POWER"
+vertical_alignment = 1
+
+[node name="UpgradeValueLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems/Header" unique_id=219106606]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "x1"
+vertical_alignment = 1
+
+[node name="UpgradeInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems/Header" unique_id=1311934591]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 34)
 layout_mode = 2
 tooltip_text = "Raises how many clicks every tap is worth."
 theme_override_colors/font_color = Color(0.42, 0.86, 1, 1)
-theme_override_font_sizes/font_size = 14
-text = "i"
+theme_override_font_sizes/font_size = 15
+text = "?"
 
-[node name="UpgradeValueLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/UpgradeHeaderRow" unique_id=219106606]
+[node name="ClickProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems" unique_id=771755921]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+show_percentage = false
+
+[node name="UpgradeCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems" unique_id=145146842]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.42, 0.86, 1, 1)
-theme_override_font_sizes/font_size = 22
-text = "Click value: x1"
+theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
+theme_override_font_sizes/font_size = 15
+text = "Next level costs 100 coins"
+
+[node name="UpgradePurchaseButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems" unique_id=729377960]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "BUY CLICK POWER"
+
+[node name="BonusChanceCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=1782764705]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard" unique_id=16051325]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 11
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin" unique_id=1687739147]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems" unique_id=497662541]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems/Header" unique_id=561401417]
+custom_minimum_size = Vector2(62, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "LUCK"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="UpgradeDescriptionLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-visible = false
+[node name="Name" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems/Header" unique_id=2047393351]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.84, 0.92, 1)
-theme_override_font_sizes/font_size = 16
-text = "Raises how many clicks every tap is worth."
-horizontal_alignment = 1
-autowrap_mode = 3
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+text = "BONUS CHANCE"
+vertical_alignment = 1
 
-[node name="UpgradeCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=145146842]
+[node name="BonusChanceLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems/Header" unique_id=55250274]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Next upgrade: 100 coins"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.72, 0.28, 1)
+theme_override_font_sizes/font_size = 24
+text = "0.1%"
+vertical_alignment = 1
 
-[node name="UpgradePurchaseButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=729377960]
+[node name="BonusChanceInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems/Header" unique_id=1180575889]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 62)
-layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "Buy x2"
-
-[node name="BonusChanceHeaderRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-layout_mode = 2
-alignment = 1
-
-[node name="BonusChanceInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceHeaderRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(34, 34)
 layout_mode = 2
 tooltip_text = "Raises the chance that a tap becomes a bonus."
 theme_override_colors/font_color = Color(1, 0.72, 0.28, 1)
-theme_override_font_sizes/font_size = 14
-text = "i"
+theme_override_font_sizes/font_size = 15
+text = "?"
 
-[node name="BonusChanceLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceHeaderRow"]
+[node name="BonusChanceProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems" unique_id=1443370115]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+show_percentage = false
+
+[node name="BonusChanceCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems" unique_id=138073535]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.72, 0.28, 1)
-theme_override_font_sizes/font_size = 21
-text = "Bonus chance: 0.1%"
+theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
+theme_override_font_sizes/font_size = 15
+text = "Next level costs 75 coins"
+
+[node name="BonusChanceButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems" unique_id=2068679532]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "BOOST LUCK"
+
+[node name="BonusValueCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=721020533]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard" unique_id=1483288956]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 11
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin" unique_id=449675682]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems" unique_id=1200217277]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems/Header" unique_id=251857836]
+custom_minimum_size = Vector2(62, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "CRIT"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="BonusChanceDescriptionLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-visible = false
+[node name="Name" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems/Header" unique_id=1262756673]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.84, 0.92, 1)
-theme_override_font_sizes/font_size = 16
-text = "Raises the chance that a tap becomes a bonus."
-horizontal_alignment = 1
-autowrap_mode = 3
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+text = "BONUS POWER"
+vertical_alignment = 1
 
-[node name="BonusChanceCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="BonusValueLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems/Header" unique_id=280540638]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Next chance upgrade: 75 coins"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.42, 0.52, 1)
+theme_override_font_sizes/font_size = 24
+text = "x2"
+vertical_alignment = 1
 
-[node name="BonusChanceButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="BonusValueInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems/Header" unique_id=510205278]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 54)
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Upgrade chance"
-
-[node name="BonusValueHeaderRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-layout_mode = 2
-alignment = 1
-
-[node name="BonusValueInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueHeaderRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(34, 34)
 layout_mode = 2
 tooltip_text = "Makes each bonus click multiply your tap by more."
-theme_override_colors/font_color = Color(1, 0.42, 0.42, 1)
-theme_override_font_sizes/font_size = 14
-text = "i"
+theme_override_colors/font_color = Color(1, 0.42, 0.52, 1)
+theme_override_font_sizes/font_size = 15
+text = "?"
 
-[node name="BonusValueLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueHeaderRow"]
+[node name="BonusValueProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems" unique_id=1734698549]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+show_percentage = false
+
+[node name="BonusValueCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems" unique_id=1659101702]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.42, 0.42, 1)
-theme_override_font_sizes/font_size = 21
-text = "Bonus value: x2"
+theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
+theme_override_font_sizes/font_size = 15
+text = "Next level costs 500 coins"
+
+[node name="BonusValueButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems" unique_id=1317329512]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "AMPLIFY BONUS"
+
+[node name="BonusStreakCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=559407746]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard" unique_id=1513471559]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 11
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin" unique_id=693700491]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems" unique_id=844587364]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems/Header" unique_id=2012415143]
+custom_minimum_size = Vector2(62, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "HEAT"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="BonusValueDescriptionLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-visible = false
+[node name="Name" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems/Header" unique_id=1645769186]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.84, 0.92, 1)
-theme_override_font_sizes/font_size = 16
-text = "Makes each bonus click multiply your tap by more."
-horizontal_alignment = 1
-autowrap_mode = 3
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+text = "STREAK BOOST"
+vertical_alignment = 1
 
-[node name="BonusValueCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="BonusStreakLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems/Header" unique_id=1385540838]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Next bonus value: x3"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.92, 0.18, 1)
+theme_override_font_sizes/font_size = 24
+text = "x2"
+vertical_alignment = 1
 
-[node name="BonusValueButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="BonusStreakInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems/Header" unique_id=1401443000]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 54)
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Upgrade bonus"
-
-[node name="BonusStreakHeaderRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-layout_mode = 2
-alignment = 1
-
-[node name="BonusStreakInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakHeaderRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(34, 34)
 layout_mode = 2
 tooltip_text = "If 2 of your last 5 taps are bonuses, the next bonus gets this extra multiplier."
 theme_override_colors/font_color = Color(1, 0.92, 0.18, 1)
-theme_override_font_sizes/font_size = 14
-text = "i"
+theme_override_font_sizes/font_size = 15
+text = "?"
 
-[node name="BonusStreakLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakHeaderRow"]
+[node name="BonusStreakProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems" unique_id=1986699575]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+show_percentage = false
+
+[node name="BonusStreakCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems" unique_id=1606129275]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.92, 0.18, 1)
-theme_override_font_sizes/font_size = 21
-text = "Bonus streak: x2"
+theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
+theme_override_font_sizes/font_size = 15
+text = "Next level costs 10,800 coins"
+
+[node name="BonusStreakButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems" unique_id=587514177]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "POWER UP STREAK"
+
+[node name="PassiveGainCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=837835359]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CardMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard" unique_id=217732347]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 11
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="CardItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin" unique_id=807320983]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems" unique_id=1340587511]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems/Header" unique_id=449154707]
+custom_minimum_size = Vector2(62, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "IDLE"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="BonusStreakDescriptionLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-visible = false
+[node name="Name" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems/Header" unique_id=702435740]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.84, 0.92, 1)
-theme_override_font_sizes/font_size = 16
-text = "If 2 of your last 5 taps are bonuses, the next bonus gets this extra multiplier."
-horizontal_alignment = 1
-autowrap_mode = 3
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+text = "OFFLINE INCOME"
+vertical_alignment = 1
 
-[node name="BonusStreakCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="PassiveGainLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems/Header" unique_id=2088860315]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Next streak: x3"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.48, 1, 0.58, 1)
+theme_override_font_sizes/font_size = 22
+text = "1/min"
+vertical_alignment = 1
 
-[node name="BonusStreakButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="PassiveGainInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems/Header" unique_id=1803435433]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 54)
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Upgrade streak"
-
-[node name="PassiveGainHeaderRow" type="HBoxContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-layout_mode = 2
-alignment = 1
-
-[node name="PassiveGainInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainHeaderRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(34, 34)
 layout_mode = 2
 tooltip_text = "Earns coins while away, with a low capped time limit."
 theme_override_colors/font_color = Color(0.48, 1, 0.58, 1)
-theme_override_font_sizes/font_size = 14
-text = "i"
+theme_override_font_sizes/font_size = 15
+text = "?"
 
-[node name="PassiveGainLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainHeaderRow"]
+[node name="PassiveGainProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems" unique_id=806130759]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+show_percentage = false
+
+[node name="PassiveGainCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems" unique_id=1825046092]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.48, 1, 0.58, 1)
-theme_override_font_sizes/font_size = 21
-text = "Offline gain: 1/min"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
+theme_override_font_sizes/font_size = 15
+text = "Next level costs 250 coins"
 
-[node name="PassiveGainDescriptionLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-visible = false
+[node name="OfflineInfoLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems" unique_id=1855070583]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.84, 0.92, 1)
-theme_override_font_sizes/font_size = 16
-text = "Earns coins while away, with a low capped time limit."
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.48, 0.82, 0.58, 1)
+theme_override_font_sizes/font_size = 13
+text = "Up to 3 hours of offline earnings."
 autowrap_mode = 3
 
-[node name="PassiveGainCostLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
+[node name="PassiveGainButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems" unique_id=731495598]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Next offline gain: 1,000 coins"
-horizontal_alignment = 1
-
-[node name="OfflineInfoLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 17
-text = "Offline gain is capped at 3 hours."
-horizontal_alignment = 1
-autowrap_mode = 3
-
-[node name="PassiveGainButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 54)
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Upgrade offline"
+theme_override_font_sizes/font_size = 19
+text = "GROW OFFLINE INCOME"
 
 [node name="UpgradesBackButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=65590167]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 58)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
-theme_override_font_sizes/font_size = 23
-text = "Back"
+theme_override_font_sizes/font_size = 20
+text = "BACK TO GAME"
 
-[node name="AchievementsPanel" type="PanelContainer" parent="MenuOverlay/MenuCenter"]
+[node name="AchievementsPanel" type="PanelContainer" parent="MenuOverlay/MenuCenter" unique_id=370900129]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(520, 620)
 layout_mode = 2
 
-[node name="AchievementsMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel"]
+[node name="AchievementsMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel" unique_id=1069513667]
 layout_mode = 2
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 24
 
-[node name="AchievementsItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin"]
+[node name="AchievementsItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin" unique_id=1815180694]
 layout_mode = 2
 theme_override_constants/separation = 16
 alignment = 1
 
-[node name="AchievementsTitle" type="Label" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems"]
+[node name="AchievementsTitle" type="Label" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=1164308463]
 layout_mode = 2
 theme_override_font_sizes/font_size = 34
 text = "Achievements"
 horizontal_alignment = 1
 
-[node name="AchievementsScroll" type="ScrollContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems"]
+[node name="AchievementsScroll" type="ScrollContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=349245574]
 custom_minimum_size = Vector2(460, 420)
 layout_mode = 2
 horizontal_scroll_mode = 0
 
-[node name="AchievementsListLabel" type="Label" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems/AchievementsScroll"]
+[node name="AchievementsListLabel" type="Label" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems/AchievementsScroll" unique_id=1378134283]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 18
 text = "Achievements"
 
-[node name="AchievementsBackButton" type="Button" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems"]
+[node name="AchievementsBackButton" type="Button" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=1290131042]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(360, 58)
 layout_mode = 2
 theme_override_font_sizes/font_size = 23
 text = "Back"
 
-[node name="StatsPanel" type="PanelContainer" parent="MenuOverlay/MenuCenter"]
+[node name="StatsPanel" type="PanelContainer" parent="MenuOverlay/MenuCenter" unique_id=1272962270]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(520, 620)
+custom_minimum_size = Vector2(610, 900)
 layout_mode = 2
 
-[node name="StatsMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/StatsPanel"]
+[node name="StatsMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/StatsPanel" unique_id=2120595473]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
 
-[node name="StatsItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin"]
+[node name="StatsItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin" unique_id=1458236202]
 layout_mode = 2
-theme_override_constants/separation = 16
-alignment = 1
+theme_override_constants/separation = 12
 
-[node name="StatsTitle" type="Label" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems"]
+[node name="StatsHeader" type="PanelContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems" unique_id=1837689325]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 34
-text = "Stats"
+
+[node name="HeaderMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems/StatsHeader" unique_id=438261848]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 13
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 13
+
+[node name="HeaderItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems/StatsHeader/HeaderMargin" unique_id=1399426910]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="StatsTitle" type="Label" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems/StatsHeader/HeaderMargin/HeaderItems" unique_id=364431383]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.76, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "STATS"
 horizontal_alignment = 1
 
-[node name="StatsListLabel" type="Label" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems"]
-unique_name_in_owner = true
+[node name="StatsSubtitle" type="Label" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems/StatsHeader/HeaderMargin/HeaderItems" unique_id=1683412776]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Stats"
+theme_override_colors/font_color = Color(0.58, 0.62, 0.76, 1)
+theme_override_font_sizes/font_size = 14
+text = "Your click empire at a glance."
+horizontal_alignment = 1
 
-[node name="StatsBackButton" type="Button" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 58)
+[node name="StatsScroll" type="ScrollContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems" unique_id=476372705]
+custom_minimum_size = Vector2(0, 660)
 layout_mode = 2
-theme_override_font_sizes/font_size = 23
-text = "Back"
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="StatsCards" type="VBoxContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems/StatsScroll" unique_id=146282289]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="StatsBackButton" type="Button" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems" unique_id=708688776]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "BACK"
 
 [node name="ClickPopupLayer" type="Control" parent="." unique_id=1544432264]
 unique_name_in_owner = true
@@ -735,12 +1182,12 @@ unique_name_in_owner = true
 stream = ExtResource("6_cat_meow")
 volume_db = -6.0
 
-[node name="BonusSound" type="AudioStreamPlayer" parent="."]
+[node name="BonusSound" type="AudioStreamPlayer" parent="." unique_id=114437736]
 unique_name_in_owner = true
 stream = ExtResource("8_bonus")
 volume_db = -7.0
 
-[node name="SpecialMilestoneSound" type="AudioStreamPlayer" parent="."]
+[node name="SpecialMilestoneSound" type="AudioStreamPlayer" parent="." unique_id=1134723712]
 unique_name_in_owner = true
 stream = ExtResource("7_special")
 volume_db = -7.0
