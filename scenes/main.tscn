@@ -19,19 +19,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_main")
 
-[node name="SaveTimer" type="Timer" parent="." unique_id=1664748510]
-unique_name_in_owner = true
-wait_time = 0.8
-one_shot = true
-
-[node name="DailyRewardTimer" type="Timer" parent="." unique_id=1621092547]
-unique_name_in_owner = true
-
-[node name="ComboTimer" type="Timer" parent="." unique_id=1596440821]
-unique_name_in_owner = true
-wait_time = 2.5
-one_shot = true
-
 [node name="Background" type="ColorRect" parent="." unique_id=728460180]
 layout_mode = 1
 anchors_preset = 15
@@ -132,13 +119,19 @@ texture = ExtResource("9_coin")
 expand_mode = 3
 stretch_mode = 5
 
-[node name="CoinsLabel" type="Label" parent="HudWallet/WalletMargin/WalletRow" unique_id=1187947586]
-unique_name_in_owner = true
+[node name="CoinsClip" type="Control" parent="HudWallet/WalletMargin/WalletRow" unique_id=1912120325]
+clip_contents = true
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="CoinsLabel" type="Label" parent="HudWallet/WalletMargin/WalletRow/CoinsClip" unique_id=1187947586]
+unique_name_in_owner = true
+layout_mode = 0
+offset_bottom = 48.0
 theme_override_colors/font_color = Color(1, 0.9, 0.58, 1)
 theme_override_font_sizes/font_size = 28
-text = "Coins: 0"
+text = "0"
 vertical_alignment = 1
 
 [node name="UpgradeButton" type="Button" parent="." unique_id=1440675590]
@@ -460,7 +453,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.88, 0.46, 1)
 theme_override_font_sizes/font_size = 22
-text = "Coins: 0"
+text = "0"
 vertical_alignment = 1
 
 [node name="ClickSettingsCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems" unique_id=2044367467]
@@ -734,15 +727,6 @@ theme_override_font_sizes/font_size = 24
 text = "x1"
 vertical_alignment = 1
 
-[node name="UpgradeInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems/Header" unique_id=1311934591]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(34, 34)
-layout_mode = 2
-tooltip_text = "Raises how many clicks every tap is worth."
-theme_override_colors/font_color = Color(0.42, 0.86, 1, 1)
-theme_override_font_sizes/font_size = 15
-text = "?"
-
 [node name="ClickProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems" unique_id=771755921]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 10)
@@ -804,15 +788,6 @@ theme_override_colors/font_color = Color(1, 0.72, 0.28, 1)
 theme_override_font_sizes/font_size = 24
 text = "0.1%"
 vertical_alignment = 1
-
-[node name="BonusChanceInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems/Header" unique_id=1180575889]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(34, 34)
-layout_mode = 2
-tooltip_text = "Raises the chance that a tap becomes a bonus."
-theme_override_colors/font_color = Color(1, 0.72, 0.28, 1)
-theme_override_font_sizes/font_size = 15
-text = "?"
 
 [node name="BonusChanceProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems" unique_id=1443370115]
 unique_name_in_owner = true
@@ -876,15 +851,6 @@ theme_override_font_sizes/font_size = 24
 text = "x2"
 vertical_alignment = 1
 
-[node name="BonusValueInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems/Header" unique_id=510205278]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(34, 34)
-layout_mode = 2
-tooltip_text = "Makes each bonus click multiply your tap by more."
-theme_override_colors/font_color = Color(1, 0.42, 0.52, 1)
-theme_override_font_sizes/font_size = 15
-text = "?"
-
 [node name="BonusValueProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems" unique_id=1734698549]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 10)
@@ -947,15 +913,6 @@ theme_override_font_sizes/font_size = 24
 text = "x2"
 vertical_alignment = 1
 
-[node name="BonusStreakInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems/Header" unique_id=1401443000]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(34, 34)
-layout_mode = 2
-tooltip_text = "If 2 of your last 5 taps are bonuses, the next bonus gets this extra multiplier."
-theme_override_colors/font_color = Color(1, 0.92, 0.18, 1)
-theme_override_font_sizes/font_size = 15
-text = "?"
-
 [node name="BonusStreakProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems" unique_id=1986699575]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 10)
@@ -1017,15 +974,6 @@ theme_override_colors/font_color = Color(0.48, 1, 0.58, 1)
 theme_override_font_sizes/font_size = 22
 text = "1/min"
 vertical_alignment = 1
-
-[node name="PassiveGainInfoButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems/Header" unique_id=1803435433]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(34, 34)
-layout_mode = 2
-tooltip_text = "Earns coins while away, with a low capped time limit."
-theme_override_colors/font_color = Color(0.48, 1, 0.58, 1)
-theme_override_font_sizes/font_size = 15
-text = "?"
 
 [node name="PassiveGainProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems" unique_id=806130759]
 unique_name_in_owner = true
@@ -1135,6 +1083,7 @@ theme_override_constants/margin_bottom = 13
 
 [node name="HeaderItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems/StatsHeader/HeaderMargin" unique_id=1399426910]
 layout_mode = 2
+size_flags_horizontal = 0
 theme_override_constants/separation = 2
 
 [node name="StatsTitle" type="Label" parent="MenuOverlay/MenuCenter/StatsPanel/StatsMargin/StatsItems/StatsHeader/HeaderMargin/HeaderItems" unique_id=364431383]
