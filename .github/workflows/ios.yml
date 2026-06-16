@@ -81,6 +81,7 @@ jobs:
           fi
           cp "$IOS_TEMPLATE_SOURCE" "$TEMPLATE_DIR/ios.zip"
           ls -la "$TEMPLATE_DIR"
+          test -f "$TEMPLATE_DIR/ios.zip"
 
           echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
 
