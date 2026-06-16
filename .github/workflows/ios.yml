@@ -67,8 +67,11 @@ jobs:
           curl -L -o "$RUNNER_TEMP/godot_templates.tpz" \
             "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
 
-          mkdir -p "$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION_DIR}"
-          unzip -q "$RUNNER_TEMP/godot_templates.tpz" -d "$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION_DIR}"
+          unzip -q "$RUNNER_TEMP/godot_templates.tpz" -d "$RUNNER_TEMP/godot_templates"
+
+          TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION_DIR}"
+          mkdir -p "$TEMPLATE_DIR"
+          cp "$RUNNER_TEMP/godot_templates/templates/"* "$TEMPLATE_DIR/"
 
           echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
 
