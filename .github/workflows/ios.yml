@@ -90,6 +90,10 @@ jobs:
           set -euo pipefail
 
           adb start-server
+          TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION_DIR}"
+          echo "Checking Godot templates in: $TEMPLATE_DIR"
+          ls -la "$TEMPLATE_DIR"
+          test -f "$TEMPLATE_DIR/ios.zip"
           mkdir -p "$IOS_BUILD_DIR"
           "$GODOT_BIN" --headless --path "$GODOT_PROJECT_PATH" --export-release "$GODOT_PRESET" "$IOS_BUILD_DIR/$IOS_PROJECT_NAME.xcodeproj"
 
