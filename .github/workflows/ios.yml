@@ -73,6 +73,13 @@ jobs:
           mkdir -p "$TEMPLATE_DIR"
           find "$RUNNER_TEMP/godot_templates" -type f -name '*.zip' -exec cp {} "$TEMPLATE_DIR/" \;
           find "$RUNNER_TEMP/godot_templates" -type f -name 'version.txt' -exec cp {} "$TEMPLATE_DIR/" \;
+          IOS_TEMPLATE_SOURCE="$(find "$RUNNER_TEMP/godot_templates" -type f \( -name 'ios.zip' -o -name '*ios*.zip' -o -name 'iphone*.zip' \) | head -n 1)"
+          if [ -z "$IOS_TEMPLATE_SOURCE" ]; then
+            echo "Could not find an iOS export template in the downloaded TPZ."
+            find "$RUNNER_TEMP/godot_templates" -maxdepth 4 -type f | sort
+            exit 1
+          fi
+          cp "$IOS_TEMPLATE_SOURCE" "$TEMPLATE_DIR/ios.zip"
           ls -la "$TEMPLATE_DIR"
 
           echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
