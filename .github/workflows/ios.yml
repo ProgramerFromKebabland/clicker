@@ -94,6 +94,7 @@ jobs:
           echo "Checking Godot templates in: $TEMPLATE_DIR"
           ls -la "$TEMPLATE_DIR"
           test -f "$TEMPLATE_DIR/ios.zip"
+          perl -0pi -e 's/application\/export_project_only=false/application\/export_project_only=true/' export_presets.cfg
           mkdir -p "$IOS_BUILD_DIR"
           "$GODOT_BIN" --headless --path "$GODOT_PROJECT_PATH" --export-release "$GODOT_PRESET" "$IOS_BUILD_DIR/$IOS_PROJECT_NAME.xcodeproj"
 
