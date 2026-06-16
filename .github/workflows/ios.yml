@@ -71,7 +71,9 @@ jobs:
 
           TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION_DIR}"
           mkdir -p "$TEMPLATE_DIR"
-          cp "$RUNNER_TEMP/godot_templates/templates/"* "$TEMPLATE_DIR/"
+          find "$RUNNER_TEMP/godot_templates" -type f -name '*.zip' -exec cp {} "$TEMPLATE_DIR/" \;
+          find "$RUNNER_TEMP/godot_templates" -type f -name 'version.txt' -exec cp {} "$TEMPLATE_DIR/" \;
+          ls -la "$TEMPLATE_DIR"
 
           echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
 
