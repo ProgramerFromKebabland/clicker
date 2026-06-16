@@ -13,7 +13,7 @@ env:
 
 jobs:
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-26
 
     steps:
       - name: Checkout repository
@@ -150,7 +150,7 @@ jobs:
             <key>destination</key>
             <string>export</string>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>${BUNDLE_ID}</key>
