@@ -8,7 +8,14 @@
 [ext_resource type="AudioStream" uid="uid://bbd5sk53nfhf0" path="res://assets/cat_meow.wav" id="6_cat_meow"]
 [ext_resource type="AudioStream" uid="uid://beqh07bxkxjp4" path="res://assets/special_milestone.wav" id="7_special"]
 [ext_resource type="AudioStream" uid="uid://dxvuttba7e65p" path="res://assets/bonus_chime.wav" id="8_bonus"]
-[ext_resource type="Texture2D" uid="uid://respuvmt6qj1" path="res://assets/coin.png" id="9_coin"]
+[ext_resource type="Texture2D" uid="uid://cdsicb6rsanvc" path="res://assets/cat_bowl.svg" id="9_coin"]
+[ext_resource type="Texture2D" uid="uid://c1f77x3tpmx1t" path="res://assets/kibble.svg" id="10_kibble"]
+[ext_resource type="AudioStream" uid="uid://drkkkenmijb8l" path="res://assets/reward_redeem.wav" id="10_reward_redeem"]
+[ext_resource type="Texture2D" uid="uid://b2tkncs7iqy4d" path="res://assets/environment/cozy_cat_lounge.png" id="11_room"]
+[ext_resource type="AudioStream" uid="uid://blwvna2o55lsc" path="res://assets/purchase_confirm.wav" id="12_purchase"]
+[ext_resource type="AudioStream" uid="uid://dw5e2ebtqb3hf" path="res://assets/crate_open.wav" id="13_crate_open"]
+[ext_resource type="AudioStream" uid="uid://dwsobqhld2nkl" path="res://assets/gem_reveal.wav" id="14_gem_reveal"]
+[ext_resource type="AudioStream" uid="uid://cmpei46qg4d2e" path="res://assets/gem_discovery.wav" id="15_gem_discovery"]
 
 [node name="Main" type="Control" unique_id=1858517946]
 layout_mode = 3
@@ -28,6 +35,30 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.075, 0.082, 0.095, 1)
 
+[node name="RoomBackground" type="TextureRect" parent="." unique_id=658005270]
+unique_name_in_owner = true
+modulate = Color(0.72, 0.76, 0.82, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("11_room")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="RoomVignette" type="ColorRect" parent="." unique_id=169859886]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.008, 0.02, 0.04, 0.22)
+
 [node name="GameLayer" type="MarginContainer" parent="." unique_id=1602258958]
 layout_mode = 1
 anchors_preset = 15
@@ -42,7 +73,7 @@ theme_override_constants/margin_bottom = 120
 
 [node name="GameBox" type="VBoxContainer" parent="GameLayer" unique_id=2125395265]
 layout_mode = 2
-theme_override_constants/separation = 28
+theme_override_constants/separation = 18
 alignment = 1
 
 [node name="ScoreLabel" type="Label" parent="GameLayer/GameBox" unique_id=1790752777]
@@ -54,19 +85,22 @@ horizontal_alignment = 1
 
 [node name="ComboLabel" type="Label" parent="GameLayer/GameBox" unique_id=164903011]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.88, 1, 1)
-theme_override_font_sizes/font_size = 24
-text = "Combo x1.0"
-horizontal_alignment = 1
+text = "COMBO x1.0"
 
 [node name="ComboTimerLabel" type="Label" parent="GameLayer/GameBox" unique_id=2056465341]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.78, 1)
-theme_override_font_sizes/font_size = 14
-text = "ready"
-horizontal_alignment = 1
+text = "0 / 8 TAPS"
+
+[node name="ComboProgressBar" type="ProgressBar" parent="GameLayer/GameBox" unique_id=628567115]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+max_value = 8.0
+show_percentage = false
 
 [node name="CatButton" type="TextureButton" parent="GameLayer/GameBox" unique_id=1113175424]
 unique_name_in_owner = true
@@ -83,7 +117,8 @@ stretch_mode = 5
 [node name="HintLabel" type="Label" parent="GameLayer/GameBox" unique_id=1690992318]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.64, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 18
 text = "Tap the cat"
 horizontal_alignment = 1
 
@@ -283,7 +318,7 @@ alignment = 1
 unique_name_in_owner = true
 custom_minimum_size = Vector2(42, 42)
 layout_mode = 2
-texture = ExtResource("9_coin")
+texture = ExtResource("10_kibble")
 expand_mode = 3
 stretch_mode = 5
 
@@ -292,7 +327,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.88, 0.46, 1)
 theme_override_font_sizes/font_size = 24
-text = "0 COINS"
+text = "0 KIBBLES"
 vertical_alignment = 1
 
 [node name="DailyRewardCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=404648928]
@@ -332,8 +367,8 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "Claim 100 coins"
-icon = ExtResource("9_coin")
+text = "Claim 100 kibbles"
+icon = ExtResource("10_kibble")
 expand_icon = true
 
 [node name="DailyRewardTimerLabel" type="Label" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems/DailyRewardCard/RewardMargin/RewardItems" unique_id=524872474]
@@ -444,7 +479,7 @@ alignment = 1
 [node name="SettingsCoinIcon" type="TextureRect" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/SettingsWallet/WalletMargin/WalletRow" unique_id=230337958]
 custom_minimum_size = Vector2(38, 38)
 layout_mode = 2
-texture = ExtResource("9_coin")
+texture = ExtResource("10_kibble")
 expand_mode = 3
 stretch_mode = 5
 
@@ -575,7 +610,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.68, 0.74, 0.84, 1)
 theme_override_font_sizes/font_size = 16
-text = "Next offline gain: 1,000 coins"
+text = "Next offline gain: 1,000 kibbles"
 
 [node name="SettingsPassiveGainButton" type="Button" parent="MenuOverlay/MenuCenter/SettingsPanel/SettingsMargin/SettingsItems/OfflineSettingsCard/CardMargin/CardItems" unique_id=211323818]
 unique_name_in_owner = true
@@ -664,7 +699,7 @@ alignment = 1
 unique_name_in_owner = true
 custom_minimum_size = Vector2(38, 38)
 layout_mode = 2
-texture = ExtResource("9_coin")
+texture = ExtResource("10_kibble")
 expand_mode = 3
 stretch_mode = 5
 
@@ -683,7 +718,7 @@ text = "12,384"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.62, 0.34, 1)
 theme_override_font_sizes/font_size = 11
-text = "COINS AVAILABLE"
+text = "KIBBLES READY"
 
 [node name="ClickUpgradeCard" type="PanelContainer" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems" unique_id=1578405803]
 unique_name_in_owner = true
@@ -738,7 +773,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
 theme_override_font_sizes/font_size = 15
-text = "Next level costs 100 coins"
+text = "Next level costs 100 kibbles"
 
 [node name="UpgradePurchaseButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems" unique_id=729377960]
 unique_name_in_owner = true
@@ -800,7 +835,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
 theme_override_font_sizes/font_size = 15
-text = "Next level costs 75 coins"
+text = "Next level costs 75 kibbles"
 
 [node name="BonusChanceButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems" unique_id=2068679532]
 unique_name_in_owner = true
@@ -862,7 +897,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
 theme_override_font_sizes/font_size = 15
-text = "Next level costs 500 coins"
+text = "Next level costs 500 kibbles"
 
 [node name="BonusValueButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems" unique_id=1317329512]
 unique_name_in_owner = true
@@ -924,7 +959,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
 theme_override_font_sizes/font_size = 15
-text = "Next level costs 10,800 coins"
+text = "Next level costs 10,800 kibbles"
 
 [node name="BonusStreakButton" type="Button" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems" unique_id=587514177]
 unique_name_in_owner = true
@@ -986,7 +1021,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.83, 0.91, 1)
 theme_override_font_sizes/font_size = 15
-text = "Next level costs 250 coins"
+text = "Next level costs 250 kibbles"
 
 [node name="OfflineInfoLabel" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems" unique_id=1855070583]
 unique_name_in_owner = true
@@ -1025,26 +1060,66 @@ theme_override_constants/margin_bottom = 24
 
 [node name="AchievementsItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin" unique_id=1815180694]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 12
 alignment = 1
 
 [node name="AchievementsTitle" type="Label" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=1164308463]
 layout_mode = 2
 theme_override_font_sizes/font_size = 34
-text = "Achievements"
+text = "ACHIEVEMENTS"
 horizontal_alignment = 1
 
-[node name="AchievementsScroll" type="ScrollContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=349245574]
-custom_minimum_size = Vector2(460, 420)
-layout_mode = 2
-horizontal_scroll_mode = 0
-
-[node name="AchievementsListLabel" type="Label" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems/AchievementsScroll" unique_id=1378134283]
+[node name="AchievementsSummary" type="PanelContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=1971046284]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
+
+[node name="SummaryMargin" type="MarginContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems/AchievementsSummary" unique_id=1131469463]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="SummaryItems" type="VBoxContainer" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems/AchievementsSummary/SummaryMargin" unique_id=916725018]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AchievementsProgressLabel" type="Label" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems/AchievementsSummary/SummaryMargin/SummaryItems" unique_id=315804967]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "0 / 1000 UNLOCKED"
+horizontal_alignment = 1
+
+[node name="AchievementsProgressBar" type="ProgressBar" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems/AchievementsSummary/SummaryMargin/SummaryItems" unique_id=1848940157]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+max_value = 1000.0
+show_percentage = false
+
+[node name="AchievementsFilter" type="OptionButton" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=2081174785]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "Achievements"
+item_count = 3
+popup/item_0/text = "ALL 1000"
+popup/item_0/id = 0
+popup/item_1/text = "UNLOCKED"
+popup/item_1/id = 1
+popup/item_2/text = "LOCKED"
+popup/item_2/id = 2
+
+[node name="AchievementsList" type="ItemList" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=1173480954]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(460, 420)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/line_separation = 8
+theme_override_font_sizes/font_size = 17
+allow_reselect = true
+same_column_width = true
 
 [node name="AchievementsBackButton" type="Button" parent="MenuOverlay/MenuCenter/AchievementsPanel/AchievementsMargin/AchievementsItems" unique_id=1290131042]
 unique_name_in_owner = true
@@ -1152,4 +1227,24 @@ volume_db = -7.0
 [node name="SpecialMilestoneSound" type="AudioStreamPlayer" parent="." unique_id=1134723712]
 unique_name_in_owner = true
 stream = ExtResource("7_special")
+
+[node name="RewardRedeemSound" type="AudioStreamPlayer" parent="." unique_id=454664298]
+unique_name_in_owner = true
+stream = ExtResource("10_reward_redeem")
+
+[node name="PurchaseSound" type="AudioStreamPlayer" parent="." unique_id=825874425]
+unique_name_in_owner = true
+stream = ExtResource("12_purchase")
+
+[node name="CrateOpenSound" type="AudioStreamPlayer" parent="." unique_id=1564916649]
+unique_name_in_owner = true
+stream = ExtResource("13_crate_open")
+
+[node name="GemRevealSound" type="AudioStreamPlayer" parent="." unique_id=662011792]
+unique_name_in_owner = true
+stream = ExtResource("14_gem_reveal")
+
+[node name="GemDiscoverySound" type="AudioStreamPlayer" parent="." unique_id=1738566179]
+unique_name_in_owner = true
+stream = ExtResource("15_gem_discovery")
 volume_db = -7.0

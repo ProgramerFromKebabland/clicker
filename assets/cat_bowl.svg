@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="rim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#dbe7ef"/>
+      <stop offset="100%" stop-color="#aebdcb"/>
+    </linearGradient>
+    <linearGradient id="bowl" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fffdf8"/>
+      <stop offset="100%" stop-color="#ebe4da"/>
+    </linearGradient>
+    <radialGradient id="kibblePile" cx="50%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#d7b18c"/>
+      <stop offset="60%" stop-color="#b77e50"/>
+      <stop offset="100%" stop-color="#7b4a28"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="48" cy="70" rx="36" ry="16" fill="#ffcb6a" opacity="0.16"/>
+  <ellipse cx="48" cy="68" rx="31" ry="12" fill="#ffefb8" opacity="0.2"/>
+  <ellipse cx="48" cy="36" rx="25" ry="15" fill="url(#kibblePile)"/>
+  <g fill="#8d5a33">
+    <ellipse cx="29" cy="37" rx="4.5" ry="3.6"/>
+    <ellipse cx="36" cy="31" rx="4.2" ry="3.4"/>
+    <ellipse cx="45" cy="33" rx="4.4" ry="3.5"/>
+    <ellipse cx="54" cy="31" rx="4.1" ry="3.3"/>
+    <ellipse cx="62" cy="36" rx="4.7" ry="3.7"/>
+    <ellipse cx="39" cy="39" rx="4.4" ry="3.5"/>
+    <ellipse cx="50" cy="40" rx="4.6" ry="3.5"/>
+    <ellipse cx="58" cy="42" rx="4.4" ry="3.4"/>
+  </g>
+  <path d="M20 41c1-8 13-15 28-15 15 0 27 7 28 15-4-6-14-9-28-9-13 0-23 3-28 9Z" fill="#f2ddc8" opacity="0.4"/>
+  <path d="M18 44h60c0 17-8 27-30 27S18 61 18 44Z" fill="url(#bowl)"/>
+  <path d="M16 43c0-4 3-7 7-7h50c4 0 7 3 7 7v5H16v-5Z" fill="url(#rim)"/>
+  <path d="M30 53l5-5 5 5" fill="#f4ebe1"/>
+  <path d="M56 53l5-5 5 5" fill="#f4ebe1"/>
+  <g fill="none" stroke="#7d6758" stroke-linecap="round" stroke-width="2">
+    <path d="M29 59h-8"/>
+    <path d="M29 62h-9"/>
+    <path d="M67 59h8"/>
+    <path d="M67 62h9"/>
+    <path d="M40 66c2 2 5 3 8 3 3 0 6-1 8-3"/>
+  </g>
+  <g fill="#6b5548">
+    <ellipse cx="39" cy="59" rx="2.3" ry="2.7"/>
+    <ellipse cx="57" cy="59" rx="2.3" ry="2.7"/>
+    <path d="M48 61c2 0 4 1 4 3-2 1-3 2-4 2s-3-1-4-2c0-2 2-3 4-3Z"/>
+  </g>
+</svg>
