@@ -12,7 +12,7 @@ func _init(game_ref) -> void:
 
 
 func update_score() -> void:
-	game.score_label.text = "Clicks: %s" % game._format_number(game.score)
+	game.score_label.text = game._format_number(game.score)
 
 
 func update_coins(animated: bool = true) -> void:
@@ -44,6 +44,9 @@ func set_coin_display(value: float) -> void:
 		game.skins_wallet_label.text = "%s KIBBLES" % formatted
 	if is_instance_valid(game.boost_wallet_label):
 		game.boost_wallet_label.text = "%s KIBBLES" % formatted
+	if is_instance_valid(game.food_wallet_label):
+		game.food_wallet_label.text = "%s KIBBLES" % formatted
+		game._update_food_ui()
 	if game.crate_logic != null:
 		game.crate_logic.update_wallet()
 
@@ -78,11 +81,11 @@ func spawn_coin_stream(amount: int, origin_global: Vector2) -> void:
 		particle.texture = KIBBLE_PARTICLE_TEXTURE
 		particle.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		particle.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		particle.custom_minimum_size = Vector2(18.0, 18.0)
-		particle.size = Vector2(18.0, 18.0)
+		particle.custom_minimum_size = Vector2(32.0, 32.0)
+		particle.size = Vector2(32.0, 32.0)
 		particle.pivot_offset = particle.size * 0.5
 		particle.position = start - particle.pivot_offset + Vector2(randf_range(-12.0, 12.0), randf_range(-10.0, 10.0))
-		particle.scale = Vector2(0.45, 0.45)
+		particle.scale = Vector2(0.58, 0.58)
 		particle.rotation = randf_range(-0.4, 0.4)
 		particle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		particle.z_index = 60
@@ -92,11 +95,11 @@ func spawn_coin_stream(amount: int, origin_global: Vector2) -> void:
 		var midpoint = (particle.position + destination) * 0.5 + Vector2(randf_range(-55.0, 55.0), randf_range(-120.0, -65.0))
 		var flight = game.create_tween()
 		flight.tween_interval(delay)
-		flight.tween_property(particle, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		flight.tween_property(particle, "scale", Vector2(1.08, 1.08), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		flight.parallel().tween_property(particle, "position", midpoint, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		flight.parallel().tween_property(particle, "rotation", particle.rotation + randf_range(1.2, 2.8), 0.28)
 		flight.tween_property(particle, "position", destination - particle.pivot_offset, 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-		flight.parallel().tween_property(particle, "scale", Vector2(0.68, 0.68), 0.34)
+		flight.parallel().tween_property(particle, "scale", Vector2(0.72, 0.72), 0.34)
 		flight.parallel().tween_property(particle, "modulate", Color(1.0, 0.95, 0.88, 0.82), 0.34)
 		flight.tween_callback(game._coin_particle_arrived.bind(particle))
 

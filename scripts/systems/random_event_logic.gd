@@ -17,6 +17,9 @@ var event_icon: TextureRect
 var progress_bar: ProgressBar
 var sparkle_label: Label
 var live_badge: Label
+var active_boosts_panel: PanelContainer
+var active_boosts_list: VBoxContainer
+var active_boosts_empty_label: Label
 var event_audio: AudioStreamPlayer
 var interaction_audio: AudioStreamPlayer
 var active_event := ""
@@ -58,7 +61,7 @@ func build_ui() -> void:
 	layer.name = "RandomEventLayer"
 	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.z_index = 20
+	layer.z_index = 4
 	game.add_child(layer)
 	event_audio = AudioStreamPlayer.new()
 	event_audio.name = "EventAudio"
@@ -70,36 +73,39 @@ func build_ui() -> void:
 	layer.add_child(interaction_audio)
 	banner = PanelContainer.new()
 	banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	banner.position = Vector2(-150, 6)
-	banner.size = Vector2(300, 270)
-	banner.mouse_filter = Control.MOUSE_FILTER_STOP
+	banner.position = Vector2(-92, 6)
+	banner.size = Vector2(184, 160)
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(banner)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.055, 0.075, 0.12, 0.96)
 	style.border_color = Color(1.0, 0.72, 0.12, 1.0)
-	style.set_border_width_all(4)
-	style.set_corner_radius_all(24)
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(18)
 	style.shadow_color = Color(1.0, 0.48, 0.05, 0.55)
 	style.shadow_size = 18
 	banner.add_theme_stylebox_override("panel", style)
 	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for side in ["margin_left", "margin_right"]:
-		margin.add_theme_constant_override(side, 16)
+		margin.add_theme_constant_override(side, 12)
 	for side in ["margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 10)
+		margin.add_theme_constant_override(side, 8)
 	banner.add_child(margin)
 	var column := VBoxContainer.new()
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 4)
+	column.add_theme_constant_override("separation", 3)
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(column)
 	live_badge = Label.new()
 	live_badge.text = "✦  LIMITED EVENT  ✦"
 	live_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	live_badge.add_theme_font_size_override("font_size", 11)
+	live_badge.add_theme_font_size_override("font_size", 9)
 	live_badge.add_theme_color_override("font_color", Color(1.0, 0.92, 0.58))
+	live_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(live_badge)
 	event_icon = TextureRect.new()
-	event_icon.custom_minimum_size = Vector2(96, 96)
+	event_icon.custom_minimum_size = Vector2(44, 44)
 	event_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	event_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	event_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -108,29 +114,33 @@ func build_ui() -> void:
 	sparkle_label = Label.new()
 	sparkle_label.text = "✦  ✧  ✦"
 	sparkle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sparkle_label.add_theme_font_size_override("font_size", 16)
+	sparkle_label.add_theme_font_size_override("font_size", 12)
 	sparkle_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.25))
 	sparkle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(sparkle_label)
 	var copy := VBoxContainer.new()
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	copy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(copy)
 	title_label = Label.new()
-	title_label.add_theme_font_size_override("font_size", 19)
+	title_label.add_theme_font_size_override("font_size", 15)
 	title_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.38))
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(title_label)
 	detail_label = Label.new()
-	detail_label.add_theme_font_size_override("font_size", 12)
+	detail_label.add_theme_font_size_override("font_size", 9)
 	detail_label.add_theme_color_override("font_color", Color(0.9, 0.93, 1.0))
 	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(detail_label)
 	timer_label = Label.new()
 	progress_bar = ProgressBar.new()
-	progress_bar.custom_minimum_size.y = 7
+	progress_bar.custom_minimum_size.y = 6
 	progress_bar.show_percentage = false
+	progress_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var progress_bg := StyleBoxFlat.new()
 	progress_bg.bg_color = Color(0.02, 0.025, 0.06, 0.9)
 	progress_bg.set_corner_radius_all(5)
@@ -142,14 +152,16 @@ func build_ui() -> void:
 	progress_fill.shadow_size = 5
 	progress_bar.add_theme_stylebox_override("fill", progress_fill)
 	copy.add_child(progress_bar)
-	timer_label.add_theme_font_size_override("font_size", 12)
+	timer_label.add_theme_font_size_override("font_size", 10)
 	timer_label.add_theme_color_override("font_color", Color(0.7, 0.78, 0.9))
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	timer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(timer_label)
 	action_button = Button.new()
-	action_button.custom_minimum_size = Vector2(190, 46)
+	action_button.custom_minimum_size = Vector2(132, 30)
 	action_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	action_button.add_theme_font_size_override("font_size", 13)
+	action_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	action_button.add_theme_font_size_override("font_size", 10)
 	action_button.add_theme_color_override("font_color", Color.WHITE)
 	action_button.add_theme_color_override("font_hover_color", Color.WHITE)
 	var button_normal := StyleBoxFlat.new()
@@ -171,10 +183,13 @@ func build_ui() -> void:
 	action_button.pressed.connect(_on_action_pressed)
 	column.add_child(action_button)
 	banner.hide()
+	_build_active_boosts_panel()
 
 func process(delta: float) -> void:
 	if game.menu_overlay.visible or game.tutorial_active or game.tutorial_prompt_visible:
+		_update_active_boosts_panel()
 		return
+	_update_active_boosts_panel()
 	if active_event.is_empty():
 		next_event_time -= delta
 		if next_event_time <= 0.0:
@@ -238,6 +253,7 @@ func _start_random_event() -> void:
 			action_button.disabled = game.coins < merchant_cost
 	timer_label.text = "%ds remaining" % ceili(event_time_left)
 	banner.show()
+	_update_active_boosts_panel()
 	_start_icon_animation()
 	_start_sparkle_animation()
 	_start_button_animation()
@@ -395,3 +411,114 @@ func _end_event(message := "") -> void:
 		tween.tween_interval(2.5)
 		tween.tween_callback(func(): game.hint_label.text = "Tap the cat")
 	banner.hide()
+	_update_active_boosts_panel()
+
+func _build_active_boosts_panel() -> void:
+	active_boosts_panel = PanelContainer.new()
+	active_boosts_panel.name = "ActiveBoostsPanel"
+	active_boosts_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	active_boosts_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	active_boosts_panel.position = Vector2(-238, 126)
+	active_boosts_panel.size = Vector2(218, 0)
+	active_boosts_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(active_boosts_panel)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.035, 0.045, 0.08, 0.88)
+	style.border_color = Color(0.72, 0.5, 1.0, 0.72)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(15)
+	style.shadow_color = Color(0.35, 0.2, 0.8, 0.35)
+	style.shadow_size = 10
+	active_boosts_panel.add_theme_stylebox_override("panel", style)
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	active_boosts_panel.add_child(margin)
+	active_boosts_list = VBoxContainer.new()
+	active_boosts_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	active_boosts_list.add_theme_constant_override("separation", 4)
+	margin.add_child(active_boosts_list)
+	var title := Label.new()
+	title.text = "ACTIVE BOOSTS"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 10)
+	title.add_theme_color_override("font_color", Color(0.93, 0.86, 1.0, 1.0))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	active_boosts_list.add_child(title)
+	active_boosts_empty_label = Label.new()
+	active_boosts_empty_label.text = "None active"
+	active_boosts_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	active_boosts_empty_label.add_theme_font_size_override("font_size", 10)
+	active_boosts_empty_label.add_theme_color_override("font_color", Color(0.6, 0.66, 0.76, 1.0))
+	active_boosts_empty_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	active_boosts_list.add_child(active_boosts_empty_label)
+	active_boosts_panel.hide()
+
+func _update_active_boosts_panel() -> void:
+	if not is_instance_valid(active_boosts_panel) or game.boost_logic == null:
+		return
+	for index in range(active_boosts_list.get_child_count() - 1, 1, -1):
+		active_boosts_list.get_child(index).free()
+	var has_active_boost := false
+	for data in BoostLogic.BOOST_DATA:
+		var boost_id := String(data["id"])
+		var remaining: float = game.boost_logic.get_remaining_seconds(boost_id)
+		var is_tap_boost: bool = boost_id == "nine_lives" and game.nine_lives_taps_left > 0
+		if remaining <= 0.0 and not is_tap_boost:
+			continue
+		has_active_boost = true
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 5)
+		active_boosts_list.add_child(row)
+		var dot := Label.new()
+		dot.text = "•"
+		dot.add_theme_font_size_override("font_size", 14)
+		dot.add_theme_color_override("font_color", data["accent"] as Color)
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(dot)
+		var name := Label.new()
+		name.text = String(data["name"]).capitalize()
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name.add_theme_font_size_override("font_size", 11)
+		name.add_theme_color_override("font_color", Color.WHITE)
+		name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(name)
+		var time := Label.new()
+		time.text = "%d taps" % game.nine_lives_taps_left if is_tap_boost else game.boost_logic.format_seconds(remaining)
+		time.add_theme_font_size_override("font_size", 11)
+		time.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
+		time.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(time)
+	game._cleanup_food_boosts()
+	for data in game.FOOD_BOOSTS:
+		var boost_id := String(data["id"])
+		var remaining := float(game.active_food_boosts.get(boost_id, 0.0)) - Time.get_unix_time_from_system()
+		if remaining <= 0.0:
+			continue
+		has_active_boost = true
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 5)
+		active_boosts_list.add_child(row)
+		var dot := Label.new()
+		dot.text = "•"
+		dot.add_theme_color_override("font_color", Color(1.0, 0.68, 0.26, 1.0))
+		row.add_child(dot)
+		var name := Label.new()
+		name.text = String(data["name"])
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name.add_theme_font_size_override("font_size", 11)
+		name.add_theme_color_override("font_color", Color.WHITE)
+		row.add_child(name)
+		var time := Label.new()
+		time.text = game.boost_logic.format_seconds(remaining)
+		time.add_theme_font_size_override("font_size", 11)
+		time.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
+		row.add_child(time)
+	active_boosts_empty_label.visible = not has_active_boost
+	active_boosts_panel.visible = has_active_boost or not active_event.is_empty()

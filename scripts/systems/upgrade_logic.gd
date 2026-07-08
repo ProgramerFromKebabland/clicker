@@ -115,7 +115,9 @@ func update_extended_upgrade_ui() -> void:
 		var cost: int = get_extended_upgrade_cost(upgrade_data, level)
 		cost_label.text = "%s  |  %s kibbles" % [get_extended_upgrade_next_text(upgrade_id, level + 1), game._format_number(cost)]
 		game._set_upgrade_progress(progress_bar, cost)
-		set_upgrade_button_state(button, "UPGRADE TO LEVEL %d" % (level + 1), game.coins < cost, cost)
+		var button_text := "%s KIBBLES" % game._format_number(cost) if String(upgrade_data.get("category", "classical")) == "advanced" else "UPGRADE TO LEVEL %d" % (level + 1)
+		var displayed_cost := -1 if String(upgrade_data.get("category", "classical")) == "advanced" else cost
+		set_upgrade_button_state(button, button_text, game.coins < cost, displayed_cost)
 
 
 func set_upgrade_button_state(button: Button, ready_text: String, disabled: bool, cost: int = -1) -> void:
@@ -239,7 +241,7 @@ func get_passive_upgrade_cost() -> int:
 
 
 func roll_bonus_multiplier() -> int:
-	var chance: float = minf(100.0, get_bonus_chance_percent() + game.boost_logic.get_temporary_bonus_chance())
+	var chance: float = minf(100.0, get_bonus_chance_percent() + game.boost_logic.get_temporary_bonus_chance() + game.get_food_bonus_chance_bonus())
 	if not game._is_bonus_guaranteed() and randf() > chance / 100.0:
 		return 1
 	return get_bonus_multiplier()

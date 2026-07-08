@@ -40,10 +40,13 @@ func save_game() -> void:
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_OWNED_SKINS_KEY, PackedStringArray(game.owned_skin_ids))
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EQUIPPED_SKIN_KEY, game.equipped_skin_id)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EQUIPPED_ROOM_SKIN_KEY, game.equipped_room_skin_id)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_UI_TINT_KEY, game.ui_tint.to_html(false))
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EXTENDED_UPGRADES_KEY, game.extended_upgrade_levels)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_FOOD_INVENTORY_KEY, game.food_inventory)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_TUTORIAL_COMPLETED_KEY, game.tutorial_completed)
 	save_file.set_value(game.SAVE_SECTION, "active_boost_end_times", game.active_boost_end_times)
 	save_file.set_value(game.SAVE_SECTION, "boost_recharge_end_times", game.boost_recharge_end_times)
+	save_file.set_value(game.SAVE_SECTION, "active_food_boosts", game.active_food_boosts)
 	save_file.set_value(game.SAVE_SECTION, "nine_lives_taps_left", game.nine_lives_taps_left)
 	save_file.set_value(game.SAVE_SECTION, "nine_lives_recharge_duration", game.nine_lives_recharge_duration)
 	if game.crate_logic != null:
@@ -105,6 +108,8 @@ func load_game() -> void:
 	game.equipped_room_skin_id = String(save_file.get_value(game.SAVE_SECTION, game.SAVE_EQUIPPED_ROOM_SKIN_KEY, game.DEFAULT_ROOM_SKIN_ID))
 	if game._get_room_skin_data(game.equipped_room_skin_id).is_empty():
 		game.equipped_room_skin_id = game.DEFAULT_ROOM_SKIN_ID
+	var saved_ui_tint := String(save_file.get_value(game.SAVE_SECTION, game.SAVE_UI_TINT_KEY, game.DEFAULT_UI_TINT.to_html(false)))
+	game.ui_tint = Color.from_string(saved_ui_tint, game.DEFAULT_UI_TINT)
 	var saved_extended_upgrades: Dictionary = save_file.get_value(game.SAVE_SECTION, game.SAVE_EXTENDED_UPGRADES_KEY, {})
 	for raw_upgrade_data in game.EXTENDED_UPGRADE_DATA:
 		var upgrade_data: Dictionary = raw_upgrade_data
@@ -113,6 +118,12 @@ func load_game() -> void:
 		game.extended_upgrade_levels[upgrade_id] = clampi(int(saved_extended_upgrades.get(upgrade_id, 0)), 0, max_level)
 	game.active_boost_end_times = save_file.get_value(game.SAVE_SECTION, "active_boost_end_times", {})
 	game.boost_recharge_end_times = save_file.get_value(game.SAVE_SECTION, "boost_recharge_end_times", {})
+	game.active_food_boosts = save_file.get_value(game.SAVE_SECTION, "active_food_boosts", {})
+	var saved_food_inventory: Dictionary = save_file.get_value(game.SAVE_SECTION, game.SAVE_FOOD_INVENTORY_KEY, {})
+	game.food_inventory.clear()
+	for index in range(game.FOOD_NAMES.size()):
+		var food_id: String = game._get_food_id(index)
+		game.food_inventory[food_id] = maxi(0, int(saved_food_inventory.get(food_id, 0)))
 	game.nine_lives_taps_left = maxi(0, int(save_file.get_value(game.SAVE_SECTION, "nine_lives_taps_left", 0)))
 	game.nine_lives_recharge_duration = maxf(0.0, float(save_file.get_value(game.SAVE_SECTION, "nine_lives_recharge_duration", 0.0)))
 	if game.crate_logic != null:

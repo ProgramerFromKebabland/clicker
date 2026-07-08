@@ -8,11 +8,9 @@ const WEEK_SECONDS := 604800
 var game
 var level := 0
 var progress := 0
-var lifetime_levels := 0
-var permanent_milestones := 0
+var rewards_earned := 0
 var crate_keys := 0
-var aura_unlocked := false
-var title_unlocked := false
+var cozy_crates := 0
 var week_id := 0
 var boost_end_time := 0
 
@@ -91,45 +89,62 @@ func get_cost(for_level: int = level) -> int:
 
 func _donate() -> void:
 	_check_week()
-	var amount := mini(game.coins, maxi(0, int(donate_edit.text)))
+	var amount: int = mini(game.coins, maxi(0, int(donate_edit.text)))
 	if amount <= 0 or not game._spend_coins(amount): return
 	progress += amount
 	while progress >= get_cost():
-		progress -= get_cost(); level += 1; lifetime_levels += 1; _grant_reward()
+		progress -= get_cost(); level += 1; _grant_reward()
 	donate_edit.clear(); game._update_coins(false); game._update_score(); update_ui(); game._queue_save()
 
 func _grant_reward() -> void:
-	match lifetime_levels % 5:
-		1: crate_keys += 1
+	rewards_earned += 1
+	match (rewards_earned - 1) % 6:
+		0: _grant_gem()
+		1: cozy_crates += 1
 		2: boost_end_time = maxi(boost_end_time, int(Time.get_unix_time_from_system())) + 600
-		3: aura_unlocked = true
-		4: title_unlocked = true
-		0: permanent_milestones += 1
+		3: _grant_food()
+		4:
+			var kibble_reward: int = maxi(1000, get_cost(maxi(0, level - 1)) / 4)
+			game._add_score(kibble_reward); game._add_coins(kibble_reward)
+		5: crate_keys += 1
 	if game.special_milestone_sound != null: game.special_milestone_sound.play()
 
+func _grant_gem() -> void:
+	if game.crate_logic == null: return
+	var candidates: Array[String] = []
+	for skin: Dictionary in game.SKIN_DATA:
+		var skin_id: String = String(skin["id"])
+		if game.crate_logic.get_fragments(skin_id) < game.crate_logic.MAX_GEM_FRAGMENTS: candidates.append(skin_id)
+	if candidates.is_empty(): return
+	var skin_id: String = candidates.pick_random()
+	game.crate_logic.gem_fragments[skin_id] = game.crate_logic.get_fragments(skin_id) + 1
+
+func _grant_food() -> void:
+	var food_id: String = "food_%02d" % randi_range(0, game.FOOD_NAMES.size() - 1)
+	game.food_inventory[food_id] = int(game.food_inventory.get(food_id, 0)) + 1
+
 func get_gain_multiplier() -> float:
-	var permanent := 1.0 + permanent_milestones * 0.0025
-	return permanent * (1.5 if int(Time.get_unix_time_from_system()) < boost_end_time else 1.0)
+	return 1.5 if int(Time.get_unix_time_from_system()) < boost_end_time else 1.0
 
 func _check_week() -> void:
-	var current := int(Time.get_unix_time_from_system()) / WEEK_SECONDS
+	var current: int = int(Time.get_unix_time_from_system()) / WEEK_SECONDS
 	if week_id == 0: week_id = current
 	elif week_id != current: week_id = current; level = 0; progress = 0
 
 func update_ui() -> void:
 	if not is_instance_valid(level_label): return
 	_check_week()
-	var cost := get_cost()
+	var cost: int = get_cost()
 	level_label.text = "WEEKLY BOWL  •  LEVEL %d" % level
 	progress_bar.max_value = cost; progress_bar.value = progress
 	progress_label.text = "%s / %s KIBBLE" % [game._format_number(progress), game._format_number(cost)]
 	wallet_label.text = "WALLET: %s KIBBLE" % game._format_number(game.coins)
-	var reward_names := ["CRATE KEY", "10 MIN +50% BOOST", "COSMETIC AURA", "TITLE", "+0.25% PERMANENT GAIN"]
-	reward_label.text = "NEXT REWARD: %s\nLevels become substantially more expensive (×2.35 each)." % reward_names[lifetime_levels % 5]
-	milestone_label.text = "PERMANENT LEGACY\n%d lifetime levels  •  %d keys  •  +%.2f%% all gain\nAura: %s  •  Title: %s" % [lifetime_levels, crate_keys, permanent_milestones * 0.25, "UNLOCKED" if aura_unlocked else "LOCKED", "BOTTOMLESS BENEFACTOR" if title_unlocked else "LOCKED"]
+	var reward_names: Array[String] = ["CAT GEM", "COZY CRATE", "10 MIN +50% BOOST", "FOOD", "KIBBLES", "UNIVERSAL CRATE KEY"]
+	reward_label.text = "NEXT REWARD: %s\nLevels become substantially more expensive (×2.35 each)." % reward_names[rewards_earned % reward_names.size()]
+	milestone_label.text = "BOWL REWARDS\n%d earned  •  %d Cozy Crates  •  %d universal keys\nKeys make any crate free. Cozy Crates make a Cozy Crate free." % [rewards_earned, cozy_crates, crate_keys]
 
 func get_save_data() -> Dictionary:
-	return {"level": level, "progress": progress, "lifetime_levels": lifetime_levels, "permanent_milestones": permanent_milestones, "crate_keys": crate_keys, "aura_unlocked": aura_unlocked, "title_unlocked": title_unlocked, "week_id": week_id, "boost_end_time": boost_end_time}
+	return {"level": level, "progress": progress, "rewards_earned": rewards_earned, "crate_keys": crate_keys, "cozy_crates": cozy_crates, "week_id": week_id, "boost_end_time": boost_end_time}
 
 func load_save_data(data: Dictionary) -> void:
-	level = maxi(0, int(data.get("level", 0))); progress = maxi(0, int(data.get("progress", 0))); lifetime_levels = maxi(0, int(data.get("lifetime_levels", 0))); permanent_milestones = maxi(0, int(data.get("permanent_milestones", 0))); crate_keys = maxi(0, int(data.get("crate_keys", 0))); aura_unlocked = bool(data.get("aura_unlocked", false)); title_unlocked = bool(data.get("title_unlocked", false)); week_id = int(data.get("week_id", 0)); boost_end_time = int(data.get("boost_end_time", 0)); _check_week()
+	level = maxi(0, int(data.get("level", 0))); progress = maxi(0, int(data.get("progress", 0))); rewards_earned = maxi(0, int(data.get("rewards_earned", data.get("lifetime_levels", 0)))); crate_keys = maxi(0, int(data.get("crate_keys", 0))); cozy_crates = maxi(0, int(data.get("cozy_crates", 0))); week_id = int(data.get("week_id", 0)); boost_end_time = int(data.get("boost_end_time", 0)); _check_week()

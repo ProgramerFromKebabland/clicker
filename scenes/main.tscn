@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c4ij5cb7scyqy" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Texture2D" uid="uid://db7sppox7s5tn" path="res://assets/cat1.png" id="2_cat"]
-[ext_resource type="Texture2D" uid="uid://bf03cr836j7of" path="res://assets/pause_button.png" id="3_pause"]
+[ext_resource type="Texture2D" uid="uid://b4tjr1mrw7cga" path="res://assets/ui/pause_icon.png" id="3_pause"]
 [ext_resource type="AudioStream" uid="uid://b1gt4kn55vyhy" path="res://assets/cat_click.wav" id="4_cat_click"]
 [ext_resource type="AudioStream" uid="uid://yar7bup4ebkm" path="res://assets/ui_select.wav" id="5_ui_select"]
 [ext_resource type="AudioStream" uid="uid://bbd5sk53nfhf0" path="res://assets/cat_meow.wav" id="6_cat_meow"]
@@ -16,6 +16,7 @@
 [ext_resource type="AudioStream" uid="uid://dw5e2ebtqb3hf" path="res://assets/crate_open.wav" id="13_crate_open"]
 [ext_resource type="AudioStream" uid="uid://dwsobqhld2nkl" path="res://assets/gem_reveal.wav" id="14_gem_reveal"]
 [ext_resource type="AudioStream" uid="uid://cmpei46qg4d2e" path="res://assets/gem_discovery.wav" id="15_gem_discovery"]
+[ext_resource type="Texture2D" uid="uid://cam7we76q3p5p" path="res://assets/ui/upgrade_icon.png" id="16_upgrade"]
 
 [node name="Main" type="Control" unique_id=1858517946]
 layout_mode = 3
@@ -80,7 +81,7 @@ alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 42
-text = "Clicks: 0"
+text = "0"
 horizontal_alignment = 1
 
 [node name="ComboLabel" type="Label" parent="GameLayer/GameBox" unique_id=164903011]
@@ -129,9 +130,9 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 24.0
-offset_top = -90.0
+offset_top = -166.0
 offset_right = 324.0
-offset_bottom = -24.0
+offset_bottom = -100.0
 grow_vertical = 0
 
 [node name="WalletMargin" type="MarginContainer" parent="HudWallet" unique_id=73964489]
@@ -184,47 +185,50 @@ offset_right = -24.0
 offset_bottom = -24.0
 grow_horizontal = 0
 grow_vertical = 0
+theme_override_constants/icon_max_width = 42
 theme_override_font_sizes/font_size = 21
-text = "UPGRADES"
+text = "UPGRADE"
+icon = ExtResource("16_upgrade")
+expand_icon = true
 
 [node name="UpgradeAlertBadge" type="PanelContainer" parent="." unique_id=762823395]
 unique_name_in_owner = true
 visible = false
 z_index = 5
-custom_minimum_size = Vector2(46, 46)
+custom_minimum_size = Vector2(36, 36)
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -66.0
-offset_top = -110.0
-offset_right = -20.0
-offset_bottom = -64.0
+offset_left = -68.0
+offset_top = -82.0
+offset_right = -32.0
+offset_bottom = -46.0
 grow_horizontal = 0
 grow_vertical = 0
 mouse_filter = 2
 
 [node name="AlertLabel" type="Label" parent="UpgradeAlertBadge" unique_id=1890454595]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.08, 0.12, 1)
-theme_override_font_sizes/font_size = 27
+theme_override_colors/font_color = Color(1, 0.28, 0.34, 1)
+theme_override_font_sizes/font_size = 21
 text = "!"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="MenuButton" type="TextureButton" parent="." unique_id=106497307]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(68, 68)
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -116.0
+offset_left = -88.0
 offset_top = 20.0
 offset_right = -20.0
-offset_bottom = 116.0
+offset_bottom = 88.0
 grow_horizontal = 0
 grow_vertical = 0
 tooltip_text = "Pause"
@@ -236,6 +240,7 @@ stretch_mode = 5
 
 [node name="MenuOverlay" type="ColorRect" parent="." unique_id=152133529]
 unique_name_in_owner = true
+z_index = 10
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -740,9 +745,9 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/ClickUpgradeCard/CardMargin/CardItems/Header" unique_id=1426269063]
-custom_minimum_size = Vector2(62, 30)
+custom_minimum_size = Vector2(94, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 17
 text = "TAP"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -802,9 +807,9 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusChanceCard/CardMargin/CardItems/Header" unique_id=561401417]
-custom_minimum_size = Vector2(62, 30)
+custom_minimum_size = Vector2(94, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 17
 text = "LUCK"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -864,9 +869,9 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusValueCard/CardMargin/CardItems/Header" unique_id=251857836]
-custom_minimum_size = Vector2(62, 30)
+custom_minimum_size = Vector2(94, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 17
 text = "CRIT"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -926,9 +931,9 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/BonusStreakCard/CardMargin/CardItems/Header" unique_id=2012415143]
-custom_minimum_size = Vector2(62, 30)
+custom_minimum_size = Vector2(94, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 17
 text = "HEAT"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -988,9 +993,9 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Badge" type="Label" parent="MenuOverlay/MenuCenter/UpgradesPanel/UpgradesMargin/UpgradesItems/PassiveGainCard/CardMargin/CardItems/Header" unique_id=449154707]
-custom_minimum_size = Vector2(62, 30)
+custom_minimum_size = Vector2(94, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 17
 text = "IDLE"
 horizontal_alignment = 1
 vertical_alignment = 1

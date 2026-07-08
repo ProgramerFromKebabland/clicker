@@ -18,6 +18,8 @@ const CRATE_DATA: Array[Dictionary] = [
 		"picks": 1,
 		"fragments": 1,
 		"accent": Color(0.27, 0.86, 0.95, 1.0),
+		"art": "res://assets/generated/cat_crate_closed.png",
+		"open_art": "res://assets/generated/cat_crate_open.png",
 		"rarities": [["common", 0.82], ["rare", 0.16], ["epic", 0.02]],
 	},
 	{
@@ -28,6 +30,8 @@ const CRATE_DATA: Array[Dictionary] = [
 		"picks": 2,
 		"fragments": 2,
 		"accent": Color(0.72, 0.42, 1.0, 1.0),
+		"art": "res://assets/generated/chests/sparkle.png",
+		"open_art": "res://assets/generated/chests/sparkle_open.png",
 		"rarities": [["common", 0.34], ["rare", 0.45], ["epic", 0.19], ["mythic", 0.02]],
 	},
 	{
@@ -38,7 +42,33 @@ const CRATE_DATA: Array[Dictionary] = [
 		"picks": 3,
 		"fragments": 4,
 		"accent": Color(1.0, 0.72, 0.18, 1.0),
+		"art": "res://assets/generated/chests/royal.png",
+		"open_art": "res://assets/generated/chests/royal_open.png",
 		"rarities": [["rare", 0.22], ["epic", 0.52], ["mythic", 0.26]],
+	},
+	{
+		"id": "celestial",
+		"name": "CELESTIAL CHEST",
+		"tagline": "Moonlit treasure from the stars",
+		"cost": 12000000,
+		"picks": 4,
+		"fragments": 7,
+		"accent": Color(0.25, 0.76, 1.0, 1.0),
+		"art": "res://assets/generated/chests/celestial.png",
+		"open_art": "res://assets/generated/chests/celestial_open.png",
+		"rarities": [["epic", 0.30], ["mythic", 0.52], ["legendary", 0.18]],
+	},
+	{
+		"id": "void",
+		"name": "VOID CHEST",
+		"tagline": "The rarest gems answer its call",
+		"cost": 180000000,
+		"picks": 5,
+		"fragments": 10,
+		"accent": Color(1.0, 0.25, 0.82, 1.0),
+		"art": "res://assets/generated/chests/void.png",
+		"open_art": "res://assets/generated/chests/void_open.png",
+		"rarities": [["mythic", 0.45], ["legendary", 0.55]],
 	},
 ]
 
@@ -99,6 +129,35 @@ func build_ui() -> void:
 	_build_main_button()
 	_build_panel()
 	update_ui(true)
+
+
+func merge_into_skins_ui(skins_list: VBoxContainer) -> void:
+	# Chests, their upgrades, and cat gems belong to the collection screen. Keep
+	# the existing controls (and their signal connections) alive by reparenting
+	# them instead of building a second copy.
+	if not is_instance_valid(scroll) or scroll.get_child_count() == 0:
+		return
+	var crate_content := scroll.get_child(0) as VBoxContainer
+	if crate_content == null:
+		return
+
+	var collection_title := Label.new()
+	collection_title.text = "CHESTS & CAT GEMS"
+	collection_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	collection_title.add_theme_font_size_override("font_size", 22)
+	collection_title.add_theme_color_override("font_color", Color(0.3, 0.88, 0.98, 1.0))
+	skins_list.add_child(collection_title)
+	skins_list.move_child(collection_title, 0)
+
+	var insert_at := 1
+	for child in crate_content.get_children():
+		child.reparent(skins_list)
+		skins_list.move_child(child, insert_at)
+		insert_at += 1
+
+	# The skins button is now the single entry point for the whole collection.
+	button.hide()
+	panel.hide()
 
 
 func _build_main_button() -> void:
@@ -271,7 +330,7 @@ func _add_crate_card(parent: VBoxContainer, crate_data: Dictionary) -> void:
 	margin.add_child(row)
 
 	var art := TextureRect.new()
-	art.texture = CRATE_CLOSED
+	art.texture = _get_crate_texture(crate_data)
 	art.custom_minimum_size = Vector2(132.0, 132.0)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -386,15 +445,17 @@ func update_wallet() -> void:
 	if not is_instance_valid(wallet_label):
 		return
 	var bowl_keys: int = game.bottomless_bowl_logic.crate_keys if game.bottomless_bowl_logic != null else 0
-	wallet_label.text = "%s KIBBLES  |  %d BOWL KEYS" % [game._format_number(game.coins), bowl_keys]
+	var cozy_crates: int = game.bottomless_bowl_logic.cozy_crates if game.bottomless_bowl_logic != null else 0
+	wallet_label.text = "%s KIBBLES  |  KEYS: %d  |  COZY CRATES: %d" % [game._format_number(game.coins), bowl_keys, cozy_crates]
 	for crate_data in CRATE_DATA:
 		var crate_id := String(crate_data["id"])
 		var open_button := crate_buttons.get(crate_id) as Button
 		if open_button == null:
 			continue
 		var cost := get_crate_cost(crate_data)
-		open_button.disabled = game.coins < cost and bowl_keys <= 0
-		open_button.text = "OPEN  •  %s KIBBLES" % game._format_number(cost) if game.coins >= cost else "NEED %s MORE" % game._format_number(cost - game.coins)
+		var has_free_crate := bowl_keys > 0 or (crate_id == "cozy" and cozy_crates > 0)
+		open_button.disabled = game.coins < cost and not has_free_crate
+		open_button.text = "FREE • USE KEY" if bowl_keys > 0 else ("FREE • USE CRATE" if crate_id == "cozy" and cozy_crates > 0 else game._format_number(cost))
 
 	for upgrade_data in WORKSHOP_DATA:
 		var upgrade_id := String(upgrade_data["id"])
@@ -546,7 +607,9 @@ func open_crate(crate_id: String) -> void:
 	if crate_data.is_empty():
 		return
 	var cost := get_crate_cost(crate_data)
-	if game.bottomless_bowl_logic != null and game.bottomless_bowl_logic.crate_keys > 0:
+	if game.bottomless_bowl_logic != null and crate_id == "cozy" and game.bottomless_bowl_logic.cozy_crates > 0:
+		game.bottomless_bowl_logic.cozy_crates -= 1
+	elif game.bottomless_bowl_logic != null and game.bottomless_bowl_logic.crate_keys > 0:
 		game.bottomless_bowl_logic.crate_keys -= 1
 	else:
 		if game.coins < cost or not game._spend_coins(cost):
@@ -660,12 +723,50 @@ func show_reward_overlay(crate_data: Dictionary, rewards: Array[Dictionary]) -> 
 	items.add_child(title)
 
 	var crate_art := TextureRect.new()
-	crate_art.texture = CRATE_CLOSED
+	crate_art.texture = _get_crate_texture(crate_data)
 	crate_art.custom_minimum_size = Vector2(250.0, 250.0)
 	crate_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	crate_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	crate_art.pivot_offset = Vector2(125.0, 125.0)
 	items.add_child(crate_art)
+
+	# Tier-colored sparks live inside the art control so the opening reads as an
+	# actual burst instead of only a texture swap.
+	var burst_sparks: Array[Label] = []
+	for spark_index in range(12):
+		var spark := Label.new()
+		spark.text = "◆" if spark_index % 2 == 0 else "✦"
+		spark.position = Vector2(112.0, 105.0)
+		spark.size = Vector2(28.0, 28.0)
+		spark.pivot_offset = Vector2(14.0, 14.0)
+		spark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		spark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		spark.add_theme_font_size_override("font_size", 18 if spark_index % 2 == 0 else 24)
+		spark.add_theme_color_override("font_color", accent.lightened(0.28))
+		spark.modulate.a = 0.0
+		spark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		crate_art.add_child(spark)
+		burst_sparks.append(spark)
+
+	var lock_flash := Label.new()
+	lock_flash.text = "✦"
+	lock_flash.position = Vector2(89.0, 76.0)
+	lock_flash.size = Vector2(72.0, 72.0)
+	lock_flash.pivot_offset = Vector2(36.0, 36.0)
+	lock_flash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lock_flash.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lock_flash.add_theme_font_size_override("font_size", 58)
+	lock_flash.add_theme_color_override("font_color", Color.WHITE)
+	lock_flash.modulate.a = 0.0
+	lock_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	crate_art.add_child(lock_flash)
+
+	var remaining_label := Label.new()
+	remaining_label.text = "%d ITEMS REMAINING" % rewards.size()
+	remaining_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	remaining_label.add_theme_font_size_override("font_size", 15)
+	remaining_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.92, 1.0))
+	items.add_child(remaining_label)
 
 	var reward_stage := CenterContainer.new()
 	reward_stage.custom_minimum_size = Vector2(260.0, 220.0)
@@ -734,6 +835,24 @@ func show_reward_overlay(crate_data: Dictionary, rewards: Array[Dictionary]) -> 
 	bonus_text.add_theme_color_override("font_color", Color(1.0, 0.83, 0.36, 1.0))
 	items.add_child(bonus_text)
 
+	var recap := Label.new()
+	var recap_lines: PackedStringArray = []
+	var total_fragments := 0
+	var total_kibbles := 0
+	for reward in rewards:
+		var fragment_count := int(reward["fragments"])
+		var converted_count := int(reward.get("converted_kibbles", 0))
+		total_fragments += fragment_count
+		total_kibbles += converted_count
+		recap_lines.append("%s  +%d gem%s%s" % [String(reward["skin_data"]["name"]), fragment_count, "s" if fragment_count != 1 else "", "  +%s kibble" % game._format_number(converted_count) if converted_count > 0 else ""])
+	recap.text = "FULL REWARD RECAP\n%s\nTOTAL: %d GEMS%s" % ["\n".join(recap_lines), total_fragments, "  +%s KIBBLES" % game._format_number(total_kibbles) if total_kibbles > 0 else ""]
+	recap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	recap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	recap.add_theme_font_size_override("font_size", 13)
+	recap.add_theme_color_override("font_color", Color(0.88, 0.92, 1.0, 1.0))
+	recap.visible = false
+	items.add_child(recap)
+
 	var continue_button := Button.new()
 	continue_button.text = "REVEALING GEMS..."
 	continue_button.disabled = true
@@ -746,16 +865,34 @@ func show_reward_overlay(crate_data: Dictionary, rewards: Array[Dictionary]) -> 
 	reward_overlay.modulate.a = 0.0
 	var open_tween: Tween = game.create_tween()
 	open_tween.tween_property(reward_overlay, "modulate:a", 1.0, 0.16)
-	open_tween.tween_property(crate_art, "scale", Vector2(0.86, 1.12), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	# Anticipation: squash and rattle before the lock flashes.
+	open_tween.tween_property(crate_art, "scale", Vector2(1.06, 0.94), 0.13).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for shake_rotation in [-0.055, 0.055, -0.04, 0.04, 0.0]:
+		open_tween.tween_property(crate_art, "rotation", shake_rotation, 0.055)
+	open_tween.tween_property(crate_art, "scale", Vector2(0.86, 1.12), 0.13).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	open_tween.tween_property(lock_flash, "modulate:a", 1.0, 0.07)
+	open_tween.parallel().tween_property(lock_flash, "scale", Vector2(1.8, 1.8), 0.18).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	open_tween.tween_callback(func() -> void:
-		crate_art.texture = CRATE_OPEN
+		crate_art.texture = _get_crate_open_texture(crate_data)
 		game._play_crate_open_sound()
 	)
+	open_tween.tween_property(lock_flash, "modulate:a", 0.0, 0.12)
 	open_tween.tween_property(crate_art, "scale", Vector2(1.1, 1.1), 0.22).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	for spark_index in range(burst_sparks.size()):
+		var spark := burst_sparks[spark_index]
+		var angle := TAU * float(spark_index) / float(burst_sparks.size())
+		var distance := 82.0 + float(spark_index % 3) * 18.0
+		open_tween.parallel().tween_property(spark, "modulate:a", 1.0, 0.08)
+		open_tween.parallel().tween_property(spark, "position", Vector2(112.0, 105.0) + Vector2(cos(angle), sin(angle)) * distance, 0.38).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		open_tween.parallel().tween_property(spark, "rotation", angle + PI, 0.38)
+	open_tween.tween_interval(0.12)
+	for spark in burst_sparks:
+		open_tween.parallel().tween_property(spark, "modulate:a", 0.0, 0.24)
 	open_tween.tween_property(crate_art, "scale", Vector2.ONE, 0.14)
 	for card_index in range(reward_cards.size()):
 		var reward_card := reward_cards[card_index]
 		open_tween.tween_callback(func() -> void:
+			remaining_label.text = "%d ITEM%s REMAINING" % [rewards.size() - card_index - 1, "" if rewards.size() - card_index - 1 == 1 else "S"]
 			reward_card.visible = true
 			reward_card.modulate.a = 0.0
 			reward_card.scale = Vector2(0.55, 0.55)
@@ -769,6 +906,8 @@ func show_reward_overlay(crate_data: Dictionary, rewards: Array[Dictionary]) -> 
 			open_tween.parallel().tween_property(reward_card, "scale", Vector2(1.12, 1.12), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 			open_tween.tween_callback(func() -> void: reward_card.visible = false)
 	open_tween.tween_callback(func() -> void:
+		remaining_label.text = "ALL ITEMS REVEALED"
+		recap.visible = true
 		continue_button.disabled = false
 		continue_button.text = "KEEP COLLECTING"
 	)
@@ -846,6 +985,16 @@ func get_crate_data(crate_id: String) -> Dictionary:
 		if String(data["id"]) == crate_id:
 			return data
 	return {}
+
+
+func _get_crate_texture(crate_data: Dictionary) -> Texture2D:
+	var texture := load(String(crate_data.get("art", ""))) as Texture2D
+	return texture if texture != null else CRATE_CLOSED
+
+
+func _get_crate_open_texture(crate_data: Dictionary) -> Texture2D:
+	var texture := load(String(crate_data.get("open_art", ""))) as Texture2D
+	return texture if texture != null else CRATE_OPEN
 
 
 func get_workshop_data(upgrade_id: String) -> Dictionary:

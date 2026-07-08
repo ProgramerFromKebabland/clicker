@@ -1,10 +1,14 @@
 extends RefCounted
 class_name MissionLogic
 
+# Mission board revision 2: adventure cards, rerolls, and board-clear celebration.
+
 const RESET_SECONDS := 12 * 60 * 60
 const MISSION_COUNT := 250
 const SLOT_COUNT := 3
 const GEM_KIBBLE_VALUE := 100000
+const BOARD_CLEAR_BONUS_MULTIPLIER := 0.25
+const MISSIONS_UI_ICON = preload("res://assets/ui/daily_missions.png")
 
 var game
 var missions: Array[Dictionary] = []
@@ -12,12 +16,18 @@ var cycle_id := -1
 var active_ids: Array[int] = []
 var baselines: Dictionary = {}
 var claimed: Dictionary = {}
+var board_bonus_claimed := false
+var reroll_used := false
 var last_ui_second := -1
 
 var button: Button
 var panel: PanelContainer
 var timer_label: Label
 var list: VBoxContainer
+var completion_label: Label
+var cycle_progress: ProgressBar
+var board_bonus_label: Label
+var reroll_button: Button
 
 
 func _init(game_ref) -> void:
@@ -41,6 +51,7 @@ func _build_prelist() -> void:
 			var id := missions.size()
 			missions.append({
 				"id": id, "kind": kind, "target": target, "difficulty": difficulty,
+				"title": _mission_title(kind, tier),
 				"text": String(verbs[kind]) % game._format_number(target),
 				"reward": _reward_for(id, difficulty, tier),
 			})
@@ -55,6 +66,18 @@ func _target_for(kind: String, tier: int) -> int:
 		"streaks": return 1 + int(tier / 3.0)
 		"crates": return 1 + int(tier / 8.0)
 	return tier
+
+
+func _mission_title(kind: String, tier: int) -> String:
+	var titles := {
+		"taps": ["PAW-SPEED TRIAL", "TEMPLE TAPSTORM", "FURY OF THE PAWS", "THE THOUSAND-PAW TEST"],
+		"kibbles": ["THE KIBBLE CACHE", "FEAST FUND", "FORTUNE OF THE FELINE", "THE GOLDEN BOWL"],
+		"bonus": ["LUCKY WHISKERS", "FORTUNE FAVORS THE CAT", "CRITICAL CATITUDE", "TOUCH OF DESTINY"],
+		"streaks": ["KEEP THE FIRE ALIVE", "UNBROKEN PAW", "COMBO CONQUEROR", "LEGENDARY MOMENTUM"],
+		"crates": ["WHAT'S IN THE BOX?", "CRATE ESCAPADE", "TREASURE CLAWS", "RAID THE ROYAL VAULT"],
+	}
+	var rank := clampi(int((tier - 1) / 13.0), 0, 3)
+	return String(titles[kind][rank])
 
 
 func _reward_for(id: int, difficulty: String, tier: int) -> Dictionary:
@@ -74,10 +97,14 @@ func _reward_for(id: int, difficulty: String, tier: int) -> Dictionary:
 func build_ui() -> void:
 	button = Button.new()
 	button.name = "MissionsButton"
-	button.text = "Daily Missions"
+	button.text = "MISSIONS"
+	button.icon = MISSIONS_UI_ICON
+	button.expand_icon = true
+	button.add_theme_constant_override("icon_max_width", 42)
 	button.tooltip_text = "View your three 12-hour missions"
 	button.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	button.custom_minimum_size = Vector2(154, 58)
+	button.custom_minimum_size = Vector2(154, 68)
+	button.add_theme_font_size_override("font_size", 17)
 	game._style_upgrade_button(button, Color(0.56, 0.38, 1.0, 1.0))
 	game.add_child(button)
 	game.move_child(button, game.menu_overlay.get_index())
@@ -99,15 +126,52 @@ func build_ui() -> void:
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
 	var title := Label.new()
-	title.text = "DAILY MISSIONS"
+	title.text = "MISSION BOARD"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 34)
 	title.add_theme_color_override("font_color", Color(0.86, 0.8, 1.0))
 	root.add_child(title)
+	var subtitle := Label.new()
+	subtitle.text = "Three challenges. One glorious haul."
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_size_override("font_size", 15)
+	subtitle.add_theme_color_override("font_color", Color(0.68, 0.66, 0.82))
+	root.add_child(subtitle)
+	var status_card := PanelContainer.new()
+	status_card.add_theme_stylebox_override("panel", game._make_upgrade_style(Color(0.08, 0.065, 0.14, 0.98), Color(0.47, 0.34, 0.82), 14, 1, -1, 6))
+	root.add_child(status_card)
+	var status_margin := MarginContainer.new()
+	for side in ["left", "top", "right", "bottom"]: status_margin.add_theme_constant_override("margin_" + side, 10)
+	status_card.add_child(status_margin)
+	var status_items := VBoxContainer.new()
+	status_items.add_theme_constant_override("separation", 6)
+	status_margin.add_child(status_items)
+	completion_label = Label.new()
+	completion_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	completion_label.add_theme_font_size_override("font_size", 18)
+	status_items.add_child(completion_label)
+	cycle_progress = ProgressBar.new()
+	cycle_progress.max_value = SLOT_COUNT
+	cycle_progress.custom_minimum_size.y = 14
+	cycle_progress.show_percentage = false
+	status_items.add_child(cycle_progress)
+	board_bonus_label = Label.new()
+	board_bonus_label.text = "CLEAR BONUS  +25% of all mission prizes"
+	board_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	board_bonus_label.add_theme_font_size_override("font_size", 14)
+	board_bonus_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.3))
+	status_items.add_child(board_bonus_label)
+	reroll_button = Button.new()
+	reroll_button.text = "REROLL BOARD  -  1 FREE"
+	reroll_button.tooltip_text = "Replace unfinished missions once per board"
+	game._style_upgrade_button(reroll_button, Color(0.55, 0.42, 0.95))
+	reroll_button.pressed.connect(_reroll_board)
+	status_items.add_child(reroll_button)
 	timer_label = Label.new()
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	timer_label.add_theme_font_size_override("font_size", 18)
-	root.add_child(timer_label)
+	timer_label.add_theme_font_size_override("font_size", 15)
+	timer_label.add_theme_color_override("font_color", Color(0.78, 0.75, 0.9))
+	status_items.add_child(timer_label)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
@@ -127,6 +191,8 @@ func _refresh_cycle() -> void:
 	active_ids.clear()
 	baselines.clear()
 	claimed.clear()
+	board_bonus_claimed = false
+	reroll_used = false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = cycle_id * 7919 + 104729
 	var buckets := [[0, 85], [85, 170], [170, 250]]
@@ -150,9 +216,18 @@ func update_ui() -> void:
 	var left: int = RESET_SECONDS - (now % RESET_SECONDS)
 	timer_label.text = "New missions in %02d:%02d:%02d" % [int(left / 3600), int((left % 3600) / 60), int(left % 60)]
 	var ready := 0
+	var completed := 0
 	for id in active_ids:
-		if not bool(claimed.get(str(id), false)) and _progress(id) >= int(missions[id]["target"]): ready += 1
-	button.text = "Daily Missions" + ("  •  %d READY" % ready if ready > 0 else "")
+		if bool(claimed.get(str(id), false)): completed += 1
+		elif _progress(id) >= int(missions[id]["target"]): ready += 1
+	button.text = "MISSIONS\n%d REWARD%s READY!" % [ready, "" if ready == 1 else "S"] if ready > 0 else "MISSIONS\n%d / %d CLEARED" % [completed, SLOT_COUNT]
+	button.add_theme_color_override("font_color", Color(1.0, 0.86, 0.38) if ready > 0 else Color.WHITE)
+	completion_label.text = _cycle_status_text(completed, ready)
+	cycle_progress.value = completed
+	board_bonus_label.text = "CLEAR BONUS CLAIMED!" if board_bonus_claimed else "CLEAR BONUS  +25% of all mission prizes"
+	board_bonus_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.64) if board_bonus_claimed else Color(1.0, 0.78, 0.3))
+	reroll_button.text = "REROLL USED" if reroll_used else "REROLL BOARD  -  1 FREE"
+	reroll_button.disabled = reroll_used or completed > 0
 	if not panel.visible and list.get_child_count() > 0:
 		return
 	_rebuild_cards()
@@ -160,39 +235,138 @@ func update_ui() -> void:
 
 func _rebuild_cards() -> void:
 	for child in list.get_children(): child.queue_free()
-	for id in active_ids:
+	for slot in range(active_ids.size()):
+		var id := active_ids[slot]
 		var mission := missions[id]
 		var done := bool(claimed.get(str(id), false))
+		var progress := mini(_progress(id), int(mission["target"]))
+		var is_ready := not done and progress >= int(mission["target"])
 		var card := PanelContainer.new()
 		var accent := Color(0.4, 0.85, 0.55) if mission["difficulty"] == "Easy" else (Color(0.35, 0.7, 1.0) if mission["difficulty"] == "Medium" else Color(0.85, 0.48, 1.0))
-		card.add_theme_stylebox_override("panel", game._make_upgrade_style(Color(0.055, 0.06, 0.105, 0.98), accent, 16, 2, -1, 8))
+		var card_fill := Color(0.075, 0.11, 0.09, 0.99) if is_ready else Color(0.055, 0.06, 0.105, 0.98)
+		card.add_theme_stylebox_override("panel", game._make_upgrade_style(card_fill, accent, 18, 3 if is_ready else 2, -1, 10 if is_ready else 8))
 		list.add_child(card)
 		var margin := MarginContainer.new()
 		for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 14)
 		card.add_child(margin)
 		var items := VBoxContainer.new()
-		items.add_theme_constant_override("separation", 7)
+		items.add_theme_constant_override("separation", 9)
 		margin.add_child(items)
+		var eyebrow := Label.new()
+		eyebrow.text = "MISSION %d OF %d   /   %s   /   %s" % [slot + 1, SLOT_COUNT, String(mission["difficulty"]).to_upper(), _kind_name(String(mission["kind"]))]
+		eyebrow.add_theme_font_size_override("font_size", 13)
+		eyebrow.add_theme_color_override("font_color", accent)
+		items.add_child(eyebrow)
 		var heading := Label.new()
-		heading.text = "%s  •  %s" % [String(mission["difficulty"]).to_upper(), String(mission["text"])]
+		heading.text = String(mission["title"])
 		heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		heading.add_theme_font_size_override("font_size", 19)
+		heading.add_theme_font_size_override("font_size", 21)
 		items.add_child(heading)
-		var progress := mini(_progress(id), int(mission["target"]))
+		var objective := Label.new()
+		objective.text = String(mission["text"])
+		objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		objective.add_theme_font_size_override("font_size", 16)
+		objective.add_theme_color_override("font_color", Color(0.82, 0.83, 0.9))
+		items.add_child(objective)
+		var percent := int(round(100.0 * float(progress) / float(maxi(1, int(mission["target"])))))
 		var detail := Label.new()
-		detail.text = "EXPIRED — reward claimed" if done else "%s / %s  •  Reward: %s" % [game._format_number(progress), game._format_number(int(mission["target"])), _reward_text(mission["reward"])]
+		detail.text = "REWARD CLAIMED - nicely done!" if done else "%s / %s  (%d%%)" % [game._format_number(progress), game._format_number(int(mission["target"])), percent]
 		detail.add_theme_color_override("font_color", Color(0.72, 0.75, 0.86))
 		items.add_child(detail)
 		var bar := ProgressBar.new()
 		bar.max_value = int(mission["target"])
 		bar.value = progress
-		bar.custom_minimum_size.y = 18
+		bar.custom_minimum_size.y = 20
+		bar.show_percentage = false
 		items.add_child(bar)
+		var reward := Label.new()
+		reward.text = "TREASURE  >>  %s" % _reward_text(mission["reward"])
+		reward.add_theme_font_size_override("font_size", 16)
+		reward.add_theme_color_override("font_color", Color(1.0, 0.82, 0.34) if not done else Color(0.55, 0.7, 0.58))
+		items.add_child(reward)
 		var complete := Button.new()
-		complete.text = "Expired" if done else ("Complete & claim" if progress >= int(mission["target"]) else "In progress")
+		complete.text = "CLAIMED" if done else ("CLAIM REWARD!" if progress >= int(mission["target"]) else _encouragement(percent))
 		complete.disabled = done or progress < int(mission["target"])
+		game._style_upgrade_button(complete, accent)
 		complete.pressed.connect(claim.bind(id))
 		items.add_child(complete)
+
+
+func _kind_name(kind: String) -> String:
+	match kind:
+		"taps": return "TAP FRENZY"
+		"kibbles": return "KIBBLE HUNT"
+		"bonus": return "LUCKY HITS"
+		"streaks": return "STREAK CHASER"
+		"crates": return "CRATE RAID"
+	return "CHALLENGE"
+
+
+func _encouragement(percent: int) -> String:
+	if percent >= 75: return "SO CLOSE - KEEP GOING!"
+	if percent >= 40: return "HALFWAY TO GLORY"
+	if percent > 0: return "NICE START - KEEP PUSHING"
+	return "START MISSION"
+
+
+func _cycle_status_text(completed: int, ready: int) -> String:
+	if completed == SLOT_COUNT: return "BOARD CLEARED!  3 / 3"
+	if ready > 0: return "%d reward%s ready to claim!" % [ready, "" if ready == 1 else "s"]
+	return "%d / %d missions conquered" % [completed, SLOT_COUNT]
+
+
+func _reroll_board() -> void:
+	if reroll_used:
+		return
+	for id in active_ids:
+		if bool(claimed.get(str(id), false)):
+			return
+	reroll_used = true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = cycle_id * 15485863 + int(game._get_unix_time()) + 32452843
+	var buckets := [[0, 85], [85, 170], [170, 250]]
+	var replacements: Array[int] = []
+	for index in range(SLOT_COUNT):
+		var bucket: Array = buckets[index]
+		var candidate := rng.randi_range(int(bucket[0]), int(bucket[1]) - 1)
+		while candidate in active_ids or candidate in replacements:
+			candidate = rng.randi_range(int(bucket[0]), int(bucket[1]) - 1)
+		replacements.append(candidate)
+	active_ids = replacements
+	baselines.clear()
+	claimed.clear()
+	for id in active_ids:
+		baselines[str(id)] = _counter(String(missions[id]["kind"]))
+	game._queue_save()
+	last_ui_second = -1
+	_rebuild_cards()
+	update_ui()
+	if game.has_method("_show_admin_status"):
+		game._show_admin_status("A fresh mission board has arrived!", Color(0.72, 0.62, 1.0))
+	else:
+		_spawn_board_notice("FRESH MISSIONS!", Color(0.72, 0.62, 1.0))
+
+
+func _spawn_board_notice(text: String, color: Color) -> void:
+	if panel == null or not is_instance_valid(panel):
+		return
+	var notice := Label.new()
+	notice.text = text
+	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	notice.add_theme_font_size_override("font_size", 26)
+	notice.add_theme_color_override("font_color", color)
+	notice.position = Vector2(60, panel.size.y * 0.45)
+	notice.size = Vector2(maxf(220.0, panel.size.x - 120.0), 48)
+	notice.z_index = 25
+	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(notice)
+	notice.pivot_offset = notice.size * 0.5
+	notice.scale = Vector2(0.35, 0.35)
+	var notice_tween: Tween = game.create_tween()
+	notice_tween.tween_property(notice, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	notice_tween.tween_interval(0.45)
+	notice_tween.tween_property(notice, "modulate:a", 0.0, 0.25)
+	notice_tween.tween_callback(notice.queue_free)
 
 
 func _reward_text(reward: Dictionary) -> String:
@@ -220,12 +394,23 @@ func claim(id: int) -> void:
 	if id not in active_ids or bool(claimed.get(str(id), false)) or _progress(id) < int(missions[id]["target"]): return
 	claimed[str(id)] = true
 	var message := _grant_reward(missions[id]["reward"])
+	var all_done := true
+	for active_id in active_ids:
+		if not bool(claimed.get(str(active_id), false)):
+			all_done = false
+			break
+	if all_done and not board_bonus_claimed:
+		board_bonus_claimed = true
+		var bonus := _board_clear_bonus()
+		_add_kibbles(bonus)
+		message += "  +  BOARD CLEAR BONUS: %s kibbles!" % game._format_number(bonus)
 	game._play_bonus_sound()
 	game._update_score()
 	game._update_coins()
 	game._update_skins_ui()
 	if game.crate_logic != null: game.crate_logic.update_ui(true)
 	game._queue_save()
+	_celebrate_claim(all_done)
 	_rebuild_cards()
 	game._show_admin_status(message, Color(0.7, 1.0, 0.65)) if game.has_method("_show_admin_status") else game._spawn_click_popup(1, 1)
 
@@ -268,8 +453,55 @@ func _add_kibbles(amount: int) -> void:
 	game._add_coins(amount)
 
 
+func _board_clear_bonus() -> int:
+	var total := 0
+	for id in active_ids:
+		var reward: Dictionary = missions[id]["reward"]
+		match String(reward["type"]):
+			"kibbles": total += int(reward["amount"])
+			"gems": total += int(reward["amount"]) * GEM_KIBBLE_VALUE
+			"skin": total += maxi(10000, int(game.click_value) * 100)
+	return maxi(500, int(round(total * BOARD_CLEAR_BONUS_MULTIPLIER)))
+
+
+func _celebrate_claim(board_cleared: bool) -> void:
+	var cheer := Label.new()
+	cheer.text = "BOARD CLEARED!" if board_cleared else "MISSION COMPLETE!"
+	cheer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cheer.add_theme_font_size_override("font_size", 30 if board_cleared else 24)
+	cheer.add_theme_color_override("font_color", Color(1.0, 0.78, 0.22) if board_cleared else Color(0.55, 1.0, 0.66))
+	cheer.position = Vector2(70, panel.size.y * 0.42)
+	cheer.size = Vector2(maxf(200.0, panel.size.x - 140.0), 54)
+	cheer.z_index = 20
+	panel.add_child(cheer)
+	cheer.pivot_offset = cheer.size * 0.5
+	cheer.scale = Vector2(0.2, 0.2)
+	var tween: Tween = game.create_tween()
+	tween.tween_property(cheer, "scale", Vector2(1.15, 1.15), 0.28).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(cheer, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(0.45 if board_cleared else 0.2)
+	tween.tween_property(cheer, "modulate:a", 0.0, 0.3)
+	tween.tween_callback(cheer.queue_free)
+	for index in range(18 if board_cleared else 8):
+		var spark := ColorRect.new()
+		spark.color = [Color(1.0, 0.72, 0.16), Color(0.58, 0.38, 1.0), Color(0.35, 0.9, 0.62)][index % 3]
+		spark.size = Vector2(7, 12)
+		spark.position = Vector2(panel.size.x * 0.5, panel.size.y * 0.48)
+		spark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		spark.z_index = 19
+		panel.add_child(spark)
+		var angle := TAU * float(index) / float(18 if board_cleared else 8)
+		var distance := randf_range(90.0, 230.0 if board_cleared else 140.0)
+		var destination := spark.position + Vector2(cos(angle), sin(angle)) * distance + Vector2(0, 45)
+		var spark_tween: Tween = game.create_tween().set_parallel(true)
+		spark_tween.tween_property(spark, "position", destination, 0.62).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		spark_tween.tween_property(spark, "rotation", randf_range(-4.0, 4.0), 0.62)
+		spark_tween.tween_property(spark, "modulate:a", 0.0, 0.62).set_delay(0.22)
+		spark_tween.chain().tween_callback(spark.queue_free)
+
+
 func get_save_data() -> Dictionary:
-	return {"cycle_id": cycle_id, "active_ids": active_ids.duplicate(), "baselines": baselines.duplicate(true), "claimed": claimed.duplicate(true)}
+	return {"cycle_id": cycle_id, "active_ids": active_ids.duplicate(), "baselines": baselines.duplicate(true), "claimed": claimed.duplicate(true), "board_bonus_claimed": board_bonus_claimed, "reroll_used": reroll_used}
 
 
 func load_save_data(data: Dictionary) -> void:
@@ -278,3 +510,5 @@ func load_save_data(data: Dictionary) -> void:
 	for value in data.get("active_ids", []): active_ids.append(clampi(int(value), 0, MISSION_COUNT - 1))
 	baselines = data.get("baselines", {}).duplicate(true)
 	claimed = data.get("claimed", {}).duplicate(true)
+	board_bonus_claimed = bool(data.get("board_bonus_claimed", false))
+	reroll_used = bool(data.get("reroll_used", false))

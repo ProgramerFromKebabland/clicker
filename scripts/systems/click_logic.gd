@@ -39,7 +39,7 @@ func perform_tap(is_ghost: bool) -> bool:
 	unboosted_click_amount = game._apply_skin_gain_bonus(unboosted_click_amount, "click")
 	var click_amount: int = maxi(1, roundi(float(game.click_value) * combo_multiplier))
 	click_amount = game._apply_skin_gain_bonus(click_amount, "click")
-	click_amount = maxi(1, roundi(float(click_amount) * game.boost_logic.get_tap_multiplier()))
+	click_amount = maxi(1, roundi(float(click_amount) * game.boost_logic.get_tap_multiplier() * game.get_food_tap_multiplier()))
 	click_amount += game.boost_logic.get_flat_tap_bonus()
 	var bonus_multiplier: int = game._roll_bonus_multiplier()
 	var unboosted_bonus_multiplier: int = bonus_multiplier
@@ -58,7 +58,7 @@ func perform_tap(is_ghost: bool) -> bool:
 	if bonus_hit:
 		unboosted_click_amount *= unboosted_bonus_multiplier * unboosted_streak_multiplier
 		click_amount *= bonus_multiplier
-		click_amount = maxi(1, roundi(float(click_amount) * game.boost_logic.get_bonus_payout_multiplier()))
+		click_amount = maxi(1, roundi(float(click_amount) * game.boost_logic.get_bonus_payout_multiplier() * game.get_food_bonus_payout_multiplier()))
 	click_amount = game.boost_logic.cap_boosted_click(click_amount, unboosted_click_amount)
 	if is_ghost:
 		click_amount = maxi(1, roundi(float(click_amount) * 0.5))
@@ -121,7 +121,7 @@ func reset_combo() -> void:
 
 
 func get_combo_multiplier() -> float:
-	return 1.0 + (game.combo_bonus * game.boost_logic.get_combo_power_multiplier())
+	return 1.0 + (game.combo_bonus * game.boost_logic.get_combo_power_multiplier() * game.get_food_combo_multiplier())
 
 
 func update_combo_ui(animated: bool = false) -> void:

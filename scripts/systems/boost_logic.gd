@@ -182,6 +182,13 @@ const BOOST_DATA: Array[Dictionary] = [
 		"description": "All sources create 60% more kibbles.",
 		"accent": Color(1.0, 0.62, 0.16, 1.0),
 	},
+	{"id": "quantum_frenzy", "category": "advanced", "name": "QUANTUM FRENZY", "badge": "x3 TAP", "cost": 50000000, "duration": 8.0, "description": "Triples tap power during a quantum surge.", "accent": Color(0.2, 0.95, 1.0)},
+	{"id": "infinite_fortune", "category": "advanced", "name": "INFINITE FORTUNE", "badge": "+40%", "cost": 65000000, "duration": 8.0, "description": "Adds 40 percentage points to bonus chance.", "accent": Color(1.0, 0.8, 0.18)},
+	{"id": "celestial_rain", "category": "advanced", "name": "CELESTIAL RAIN", "badge": "x2 ALL", "cost": 90000000, "duration": 10.0, "description": "Doubles every source of kibble income.", "accent": Color(0.55, 0.7, 1.0)},
+	{"id": "ghost_army", "category": "advanced", "name": "GHOST ARMY", "badge": "+3 GHOST", "cost": 110000000, "duration": 8.0, "description": "Each press fires three additional ghost taps.", "accent": Color(0.72, 0.42, 1.0)},
+	{"id": "jackpot_overdrive", "category": "advanced", "name": "JACKPOT OVERDRIVE", "badge": "x2 BONUS", "cost": 140000000, "duration": 7.0, "description": "Doubles all successful bonus payouts.", "accent": Color(1.0, 0.55, 0.15)},
+	{"id": "combo_singularity", "category": "advanced", "name": "COMBO SINGULARITY", "badge": "x2 COMBO", "cost": 180000000, "duration": 9.0, "description": "Doubles current combo power.", "accent": Color(1.0, 0.32, 0.72)},
+	{"id": "time_emperor", "category": "advanced", "name": "TIME EMPEROR", "badge": "TIME", "cost": 250000000, "duration": 12.0, "description": "Freezes combo and grants x2.5 global income.", "accent": Color(0.3, 0.82, 1.0)},
 ]
 const MAX_COMBINED_CLICK_BOOST := 3.0
 
@@ -196,7 +203,7 @@ func _init(game_ref) -> void:
 
 
 func process(delta: float) -> void:
-	var protects_combo: bool = is_active("time_freeze") or game.nine_lives_taps_left > 0
+	var protects_combo: bool = is_active("time_freeze") or is_active("time_emperor") or game.nine_lives_taps_left > 0
 	if game.combo_timer != null and game.combo_timer.paused != protects_combo:
 		game.combo_timer.paused = protects_combo
 
@@ -258,6 +265,8 @@ func get_temporary_bonus_chance() -> float:
 	var bonus := 10.0 if is_active("lucky_paws") else 0.0
 	if is_active("fortune_orbit"):
 		bonus += 20.0
+	if is_active("infinite_fortune"):
+		bonus += 40.0
 	return bonus
 
 
@@ -265,6 +274,8 @@ func get_tap_multiplier() -> float:
 	var multiplier := 1.5 if is_active("cat_frenzy") else 1.0
 	if is_active("supernova_paws"):
 		multiplier *= 2.0
+	if is_active("quantum_frenzy"):
+		multiplier *= 3.0
 	return multiplier
 
 
@@ -274,15 +285,17 @@ func get_bonus_payout_multiplier() -> float:
 		multiplier *= 1.25
 	if is_active("jackpot_engine"):
 		multiplier *= 1.1
-	return minf(multiplier, 1.4)
+	if is_active("jackpot_overdrive"):
+		multiplier *= 2.0
+	return multiplier
 
 
 func get_extra_ghost_taps() -> int:
-	return 1 if is_active("purrstorm") else 0
+	return (1 if is_active("purrstorm") else 0) + (3 if is_active("ghost_army") else 0)
 
 
 func get_combo_power_multiplier() -> float:
-	return 1.15 if is_active("combo_nova") else 1.0
+	return (1.15 if is_active("combo_nova") else 1.0) * (2.0 if is_active("combo_singularity") else 1.0)
 
 
 func get_streak_multiplier() -> float:
@@ -315,6 +328,10 @@ func get_global_gain_multiplier() -> float:
 	var multiplier := 1.25 if is_active("royal_treat") else 1.0
 	if is_active("royal_banquet"):
 		multiplier *= 1.6
+	if is_active("celestial_rain"):
+		multiplier *= 2.0
+	if is_active("time_emperor"):
+		multiplier *= 2.5
 	return multiplier
 
 
@@ -370,7 +387,7 @@ func purchase(boost_id: String, tier: int) -> void:
 
 	var card := game.boost_cards.get(boost_id) as Control
 	if card != null:
-		game._celebrate_upgrade(card, data["accent"] as Color)
+		game._celebrate_upgrade(card, data["accent"] as Color, "BOOSTED!")
 
 
 func update_ui() -> void:
@@ -415,7 +432,7 @@ func update_ui() -> void:
 			elif recharging:
 				button.text = "RECHARGE\n%s" % format_seconds(recharge_remaining)
 			else:
-				button.text = "%s\n%s" % [get_tier_name(tier), game._format_number(cost)]
+				button.text = "%s KIBBLES" % game._format_number(cost) if String(data.get("category", "classical")) == "advanced" else "%s\n%s" % [get_tier_name(tier), game._format_number(cost)]
 
 func get_data(boost_id: String) -> Dictionary:
 	for data in BOOST_DATA:

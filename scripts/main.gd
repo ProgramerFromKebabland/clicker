@@ -16,6 +16,9 @@ const CrateLogic = preload("res://scripts/systems/crate_logic.gd")
 const MissionLogic = preload("res://scripts/systems/mission_logic.gd")
 const RandomEventLogic = preload("res://scripts/systems/random_event_logic.gd")
 const BottomlessBowlLogic = preload("res://scripts/systems/bottomless_bowl_logic.gd")
+const BOOSTS_UI_ICON = preload("res://assets/ui/boosts.png")
+const MUSEUM_UI_ICON = preload("res://assets/ui/museum.png")
+const SKINS_UI_ICON = preload("res://assets/ui/skins.png")
 
 @onready var score_label: Label = %ScoreLabel
 @onready var room_background: TextureRect = %RoomBackground
@@ -145,7 +148,9 @@ const SAVE_UI_VOLUME_KEY := "ui_volume"
 const SAVE_OWNED_SKINS_KEY := "owned_skins"
 const SAVE_EQUIPPED_SKIN_KEY := "equipped_skin"
 const SAVE_EQUIPPED_ROOM_SKIN_KEY := "equipped_room_skin"
+const SAVE_UI_TINT_KEY := "ui_tint"
 const SAVE_EXTENDED_UPGRADES_KEY := "extended_upgrades"
+const SAVE_FOOD_INVENTORY_KEY := "food_inventory"
 const SAVE_TUTORIAL_COMPLETED_KEY := "tutorial_completed"
 const SAVE_095_BALANCE_MIGRATION_KEY := "migration_095_balance_applied"
 const UPDATE_095_RESOURCE_CAP := 100000000
@@ -186,6 +191,26 @@ const CHANCE_UPGRADE_COLOR := Color(1.0, 0.66, 0.2, 1.0)
 const VALUE_UPGRADE_COLOR := Color(1.0, 0.32, 0.48, 1.0)
 const STREAK_UPGRADE_COLOR := Color(0.98, 0.86, 0.16, 1.0)
 const PASSIVE_UPGRADE_COLOR := Color(0.3, 0.9, 0.5, 1.0)
+const FOOD_NAMES := [
+	"Tuna Bite", "Salmon Roll", "Chicken Cube", "Turkey Snack", "Beef Nibble",
+	"Sardine Star", "Shrimp Puff", "Cream Spoon", "Cheese Dot", "Egg Flake",
+	"Pumpkin Mash", "Carrot Crunch", "Apple Slice", "Berry Pop", "Honey Drop",
+	"Rice Ball", "Noodle Curl", "Seaweed Chip", "Mackerel Moon", "Cod Coin",
+	"Trout Toast", "Duck Strip", "Lamb Crumb", "Bacon Bit", "Ham Heart",
+	"Yogurt Swirl", "Milk Pearl", "Butter Toast", "Cookie Crumb", "Donut Dot",
+	"Pizza Pocket", "Burger Button", "Taco Treat", "Sushi Square", "Kebab Cube",
+	"Ice Cream Bean", "Watermelon Wedge", "Banana Button", "Popcorn Puff", "Coffee Bean",
+	"Royal Jelly", "Golden Kibble", "Lucky Biscuit", "Meteor Meatball", "Nova Nugget",
+	"Dream Dumpling", "Orbit Orange", "Galaxy Gel", "Void Velvet", "Celestial Cake",
+]
+const FOOD_BOOSTS := [
+	{"id": "snack_click", "name": "Tap boost", "text": "+35% taps", "duration": 18.0},
+	{"id": "snack_luck", "name": "Luck boost", "text": "+12% bonus luck", "duration": 18.0},
+	{"id": "snack_combo", "name": "Combo boost", "text": "+25% combo power", "duration": 18.0},
+	{"id": "snack_kibble", "name": "Kibble boost", "text": "+30% all kibbles", "duration": 18.0},
+	{"id": "snack_bonus", "name": "Bonus boost", "text": "+20% bonus payout", "duration": 18.0},
+]
+const FOOD_COST := 5000
 const EXTENDED_UPGRADE_DATA: Array[Dictionary] = [
 	{"id": "tap_mastery", "badge": "TAP+", "name": "TAP MASTERY", "accent": Color(0.22, 0.86, 0.92, 1.0), "max_level": MAX_EXTENDED_UPGRADE_LEVEL, "base_cost": 2500},
 	{"id": "combo_capacity", "badge": "CAP", "name": "COMBO CAPACITY", "accent": Color(0.72, 0.46, 1.0, 1.0), "max_level": MAX_EXTENDED_UPGRADE_LEVEL, "base_cost": 4000},
@@ -195,6 +220,16 @@ const EXTENDED_UPGRADE_DATA: Array[Dictionary] = [
 	{"id": "kibble_alchemy", "badge": "ALL+", "name": "KIBBLE ALCHEMY", "accent": Color(0.35, 1.0, 0.68, 1.0), "max_level": MAX_EXTENDED_UPGRADE_LEVEL, "base_cost": 18000},
 	{"id": "lucky_whiskers", "badge": "LUCK+", "name": "LUCKY WHISKERS", "accent": Color(1.0, 0.75, 0.22, 1.0), "max_level": MAX_EXTENDED_UPGRADE_LEVEL, "base_cost": 22000},
 	{"id": "dream_engine", "badge": "IDLE+", "name": "DREAM ENGINE", "accent": Color(0.42, 0.68, 1.0, 1.0), "max_level": MAX_EXTENDED_UPGRADE_LEVEL, "base_cost": 30000},
+	{"id": "quantum_paws", "category": "advanced", "badge": "Q-TAP", "name": "QUANTUM PAWS", "description": "Permanently increases all tap earnings by 15% per level.", "accent": Color(0.25, 0.95, 1.0), "max_level": 5, "base_cost": 2500000, "effect": "tap", "amount": 0.15},
+	{"id": "cosmic_vault", "category": "advanced", "badge": "VAULT", "name": "COSMIC VAULT", "description": "Permanently increases every kibble source by 8% per level.", "accent": Color(0.48, 0.68, 1.0), "max_level": 5, "base_cost": 4000000, "effect": "all", "amount": 0.08},
+	{"id": "nova_luck", "category": "advanced", "badge": "NOVA", "name": "NOVA LUCK", "description": "Adds 1.5 percentage points to bonus chance per level.", "accent": Color(1.0, 0.78, 0.2), "max_level": 5, "base_cost": 6000000, "effect": "luck", "amount": 1.5},
+	{"id": "eternal_combo", "category": "advanced", "badge": "∞", "name": "ETERNAL COMBO", "description": "Raises maximum combo power by x0.25 per level.", "accent": Color(0.75, 0.42, 1.0), "max_level": 5, "base_cost": 9000000, "effect": "combo", "amount": 0.25},
+	{"id": "dream_reactor", "category": "advanced", "badge": "CORE", "name": "DREAM REACTOR", "description": "Increases offline income by 25% per level.", "accent": Color(0.35, 0.8, 1.0), "max_level": 5, "base_cost": 12000000, "effect": "idle", "amount": 0.25},
+	{"id": "royal_jackpot", "category": "advanced", "badge": "ROYAL", "name": "ROYAL JACKPOT", "description": "Increases successful bonus payouts by 20% per level.", "accent": Color(1.0, 0.58, 0.16), "max_level": 5, "base_cost": 18000000, "effect": "bonus", "amount": 0.20},
+	{"id": "time_singularity", "category": "advanced", "badge": "TIME+", "name": "TIME SINGULARITY", "description": "Extends offline storage capacity by 6 hours per level.", "accent": Color(0.35, 0.72, 1.0), "max_level": 5, "base_cost": 24000000, "effect": "storage", "amount": 6.0},
+	{"id": "streak_crown", "category": "advanced", "badge": "CROWN", "name": "STREAK CROWN", "description": "Adds one permanent multiplier to bonus streaks per level.", "accent": Color(1.0, 0.38, 0.65), "max_level": 4, "base_cost": 32000000, "effect": "streak", "amount": 1.0},
+	{"id": "feast_dimension", "category": "advanced", "badge": "FEAST", "name": "FEAST DIMENSION", "description": "Increases daily rewards by 30% per level.", "accent": Color(0.45, 1.0, 0.55), "max_level": 5, "base_cost": 45000000, "effect": "daily", "amount": 0.30},
+	{"id": "celestial_engine", "category": "advanced", "badge": "STAR", "name": "CELESTIAL ENGINE", "description": "Permanently increases all kibble income by 20% per level.", "accent": Color(1.0, 0.85, 0.35), "max_level": 5, "base_cost": 75000000, "effect": "all", "amount": 0.20},
 ]
 const MAX_COIN_PARTICLES := 18
 const UPGRADE_ALERT_SHAKE_INTERVAL := 3.0
@@ -224,6 +259,16 @@ const TAP_BURST_COLORS := [
 ]
 const DEFAULT_SKIN_ID := "classic"
 const SKIN_ACCENT := Color(0.36, 0.82, 1.0, 1.0)
+const DEFAULT_UI_TINT := Color.WHITE
+const LEGACY_UI_TINT := Color(0.96, 0.96, 0.96, 1.0)
+const UI_COLOR_PRESETS: Array[Dictionary] = [
+	{"name": "OLD STYLE", "color": LEGACY_UI_TINT},
+	{"name": "ICE", "color": Color(0.55, 0.86, 1.0)},
+	{"name": "VIOLET", "color": Color(0.76, 0.58, 1.0)},
+	{"name": "MINT", "color": Color(0.48, 1.0, 0.68)},
+	{"name": "SUNSET", "color": Color(1.0, 0.62, 0.34)},
+	{"name": "ROSE", "color": Color(1.0, 0.48, 0.68)},
+]
 const DEFAULT_ROOM_SKIN_ID := "moon_conservatory"
 const ROOM_SKIN_DATA: Array[Dictionary] = [
 	{"id": "moon_conservatory", "name": "Moon Conservatory", "texture": "res://assets/backgrounds/moon_conservatory.png", "accent": Color(0.3, 0.78, 1.0, 1.0)},
@@ -299,6 +344,7 @@ var ui_volume: float = 1.0
 var owned_skin_ids: Array[String] = []
 var equipped_skin_id := DEFAULT_SKIN_ID
 var equipped_room_skin_id := DEFAULT_ROOM_SKIN_ID
+var ui_tint := DEFAULT_UI_TINT
 var extended_upgrade_levels := {
 	"tap_mastery": 0,
 	"combo_capacity": 0,
@@ -339,14 +385,21 @@ var mobile_panels_wrapped := false
 var touch_scroll_index := -1
 var touch_scroll_dragging := false
 var touch_scroll_distance := 0.0
+var touch_scroll: ScrollContainer
 var touch_slider_index := -1
-var touch_slider: HSlider
+var touch_slider: Slider
 var app_backgrounded_at_unix := 0
 var app_was_backgrounded := false
 var skins_button: Button
 var skins_panel: PanelContainer
 var skins_wallet_label: Label
 var skins_status_label: Label
+var skins_tab_buttons: Dictionary = {}
+var skins_section_panels: Dictionary = {}
+var skins_tabs_row: HBoxContainer
+var skins_active_section := "skins"
+var crates_scroll: ScrollContainer
+var crates_list: VBoxContainer
 var skins_list: VBoxContainer
 var skins_scroll: ScrollContainer
 var room_skins_scroll: ScrollContainer
@@ -366,6 +419,27 @@ var boosts_back_button: Button
 var boost_action_buttons: Dictionary = {}
 var boost_status_labels: Dictionary = {}
 var boost_cards: Dictionary = {}
+var inventory_button: Button
+var compact_inventory_panel: PanelContainer
+var compact_inventory_list: VBoxContainer
+var compact_inventory_scroll: ScrollContainer
+var shop_button: Button
+var inventory_shop_bar: HBoxContainer
+var food_panel: PanelContainer
+var food_panel_title: Label
+var food_wallet_label: Label
+var food_status_label: Label
+var food_list: GridContainer
+var food_scroll: ScrollContainer
+var food_back_button: Button
+var food_inventory: Dictionary = {}
+var food_cards: Dictionary = {}
+var food_card_counts: Dictionary = {}
+var food_icon_cache: Dictionary = {}
+var food_panel_mode := "inventory"
+var active_food_boosts: Dictionary = {}
+var dragged_food_id := ""
+var dragged_food_preview: TextureRect
 var modal_close_button: Button
 var modal_decorations: Array[Control] = []
 var combo_was_running_before_overlay := false
@@ -469,16 +543,20 @@ func _ready() -> void:
 	_build_extended_upgrades_ui()
 	_build_skins_ui()
 	_build_boosts_ui()
+	_build_food_ui()
 	_build_museum_ui()
 	bottomless_bowl_logic.build_ui()
 	_build_bottomless_bowl_button()
+	_build_inventory_shop_buttons()
 	# Still available inside the museum, without a second main-HUD button.
 	bottomless_bowl_button.hide()
 	crate_logic.build_ui()
+	crate_logic.merge_into_skins_ui(crates_list)
 	mission_logic.build_ui()
 	random_event_logic.build_ui()
 	_apply_equipped_skin()
 	_apply_equipped_room_skin()
+	_apply_ui_tint()
 	get_viewport().size_changed.connect(_apply_mobile_layout)
 
 	cat_base_scale = cat_button.scale
@@ -518,6 +596,7 @@ func _ready() -> void:
 	_update_daily_reward_ui()
 	_update_volume_ui()
 	_update_skins_ui()
+	_update_food_ui()
 	achievement_tracking_ready = true
 	_apply_volume()
 	last_cat_press_global_position = cat_button.get_global_rect().get_center()
@@ -525,7 +604,8 @@ func _ready() -> void:
 	menu_button.pressed.connect(_show_menu)
 	skins_button.pressed.connect(_show_skins)
 	boosts_button.pressed.connect(_show_boosts)
-	crate_logic.button.pressed.connect(_show_crates)
+	inventory_button.pressed.connect(_show_inventory)
+	shop_button.pressed.connect(_show_shop)
 	upgrade_button.pressed.connect(_show_upgrades)
 	settings_button.pressed.connect(_show_settings)
 	open_upgrades_button.pressed.connect(_show_upgrades)
@@ -552,11 +632,15 @@ func _ready() -> void:
 	exit_button.pressed.connect(_exit_game)
 	skins_back_button.pressed.connect(_hide_menu)
 	boosts_back_button.pressed.connect(_hide_menu)
+	food_back_button.pressed.connect(_hide_menu)
 	_setup_ui_animations(self)
 	_build_admin_panel()
 	_prepare_mobile_panels()
 	_setup_modal_navigation()
 	_apply_mobile_layout()
+	# Several setup passes above replace styleboxes. Reapply the loaded preference
+	# last so a restarted game looks exactly like the selected UI style.
+	_apply_ui_tint()
 	menu_overlay.hide()
 	call_deferred("_show_startup_popups")
 	call_deferred("_maybe_start_first_time_tutorial")
@@ -564,6 +648,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if not dragged_food_id.is_empty():
+		_update_food_drag_preview(get_viewport().get_mouse_position())
 	if boost_logic != null:
 		boost_logic.process(delta)
 	if mission_logic != null:
@@ -604,6 +690,13 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	if _handle_slider_touch(event):
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseMotion and not dragged_food_id.is_empty():
+		_update_food_drag_preview(event.global_position)
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and not dragged_food_id.is_empty():
+		_finish_food_drag(event.global_position)
 		get_viewport().set_input_as_handled()
 		return
 
@@ -669,6 +762,7 @@ func _input(event: InputEvent) -> void:
 		touch_scroll_index = -1
 		touch_scroll_dragging = false
 		touch_scroll_distance = 0.0
+		touch_scroll = null
 		return
 
 	if event.is_action_pressed("ui_cancel"):
@@ -691,16 +785,18 @@ func _input(event: InputEvent) -> void:
 			touch_scroll_index = event.index
 			touch_scroll_dragging = false
 			touch_scroll_distance = 0.0
+			touch_scroll = _get_scroll_at_position(event.position)
 		elif event.index == touch_scroll_index:
 			if touch_scroll_dragging:
 				get_viewport().set_input_as_handled()
 			touch_scroll_index = -1
 			touch_scroll_dragging = false
 			touch_scroll_distance = 0.0
+			touch_scroll = null
 		return
 
 	if event is InputEventScreenDrag and event.index == touch_scroll_index:
-		var scroll := _get_visible_menu_scroll()
+		var scroll := touch_scroll if is_instance_valid(touch_scroll) else _get_visible_menu_scroll()
 		if scroll == null:
 			return
 		touch_scroll_distance += absf(event.relative.y)
@@ -860,12 +956,12 @@ func _set_upgrade_progress(progress_bar: ProgressBar, cost: int, maxed: bool = f
 func _setup_main_ui_visuals() -> void:
 	room_background.tooltip_text = "Your cat's gem lounge"
 	score_label.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 1.0))
-	score_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.14, 0.28, 0.9))
-	score_label.add_theme_constant_override("shadow_offset_x", 2)
-	score_label.add_theme_constant_override("shadow_offset_y", 3)
+	score_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.32))
+	score_label.add_theme_constant_override("shadow_offset_x", 0)
+	score_label.add_theme_constant_override("shadow_offset_y", 2)
 	score_label.add_theme_stylebox_override(
 		"normal",
-		_make_upgrade_style(Color(0.015, 0.035, 0.065, 0.72), Color(0.28, 0.84, 0.95, 0.44), 18, 1, -1, 8)
+		_make_upgrade_style(Color(0.02, 0.025, 0.03, 0.42), Color(1.0, 1.0, 1.0, 0.08), 24, 1, -1, 3)
 	)
 	hint_label.hide()
 	cat_button.tooltip_text = "Tap the cat (Space or Enter)"
@@ -886,7 +982,7 @@ func _setup_main_ui_visuals() -> void:
 	cat_button.move_child(cat_shadow, 0)
 	hud_wallet.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.075, 0.06, 0.025, 0.96), Color(1.0, 0.72, 0.18, 0.82), 18, 2, -1, 10)
+		_make_upgrade_style(Color(0.035, 0.035, 0.035, 0.72), Color(1.0, 0.9, 0.62, 0.18), 22, 1, -1, 4)
 	)
 	coins_label.add_theme_color_override("font_shadow_color", Color(0.2, 0.08, 0.0, 0.8))
 	coins_label.add_theme_constant_override("shadow_offset_x", 2)
@@ -897,26 +993,26 @@ func _setup_main_ui_visuals() -> void:
 	upgrade_button.add_theme_color_override("icon_hover_color", Color(1.0, 0.94, 0.65, 1.0))
 	upgrade_alert_badge.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(1.0, 1.0, 1.0, 1.0), Color(0.92, 0.05, 0.1, 1.0), 23, 4, -1, 8)
+		_make_upgrade_style(Color(1.0, 1.0, 1.0, 1.0), Color(0.92, 0.08, 0.14, 1.0), 18, 3, -1, 5)
 	)
 
 
 func _setup_pause_menu_visuals() -> void:
 	menu_panel.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.2, 0.32, 0.5, 1.0), 24, 2, -1, 18)
+		_make_upgrade_style(Color(0.035, 0.038, 0.045, 0.96), Color(1.0, 1.0, 1.0, 0.1), 28, 1, -1, 8)
 	)
 	menu_header.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.055, 0.085, 0.14, 1.0), Color(0.3, 0.7, 1.0, 0.7), 18, 2, 5, 8)
+		_make_upgrade_style(Color(0.07, 0.075, 0.085, 0.72), Color(1.0, 1.0, 1.0, 0.08), 20, 1, -1, 3)
 	)
 	menu_wallet.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.14, 0.105, 0.035, 0.92), Color(1.0, 0.72, 0.16, 0.75), 14, 1, -1, 5)
+		_make_upgrade_style(Color(0.09, 0.08, 0.055, 0.62), Color(1.0, 0.86, 0.5, 0.16), 18, 1, -1, 2)
 	)
 	daily_reward_card.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.105, 0.08, 0.035, 0.95), Color(1.0, 0.66, 0.18, 0.58), 16, 1, 4, 6)
+		_make_upgrade_style(Color(0.075, 0.065, 0.045, 0.68), Color(1.0, 0.84, 0.48, 0.14), 20, 1, -1, 3)
 	)
 	_style_upgrade_button(daily_reward_button, CHANCE_UPGRADE_COLOR)
 	_style_upgrade_button(settings_button, CLICK_UPGRADE_COLOR)
@@ -930,6 +1026,9 @@ func _build_skins_ui() -> void:
 	skins_button = Button.new()
 	skins_button.name = "SkinsButton"
 	skins_button.text = "SKINS"
+	skins_button.icon = SKINS_UI_ICON
+	skins_button.expand_icon = true
+	skins_button.add_theme_constant_override("icon_max_width", 42)
 	skins_button.tooltip_text = "Open cat skins"
 	skins_button.custom_minimum_size = Vector2(144.0, 58.0)
 	skins_button.add_theme_font_size_override("font_size", 20)
@@ -1023,17 +1122,60 @@ func _build_skins_ui() -> void:
 	skins_wallet_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.46, 1.0))
 	wallet_row.add_child(skins_wallet_label)
 
+	skins_tabs_row = HBoxContainer.new()
+	skins_tabs_row.add_theme_constant_override("separation", 8)
+	items.add_child(skins_tabs_row)
+
+	for tab_data in [
+		{"id": "crates", "text": "CRATES", "accent": Color(0.24, 0.82, 0.95, 1.0)},
+		{"id": "skins", "text": "SKINS", "accent": SKIN_ACCENT},
+		{"id": "background", "text": "BACKGROUND", "accent": Color(0.7, 0.58, 1.0, 1.0)},
+		{"id": "ui_color", "text": "UI COLOR", "accent": Color(1.0, 0.48, 0.68, 1.0)},
+	]:
+		var tab_button := Button.new()
+		tab_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab_button.custom_minimum_size = Vector2(0.0, 46.0)
+		tab_button.text = String(tab_data["text"])
+		tab_button.add_theme_font_size_override("font_size", 13)
+		_style_upgrade_button(tab_button, tab_data["accent"] as Color)
+		tab_button.pressed.connect(_set_skins_section.bind(String(tab_data["id"])))
+		skins_tabs_row.add_child(tab_button)
+		skins_tab_buttons[String(tab_data["id"])] = tab_button
+
+	var sections_root := VBoxContainer.new()
+	sections_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	items.add_child(sections_root)
+
+	var crates_panel := VBoxContainer.new()
+	crates_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	crates_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sections_root.add_child(crates_panel)
+	skins_section_panels["crates"] = crates_panel
+
+	crates_scroll = ScrollContainer.new()
+	crates_scroll.custom_minimum_size = Vector2(0.0, 720.0)
+	crates_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	crates_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_configure_touch_scroll(crates_scroll)
+	crates_panel.add_child(crates_scroll)
+
+	crates_list = VBoxContainer.new()
+	crates_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	crates_list.add_theme_constant_override("separation", 12)
+	crates_scroll.add_child(crates_list)
+
+	var skins_section := VBoxContainer.new()
+	skins_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	skins_section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sections_root.add_child(skins_section)
+	skins_section_panels["skins"] = skins_section
+
 	skins_scroll = ScrollContainer.new()
 	skins_scroll.custom_minimum_size = Vector2(0.0, 720.0)
 	skins_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	skins_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_configure_touch_scroll(skins_scroll)
-
-	var skin_columns := HBoxContainer.new()
-	skin_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	skin_columns.add_theme_constant_override("separation", 10)
-	items.add_child(skin_columns)
-	skin_columns.add_child(skins_scroll)
+	skins_section.add_child(skins_scroll)
 
 	skins_list = VBoxContainer.new()
 	skins_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1059,14 +1201,21 @@ func _build_skins_ui() -> void:
 	for skin_data in SKIN_DATA:
 		_add_skin_card(skin_data)
 
+	var background_section := VBoxContainer.new()
+	background_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	background_section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sections_root.add_child(background_section)
+	skins_section_panels["background"] = background_section
+
 	room_skins_scroll = ScrollContainer.new()
-	room_skins_scroll.custom_minimum_size = Vector2(168.0, 720.0)
+	room_skins_scroll.custom_minimum_size = Vector2(0.0, 720.0)
+	room_skins_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	room_skins_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_configure_touch_scroll(room_skins_scroll)
-	skin_columns.add_child(room_skins_scroll)
+	background_section.add_child(room_skins_scroll)
 
 	room_skins_list = VBoxContainer.new()
-	room_skins_list.custom_minimum_size = Vector2(158.0, 0.0)
+	room_skins_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	room_skins_list.add_theme_constant_override("separation", 10)
 	room_skins_scroll.add_child(room_skins_list)
 
@@ -1079,21 +1228,112 @@ func _build_skins_ui() -> void:
 	for room_skin_data in ROOM_SKIN_DATA:
 		_add_room_skin_card(room_skin_data)
 
+	var ui_color_section := VBoxContainer.new()
+	ui_color_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ui_color_section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ui_color_section.add_theme_constant_override("separation", 18)
+	sections_root.add_child(ui_color_section)
+	skins_section_panels["ui_color"] = ui_color_section
+
+	var color_title := Label.new()
+	color_title.text = "CUSTOMIZE YOUR UI"
+	color_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	color_title.add_theme_font_size_override("font_size", 20)
+	ui_color_section.add_child(color_title)
+
+	var color_hint := Label.new()
+	color_hint.text = "Choose a bright accent color, pick OLD STYLE for the solid classic look, or reset for the transparent default UI."
+	color_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	color_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ui_color_section.add_child(color_hint)
+
+	var picker := ColorPickerButton.new()
+	picker.text = "OPEN COLOR PALETTE"
+	picker.color = ui_tint
+	picker.custom_minimum_size = Vector2(0.0, 64.0)
+	picker.edit_alpha = false
+	picker.color_changed.connect(_on_ui_tint_changed)
+	_style_upgrade_button(picker, Color(0.45, 0.72, 1.0, 1.0))
+	ui_color_section.add_child(picker)
+
+	var preset_title := Label.new()
+	preset_title.text = "COLOR PRESETS"
+	preset_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ui_color_section.add_child(preset_title)
+	var preset_grid := GridContainer.new()
+	preset_grid.columns = 2
+	preset_grid.add_theme_constant_override("h_separation", 10)
+	preset_grid.add_theme_constant_override("v_separation", 10)
+	ui_color_section.add_child(preset_grid)
+	for preset_data in UI_COLOR_PRESETS:
+		var preset_button := Button.new()
+		preset_button.text = String(preset_data["name"])
+		preset_button.custom_minimum_size = Vector2(0.0, 54.0)
+		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var preset_color := preset_data["color"] as Color
+		_style_upgrade_button(preset_button, preset_color)
+		preset_button.pressed.connect(_on_ui_tint_changed.bind(preset_color))
+		preset_grid.add_child(preset_button)
+
+	var reset_color_button := Button.new()
+	reset_color_button.text = "RESET TO TRANSPARENT DEFAULT"
+	reset_color_button.custom_minimum_size = Vector2(0.0, 58.0)
+	_style_upgrade_button(reset_color_button, Color(0.55, 0.58, 0.66, 1.0))
+	reset_color_button.pressed.connect(_on_ui_tint_changed.bind(DEFAULT_UI_TINT))
+	ui_color_section.add_child(reset_color_button)
+
 	skins_back_button = Button.new()
 	skins_back_button.text = "BACK TO GAME"
 	skins_back_button.custom_minimum_size = Vector2(0.0, 56.0)
 	skins_back_button.add_theme_font_size_override("font_size", 20)
 	_style_upgrade_button(skins_back_button, Color(0.42, 0.5, 0.66, 1.0))
 	items.add_child(skins_back_button)
+	_set_skins_section("skins")
+
+
+func _set_skins_section(section_id: String) -> void:
+	skins_active_section = section_id if skins_section_panels.has(section_id) else "skins"
+	for entry_id in skins_section_panels.keys():
+		var panel := skins_section_panels[entry_id] as Control
+		if panel != null:
+			panel.visible = entry_id == skins_active_section
+	for entry_id in skins_tab_buttons.keys():
+		var button := skins_tab_buttons[entry_id] as Button
+		if button == null:
+			continue
+		button.disabled = entry_id == skins_active_section
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0) if entry_id == skins_active_section else Color(0.82, 0.86, 0.94, 0.92)
+
+
+func _on_ui_tint_changed(color: Color) -> void:
+	ui_tint = Color(color.r, color.g, color.b, 1.0)
+	_apply_ui_tint()
+	_play_ui_sound()
+	_queue_save()
+
+
+func _apply_ui_tint() -> void:
+	_apply_ui_tint_to_branch(self)
+
+
+func _apply_ui_tint_to_branch(node: Node) -> void:
+	for child in node.get_children():
+		_apply_ui_tint_to_branch(child)
+	if node is CanvasItem:
+		(node as CanvasItem).self_modulate = Color.WHITE
+	if node is Control:
+		_apply_ui_tint_to_control(node as Control)
 
 
 func _build_museum_ui() -> void:
 	museum_button = Button.new()
 	museum_button.name = "MuseumButton"
 	museum_button.text = "MUSEUM"
+	museum_button.icon = MUSEUM_UI_ICON
+	museum_button.expand_icon = true
+	museum_button.add_theme_constant_override("icon_max_width", 42)
 	museum_button.tooltip_text = "Visit your evolving collection museum"
-	museum_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	museum_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	museum_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	museum_button.custom_minimum_size = Vector2(154.0, 62.0)
 	museum_button.add_theme_font_size_override("font_size", 18)
 	add_child(museum_button)
@@ -1138,8 +1378,7 @@ func _build_bottomless_bowl_button() -> void:
 	bottomless_bowl_button.name = "BottomlessBowlButton"
 	bottomless_bowl_button.text = "CAT BOWL"
 	bottomless_bowl_button.tooltip_text = "Donate kibble to the Bottomless Cat Bowl"
-	bottomless_bowl_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	bottomless_bowl_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	bottomless_bowl_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	bottomless_bowl_button.custom_minimum_size = Vector2(154.0, 62.0)
 	bottomless_bowl_button.add_theme_font_size_override("font_size", 17)
 	add_child(bottomless_bowl_button)
@@ -1288,6 +1527,9 @@ func _build_boosts_ui() -> void:
 	boosts_button = Button.new()
 	boosts_button.name = "BoostsButton"
 	boosts_button.text = "BOOSTS"
+	boosts_button.icon = BOOSTS_UI_ICON
+	boosts_button.expand_icon = true
+	boosts_button.add_theme_constant_override("icon_max_width", 42)
 	boosts_button.tooltip_text = "Open temporary boosts"
 	boosts_button.add_theme_font_size_override("font_size", 19)
 	boosts_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -1383,6 +1625,18 @@ func _build_boosts_ui() -> void:
 	boost_wallet_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.46, 1.0))
 	wallet_row.add_child(boost_wallet_label)
 
+	var boost_tabs := HBoxContainer.new()
+	boost_tabs.add_theme_constant_override("separation", 10)
+	items.add_child(boost_tabs)
+	for category in ["classical", "advanced"]:
+		var tab := Button.new()
+		tab.text = String(category).to_upper()
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab.custom_minimum_size = Vector2(0, 52)
+		_style_upgrade_button(tab, Color(0.55, 0.45, 1.0) if category == "classical" else Color(1.0, 0.45, 0.72))
+		tab.pressed.connect(_show_boost_category.bind(category))
+		boost_tabs.add_child(tab)
+
 	boosts_scroll = ScrollContainer.new()
 	boosts_scroll.custom_minimum_size = Vector2(0.0, 360.0)
 	boosts_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1397,6 +1651,7 @@ func _build_boosts_ui() -> void:
 
 	for boost_data in BoostLogic.BOOST_DATA:
 		_add_boost_card(boost_data)
+	_show_boost_category("classical")
 
 	boosts_back_button = Button.new()
 	boosts_back_button.text = "BACK TO GAME"
@@ -1405,6 +1660,579 @@ func _build_boosts_ui() -> void:
 	_style_upgrade_button(boosts_back_button, Color(0.42, 0.5, 0.66, 1.0))
 	items.add_child(boosts_back_button)
 	boost_logic.update_ui()
+
+
+func _show_boost_category(category: String) -> void:
+	for data in BoostLogic.BOOST_DATA:
+		var card := boost_cards.get(String(data["id"])) as Control
+		if card != null:
+			card.visible = String(data.get("category", "classical")) == category
+	if is_instance_valid(boosts_scroll):
+		boosts_scroll.scroll_vertical = 0
+
+
+func _build_food_ui() -> void:
+	food_panel = PanelContainer.new()
+	food_panel.name = "FoodPanel"
+	food_panel.custom_minimum_size = Vector2(640.0, 760.0)
+	food_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	food_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	food_panel.hide()
+	menu_panel.get_parent().add_child(food_panel)
+	food_panel.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.055, 0.08, 0.095, 0.98), Color(0.96, 0.68, 0.26, 0.95), 12, 2, -1, 12))
+
+	var outer_margin := MarginContainer.new()
+	outer_margin.add_theme_constant_override("margin_left", 18)
+	outer_margin.add_theme_constant_override("margin_top", 18)
+	outer_margin.add_theme_constant_override("margin_right", 18)
+	outer_margin.add_theme_constant_override("margin_bottom", 18)
+	food_panel.add_child(outer_margin)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	outer_margin.add_child(content)
+
+	food_panel_title = Label.new()
+	food_panel_title.text = "INVENTORY"
+	food_panel_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	food_panel_title.add_theme_font_size_override("font_size", 34)
+	food_panel_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.54, 1.0))
+	content.add_child(food_panel_title)
+
+	food_wallet_label = Label.new()
+	food_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	food_wallet_label.add_theme_font_size_override("font_size", 18)
+	food_wallet_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.9, 1.0))
+	food_status_label = Label.new()
+	food_status_label.text = "Use an owned snack to start its boost."
+	food_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	food_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	food_status_label.add_theme_font_size_override("font_size", 16)
+	food_status_label.add_theme_color_override("font_color", Color(0.9, 0.78, 0.58, 1.0))
+	content.add_child(food_status_label)
+
+	food_scroll = ScrollContainer.new()
+	_configure_touch_scroll(food_scroll)
+	food_scroll.custom_minimum_size = Vector2(0.0, 470.0)
+	food_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(food_scroll)
+
+	food_list = GridContainer.new()
+	food_list.columns = 3
+	food_list.add_theme_constant_override("h_separation", 10)
+	food_list.add_theme_constant_override("v_separation", 10)
+	food_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	food_scroll.add_child(food_list)
+
+	for index in range(FOOD_NAMES.size()):
+		var food_id := _get_food_id(index)
+		food_inventory[food_id] = int(food_inventory.get(food_id, 0))
+		food_list.add_child(_create_food_card(index))
+
+	# Keep the useful inventory content above the currency readout.
+	content.add_child(food_wallet_label)
+
+	food_back_button = Button.new()
+	food_back_button.text = "BACK"
+	food_back_button.custom_minimum_size = Vector2(0.0, 56.0)
+	food_back_button.add_theme_font_size_override("font_size", 20)
+	_style_upgrade_button(food_back_button, Color(0.42, 0.5, 0.66, 1.0))
+	content.add_child(food_back_button)
+
+
+func _build_inventory_shop_buttons() -> void:
+	inventory_shop_bar = HBoxContainer.new()
+	inventory_shop_bar.name = "InventoryShopBar"
+	inventory_shop_bar.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	inventory_shop_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	inventory_shop_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	inventory_shop_bar.add_theme_constant_override("separation", 10)
+	add_child(inventory_shop_bar)
+	move_child(inventory_shop_bar, menu_overlay.get_index())
+	inventory_button = _make_bottom_nav_button("INVENTORY")
+	shop_button = _make_bottom_nav_button("SHOP")
+	inventory_shop_bar.add_child(inventory_button)
+	inventory_shop_bar.add_child(shop_button)
+	_build_compact_inventory_ui()
+
+
+func _build_compact_inventory_ui() -> void:
+	compact_inventory_panel = PanelContainer.new()
+	compact_inventory_panel.name = "CompactInventoryPanel"
+	compact_inventory_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	compact_inventory_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	compact_inventory_panel.custom_minimum_size = Vector2(0.0, 0.0)
+	compact_inventory_panel.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.035, 0.045, 0.08, 0.94), Color(0.96, 0.68, 0.26, 0.9), 12, 2, -1, 10))
+	add_child(compact_inventory_panel)
+	move_child(compact_inventory_panel, menu_overlay.get_index())
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	compact_inventory_panel.add_child(margin)
+	compact_inventory_scroll = ScrollContainer.new()
+	compact_inventory_scroll.custom_minimum_size = Vector2(0.0, 190.0)
+	compact_inventory_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_configure_touch_scroll(compact_inventory_scroll)
+	margin.add_child(compact_inventory_scroll)
+	compact_inventory_list = VBoxContainer.new()
+	compact_inventory_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	compact_inventory_list.add_theme_constant_override("separation", 5)
+	compact_inventory_scroll.add_child(compact_inventory_list)
+	compact_inventory_panel.hide()
+
+
+func _refresh_compact_inventory() -> void:
+	if not is_instance_valid(compact_inventory_list):
+		return
+	for child in compact_inventory_list.get_children():
+		compact_inventory_list.remove_child(child)
+		child.queue_free()
+	var title := Label.new()
+	title.text = "SNACK BOOSTS"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.54, 1.0))
+	compact_inventory_list.add_child(title)
+	var found := false
+	for index in range(FOOD_NAMES.size()):
+		var food_id := _get_food_id(index)
+		var count := int(food_inventory.get(food_id, 0))
+		if count <= 0:
+			continue
+		found = true
+		var data := _get_food_data(index)
+		var boost := _get_food_boost(index)
+		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(0.0, 82.0)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.tooltip_text = "Drag onto the cat for %d seconds" % int(boost["duration"])
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
+		card.add_theme_stylebox_override("panel", _make_upgrade_card_style(data["accent"] as Color, false))
+		card.gui_input.connect(_on_food_icon_gui_input.bind(food_id))
+		compact_inventory_list.add_child(card)
+		var card_margin := MarginContainer.new()
+		card_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_margin.add_theme_constant_override("margin_left", 8)
+		card_margin.add_theme_constant_override("margin_top", 7)
+		card_margin.add_theme_constant_override("margin_right", 8)
+		card_margin.add_theme_constant_override("margin_bottom", 7)
+		card.add_child(card_margin)
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 9)
+		card_margin.add_child(row)
+		var icon := TextureRect.new()
+		icon.texture = _get_food_icon(index)
+		icon.custom_minimum_size = Vector2(58.0, 58.0)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon)
+		var text_column := VBoxContainer.new()
+		text_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(text_column)
+		var name_label := Label.new()
+		name_label.text = "%s  x%d" % [String(data["name"]), count]
+		name_label.add_theme_font_size_override("font_size", 15)
+		name_label.add_theme_color_override("font_color", Color.WHITE)
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text_column.add_child(name_label)
+		var effect_label := Label.new()
+		effect_label.text = String(boost["text"])
+		effect_label.add_theme_font_size_override("font_size", 14)
+		effect_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.54, 1.0))
+		effect_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text_column.add_child(effect_label)
+	if not found:
+		var empty := Label.new()
+		empty.text = "No snack boosts owned"
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.add_theme_font_size_override("font_size", 11)
+		empty.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8, 1.0))
+		compact_inventory_list.add_child(empty)
+
+
+func _make_bottom_nav_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(154.0, 58.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", 20)
+	_style_upgrade_button(button, Color(0.96, 0.68, 0.26, 1.0))
+	return button
+
+
+func _create_food_card(index: int) -> PanelContainer:
+	var food_id := _get_food_id(index)
+	var data := _get_food_data(index)
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(186.0, 154.0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(data["accent"] as Color, false))
+	food_cards[food_id] = card
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	card.add_child(margin)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 5)
+	margin.add_child(content)
+	var icon := TextureRect.new()
+	icon.texture = _get_food_icon(index)
+	icon.custom_minimum_size = Vector2(48.0, 48.0)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_STOP
+	icon.gui_input.connect(_on_food_icon_gui_input.bind(food_id))
+	content.add_child(icon)
+	var name_label := Label.new()
+	name_label.text = String(data["name"]).to_upper()
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.clip_text = true
+	name_label.add_theme_font_size_override("font_size", 13)
+	content.add_child(name_label)
+	var boost: Dictionary = _get_food_boost(index)
+	var boost_label := Label.new()
+	boost_label.text = String(boost["text"])
+	boost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boost_label.add_theme_font_size_override("font_size", 12)
+	boost_label.add_theme_color_override("font_color", Color(0.72, 0.9, 1.0, 1.0))
+	content.add_child(boost_label)
+	var count_label := Label.new()
+	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count_label.add_theme_font_size_override("font_size", 14)
+	count_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
+	content.add_child(count_label)
+	food_card_counts[food_id] = count_label
+	var action := Button.new()
+	action.custom_minimum_size = Vector2(0.0, 42.0)
+	action.add_theme_font_size_override("font_size", 14)
+	action.pressed.connect(_on_food_card_action_pressed.bind(food_id))
+	content.add_child(action)
+	card.set_meta("action_button", action)
+	return card
+
+
+func _get_food_id(index: int) -> String:
+	return "food_%02d" % index
+
+
+func _get_food_data(index: int) -> Dictionary:
+	var hue := fmod(float(index) * 0.137, 1.0)
+	return {"id": _get_food_id(index), "name": FOOD_NAMES[index], "cost": FOOD_COST, "accent": Color.from_hsv(hue, 0.62, 0.95)}
+
+
+func _get_food_index(food_id: String) -> int:
+	return clampi(int(food_id.get_slice("_", 1)), 0, FOOD_NAMES.size() - 1)
+
+
+func _get_food_boost(index: int) -> Dictionary:
+	# Every snack has a stable effect, so inventory choices are meaningful.
+	return FOOD_BOOSTS[index % FOOD_BOOSTS.size()]
+
+
+func _get_food_icon(index: int) -> Texture2D:
+	var food_id := _get_food_id(index)
+	if food_icon_cache.has(food_id):
+		return food_icon_cache[food_id]
+	var image := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	var accent: Color = _get_food_data(index)["accent"]
+	_draw_food_icon(image, index, accent)
+	var texture := ImageTexture.create_from_image(image)
+	food_icon_cache[food_id] = texture
+	return texture
+
+
+func _draw_food_icon(image: Image, index: int, accent: Color) -> void:
+	var style := index % 10
+	match style:
+		0:
+			_draw_ellipse(image, Vector2(32, 33), Vector2(24, 16), Color(0.97, 0.93, 0.82, 1.0))
+			_draw_ellipse(image, Vector2(32, 31), Vector2(18, 11), accent)
+			_draw_ellipse(image, Vector2(25, 29), Vector2(3, 3), Color(1.0, 0.96, 0.76, 1.0))
+		1:
+			_draw_ellipse(image, Vector2(32, 32), Vector2(24, 21), Color(0.08, 0.12, 0.09, 1.0))
+			_draw_ellipse(image, Vector2(32, 32), Vector2(18, 15), Color(0.98, 0.96, 0.86, 1.0))
+			_draw_ellipse(image, Vector2(32, 32), Vector2(8, 7), accent)
+		2:
+			_draw_round_rect(image, Rect2(15, 19, 34, 28), 8.0, Color(0.96, 0.72, 0.42, 1.0))
+			_draw_round_rect(image, Rect2(19, 23, 26, 20), 6.0, accent.lightened(0.08))
+			_draw_rect(image, Rect2(22, 20, 20, 4), Color(1.0, 0.9, 0.66, 1.0))
+		3:
+			_draw_triangle(image, Vector2(15, 44), Vector2(49, 44), Vector2(33, 14), accent)
+			_draw_triangle(image, Vector2(19, 41), Vector2(45, 41), Vector2(33, 20), Color(1.0, 0.86, 0.58, 1.0))
+			_draw_ellipse(image, Vector2(33, 32), Vector2(4, 3), Color(0.55, 0.12, 0.08, 1.0))
+		4:
+			_draw_ellipse(image, Vector2(32, 34), Vector2(21, 16), Color(0.78, 0.42, 0.2, 1.0))
+			_draw_ellipse(image, Vector2(32, 29), Vector2(19, 11), accent.lightened(0.08))
+			_draw_rect(image, Rect2(18, 31, 28, 4), Color(1.0, 0.92, 0.62, 1.0))
+		5:
+			_draw_ellipse(image, Vector2(31, 35), Vector2(19, 14), Color(0.98, 0.92, 0.78, 1.0))
+			_draw_ellipse(image, Vector2(34, 28), Vector2(15, 12), accent)
+			_draw_rect(image, Rect2(29, 17, 6, 16), Color(0.32, 0.18, 0.08, 1.0))
+		6:
+			_draw_triangle(image, Vector2(17, 42), Vector2(50, 38), Vector2(24, 18), Color(0.12, 0.38, 0.14, 1.0))
+			_draw_triangle(image, Vector2(20, 39), Vector2(44, 36), Vector2(25, 21), accent)
+			_draw_ellipse(image, Vector2(29, 32), Vector2(3, 3), Color(0.98, 0.9, 0.62, 1.0))
+		7:
+			_draw_round_rect(image, Rect2(18, 17, 28, 34), 7.0, Color(0.9, 0.7, 0.42, 1.0))
+			_draw_rect(image, Rect2(19, 18, 26, 12), accent.lightened(0.1))
+			_draw_ellipse(image, Vector2(26, 24), Vector2(2, 2), Color(1.0, 0.96, 0.76, 1.0))
+			_draw_ellipse(image, Vector2(37, 24), Vector2(2, 2), Color(1.0, 0.96, 0.76, 1.0))
+		8:
+			_draw_ellipse(image, Vector2(25, 34), Vector2(9, 16), accent)
+			_draw_ellipse(image, Vector2(39, 31), Vector2(9, 16), accent.darkened(0.08))
+			_draw_ellipse(image, Vector2(32, 31), Vector2(3, 4), Color(1.0, 0.94, 0.72, 1.0))
+		_:
+			_draw_round_rect(image, Rect2(17, 18, 30, 28), 5.0, Color(0.94, 0.78, 0.55, 1.0))
+			_draw_round_rect(image, Rect2(18, 17, 28, 11), 5.0, accent)
+			_draw_rect(image, Rect2(21, 33, 22, 4), Color(1.0, 0.94, 0.72, 1.0))
+	_draw_icon_shadow(image)
+
+
+func _draw_icon_shadow(image: Image) -> void:
+	for y in range(50, 56):
+		for x in range(18, 47):
+			var dx := (float(x) - 32.0) / 18.0
+			var dy := (float(y) - 53.0) / 4.0
+			if dx * dx + dy * dy <= 1.0 and image.get_pixel(x, y).a < 0.1:
+				image.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.18))
+
+
+func _draw_rect(image: Image, rect: Rect2, color: Color) -> void:
+	for y in range(maxi(0, int(rect.position.y)), mini(64, int(rect.end.y))):
+		for x in range(maxi(0, int(rect.position.x)), mini(64, int(rect.end.x))):
+			image.set_pixel(x, y, color)
+
+
+func _draw_round_rect(image: Image, rect: Rect2, radius: float, color: Color) -> void:
+	for y in range(maxi(0, int(rect.position.y)), mini(64, int(rect.end.y))):
+		for x in range(maxi(0, int(rect.position.x)), mini(64, int(rect.end.x))):
+			var px := clampf(float(x), rect.position.x + radius, rect.end.x - radius)
+			var py := clampf(float(y), rect.position.y + radius, rect.end.y - radius)
+			if Vector2(float(x), float(y)).distance_to(Vector2(px, py)) <= radius:
+				image.set_pixel(x, y, color)
+
+
+func _draw_ellipse(image: Image, center: Vector2, radius: Vector2, color: Color) -> void:
+	for y in range(64):
+		for x in range(64):
+			var dx := (float(x) - center.x) / maxf(1.0, radius.x)
+			var dy := (float(y) - center.y) / maxf(1.0, radius.y)
+			if dx * dx + dy * dy <= 1.0:
+				image.set_pixel(x, y, color)
+
+
+func _draw_triangle(image: Image, a: Vector2, b: Vector2, c: Vector2, color: Color) -> void:
+	var min_x := maxi(0, floori(minf(a.x, minf(b.x, c.x))))
+	var max_x := mini(63, ceili(maxf(a.x, maxf(b.x, c.x))))
+	var min_y := maxi(0, floori(minf(a.y, minf(b.y, c.y))))
+	var max_y := mini(63, ceili(maxf(a.y, maxf(b.y, c.y))))
+	var area := _edge(a, b, c)
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+			var p := Vector2(float(x), float(y))
+			var w0 := _edge(b, c, p)
+			var w1 := _edge(c, a, p)
+			var w2 := _edge(a, b, p)
+			if (w0 >= 0 and w1 >= 0 and w2 >= 0 and area >= 0) or (w0 <= 0 and w1 <= 0 and w2 <= 0 and area <= 0):
+				image.set_pixel(x, y, color)
+
+
+func _edge(a: Vector2, b: Vector2, c: Vector2) -> float:
+	return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x)
+
+
+func _on_food_card_action_pressed(food_id: String) -> void:
+	if food_panel_mode == "shop":
+		_buy_food(food_id)
+	else:
+		_feed_cat(food_id)
+
+
+func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
+	if food_panel_mode != "inventory":
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_start_food_drag(food_id)
+		elif dragged_food_id == food_id:
+			_finish_food_drag(event.global_position)
+	elif event is InputEventMouseMotion and dragged_food_id == food_id:
+		_update_food_drag_preview(event.global_position)
+
+
+func _buy_food(food_id: String) -> void:
+	var data := _get_food_data(_get_food_index(food_id))
+	if not _spend_coins(int(data["cost"])):
+		food_status_label.text = "Need %s kibbles for this food." % _format_number(int(data["cost"]))
+		return
+	food_inventory[food_id] = int(food_inventory.get(food_id, 0)) + 1
+	_update_coins(false)
+	_update_food_ui()
+	_refresh_compact_inventory()
+	_play_purchase_sound()
+	_queue_save()
+	food_status_label.text = "Bought %s." % String(data["name"])
+
+
+func _start_food_drag(food_id: String) -> void:
+	if int(food_inventory.get(food_id, 0)) <= 0:
+		food_status_label.text = "Buy this food in the shop first."
+		return
+	dragged_food_id = food_id
+	if not is_instance_valid(dragged_food_preview):
+		dragged_food_preview = TextureRect.new()
+		dragged_food_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dragged_food_preview.z_index = 80
+		dragged_food_preview.size = Vector2(78.0, 78.0)
+		dragged_food_preview.pivot_offset = dragged_food_preview.size * 0.5
+		click_popup_layer.add_child(dragged_food_preview)
+	dragged_food_preview.texture = _get_food_icon(_get_food_index(food_id))
+	dragged_food_preview.show()
+	_update_food_drag_preview(get_viewport().get_mouse_position())
+	food_status_label.text = "Drop it on the cat."
+	menu_overlay.hide()
+
+
+func _update_food_drag_preview(global_position: Vector2) -> void:
+	if is_instance_valid(dragged_food_preview):
+		dragged_food_preview.global_position = global_position - dragged_food_preview.pivot_offset
+
+
+func _finish_food_drag(global_position: Vector2) -> void:
+	if dragged_food_id.is_empty():
+		return
+	var food_id := dragged_food_id
+	dragged_food_id = ""
+	if is_instance_valid(dragged_food_preview):
+		dragged_food_preview.hide()
+	if cat_button.get_global_rect().has_point(global_position):
+		_feed_cat(food_id)
+	else:
+		food_status_label.text = "Dropped outside the cat."
+
+
+func _feed_cat(food_id: String) -> void:
+	if int(food_inventory.get(food_id, 0)) <= 0:
+		return
+	food_inventory[food_id] = int(food_inventory.get(food_id, 0)) - 1
+	var food_data := _get_food_data(_get_food_index(food_id))
+	var boost: Dictionary = _get_food_boost(_get_food_index(food_id))
+	active_food_boosts[String(boost["id"])] = Time.get_unix_time_from_system() + float(boost["duration"])
+	_update_food_ui()
+	_refresh_compact_inventory()
+	_update_upgrade_ui()
+	_update_stats_ui()
+	_queue_save()
+	_play_bonus_sound()
+	_animate_cat_feed()
+	_spawn_floating_text(cat_button.get_global_rect().get_center(), "%s\n%s" % [String(food_data["name"]), String(boost["text"])], food_data["accent"] as Color)
+
+
+func _animate_cat_feed() -> void:
+	if cat_tween != null and cat_tween.is_valid():
+		cat_tween.kill()
+	cat_button.pivot_offset = cat_button.size * 0.5
+	cat_tween = create_tween()
+	cat_tween.tween_property(cat_button, "scale", CAT_BONUS_POP_SCALE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	cat_tween.tween_property(cat_button, "scale", cat_base_scale, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _spawn_floating_text(origin: Vector2, text: String, accent: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 24)
+	label.add_theme_color_override("font_color", accent.lightened(0.2))
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.82))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.position = click_popup_layer.get_global_transform().affine_inverse() * origin - Vector2(130.0, 40.0)
+	label.size = Vector2(260.0, 80.0)
+	label.z_index = 72
+	click_popup_layer.add_child(label)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(label, "position:y", label.position.y - 70.0, 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 0.0, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(Callable(label, "queue_free"))
+
+
+func _is_food_boost_active(boost_id: String) -> bool:
+	return float(active_food_boosts.get(boost_id, 0.0)) > Time.get_unix_time_from_system()
+
+
+func _update_food_ui() -> void:
+	if not is_instance_valid(food_panel):
+		return
+	food_panel_title.text = "SHOP" if food_panel_mode == "shop" else "INVENTORY"
+	food_wallet_label.text = "%s KIBBLES" % _format_number(coins)
+	var owned_types := 0
+	for index in range(FOOD_NAMES.size()):
+		var food_id := _get_food_id(index)
+		var data := _get_food_data(index)
+		var count := int(food_inventory.get(food_id, 0))
+		if count > 0:
+			owned_types += 1
+		var count_label := food_card_counts.get(food_id) as Label
+		if count_label != null:
+			count_label.text = "OWNED x%d" % count if food_panel_mode == "shop" else "x%d" % count
+		var card := food_cards.get(food_id) as PanelContainer
+		if card == null:
+			continue
+		# The shop remains a catalogue; inventory is only what the player owns.
+		card.visible = food_panel_mode == "shop" or count > 0
+		var button := card.get_meta("action_button") as Button
+		if button == null:
+			continue
+		if food_panel_mode == "shop":
+			button.text = "%s KIBBLES" % _format_number(int(data["cost"]))
+			button.disabled = coins < int(data["cost"])
+		else:
+			var boost: Dictionary = _get_food_boost(index)
+			button.text = "USE  %s" % String(boost["text"])
+			button.disabled = count <= 0
+	if food_panel_mode == "inventory":
+		food_status_label.text = "Choose an owned boost." if owned_types > 0 else "No boosts owned yet — buy one in the shop."
+
+
+func _cleanup_food_boosts() -> void:
+	var now := Time.get_unix_time_from_system()
+	for boost_id in active_food_boosts.keys():
+		if float(active_food_boosts[boost_id]) <= now:
+			active_food_boosts.erase(boost_id)
+
+
+func get_food_tap_multiplier() -> float:
+	_cleanup_food_boosts()
+	return 1.35 if _is_food_boost_active("snack_click") else 1.0
+
+
+func get_food_bonus_chance_bonus() -> float:
+	_cleanup_food_boosts()
+	return 12.0 if _is_food_boost_active("snack_luck") else 0.0
+
+
+func get_food_combo_multiplier() -> float:
+	_cleanup_food_boosts()
+	return 1.25 if _is_food_boost_active("snack_combo") else 1.0
+
+
+func get_food_global_gain_multiplier() -> float:
+	_cleanup_food_boosts()
+	return 1.3 if _is_food_boost_active("snack_kibble") else 1.0
+
+
+func get_food_bonus_payout_multiplier() -> float:
+	_cleanup_food_boosts()
+	return 1.2 if _is_food_boost_active("snack_bonus") else 1.0
 
 
 func _add_boost_card(boost_data: Dictionary) -> void:
@@ -1816,34 +2644,35 @@ func _get_global_gain_multiplier() -> float:
 	var gem_multiplier: float = crate_logic.get_global_multiplier() if crate_logic != null else 1.0
 	var boost_multiplier: float = boost_logic.get_global_gain_multiplier() if boost_logic != null else 1.0
 	var event_multiplier: float = random_event_logic.get_global_gain_multiplier() if random_event_logic != null else 1.0
-	var upgrade_multiplier := 1.0 + (0.03 * get_extended_upgrade_level("kibble_alchemy"))
+	var food_multiplier := get_food_global_gain_multiplier()
+	var upgrade_multiplier := 1.0 + (0.03 * get_extended_upgrade_level("kibble_alchemy")) + get_advanced_upgrade_bonus("all")
 	var bowl_multiplier: float = bottomless_bowl_logic.get_gain_multiplier() if bottomless_bowl_logic != null else 1.0
-	return float(bonus_data.get("all_gain_mult", 1.0)) * _get_skin_set_bonus_value("all_gain_mult", 1.0) * gem_multiplier * boost_multiplier * event_multiplier * upgrade_multiplier * bowl_multiplier
+	return float(bonus_data.get("all_gain_mult", 1.0)) * _get_skin_set_bonus_value("all_gain_mult", 1.0) * gem_multiplier * boost_multiplier * event_multiplier * food_multiplier * upgrade_multiplier * bowl_multiplier
 
 
 func _get_click_gain_multiplier() -> float:
 	var bonus_data := _get_equipped_skin_bonus_data()
-	return float(bonus_data.get("click_gain_mult", 1.0)) * _get_skin_set_bonus_value("click_gain_mult", 1.0) * (1.0 + (0.05 * get_extended_upgrade_level("tap_mastery")))
+	return float(bonus_data.get("click_gain_mult", 1.0)) * _get_skin_set_bonus_value("click_gain_mult", 1.0) * (1.0 + (0.05 * get_extended_upgrade_level("tap_mastery")) + get_advanced_upgrade_bonus("tap"))
 
 
 func _get_daily_reward_multiplier() -> float:
 	var bonus_data := _get_equipped_skin_bonus_data()
-	return float(bonus_data.get("daily_reward_mult", 1.0)) * (1.0 + (0.10 * get_extended_upgrade_level("daily_feast")))
+	return float(bonus_data.get("daily_reward_mult", 1.0)) * (1.0 + (0.10 * get_extended_upgrade_level("daily_feast")) + get_advanced_upgrade_bonus("daily"))
 
 
 func _get_bonus_chance_bonus_percent() -> float:
 	var bonus_data := _get_equipped_skin_bonus_data()
-	return float(bonus_data.get("bonus_chance_bonus", 0.0)) + _get_skin_set_bonus_value("bonus_chance_bonus", 0.0) + (0.5 * get_extended_upgrade_level("lucky_whiskers"))
+	return float(bonus_data.get("bonus_chance_bonus", 0.0)) + _get_skin_set_bonus_value("bonus_chance_bonus", 0.0) + (0.5 * get_extended_upgrade_level("lucky_whiskers")) + get_advanced_upgrade_bonus("luck")
 
 
 func _get_bonus_value_multiplier_bonus() -> float:
 	var bonus_data := _get_equipped_skin_bonus_data()
-	return float(bonus_data.get("bonus_value_mult", 1.0))
+	return float(bonus_data.get("bonus_value_mult", 1.0)) * (1.0 + get_advanced_upgrade_bonus("bonus"))
 
 
 func _get_streak_bonus() -> int:
 	var bonus_data := _get_equipped_skin_bonus_data()
-	return int(bonus_data.get("streak_bonus", 0))
+	return int(bonus_data.get("streak_bonus", 0)) + roundi(get_advanced_upgrade_bonus("streak"))
 
 
 func _get_passive_gain_bonus() -> int:
@@ -1853,15 +2682,23 @@ func _get_passive_gain_bonus() -> int:
 
 func _get_effective_passive_gain() -> int:
 	var base_gain := passive_clicks_per_minute + _get_passive_gain_bonus()
-	return maxi(1, roundi(float(base_gain) * (1.0 + 0.1 * get_extended_upgrade_level("dream_engine"))))
+	return maxi(1, roundi(float(base_gain) * (1.0 + 0.1 * get_extended_upgrade_level("dream_engine") + get_advanced_upgrade_bonus("idle"))))
 
 
 func get_extended_upgrade_level(upgrade_id: String) -> int:
 	return int(extended_upgrade_levels.get(upgrade_id, 0))
 
 
+func get_advanced_upgrade_bonus(effect: String) -> float:
+	var total := 0.0
+	for data in EXTENDED_UPGRADE_DATA:
+		if String(data.get("category", "classical")) == "advanced" and String(data.get("effect", "")) == effect:
+			total += float(data.get("amount", 0.0)) * get_extended_upgrade_level(String(data["id"]))
+	return total
+
+
 func get_effective_combo_cap() -> float:
-	return MAX_COMBO_BONUS + (0.1 * get_extended_upgrade_level("combo_capacity"))
+	return MAX_COMBO_BONUS + (0.1 * get_extended_upgrade_level("combo_capacity")) + get_advanced_upgrade_bonus("combo")
 
 
 func get_effective_combo_taps_per_step(base_taps: int) -> int:
@@ -1869,7 +2706,7 @@ func get_effective_combo_taps_per_step(base_taps: int) -> int:
 
 
 func get_offline_gain_max_seconds() -> int:
-	return OFFLINE_GAIN_MAX_SECONDS + (get_extended_upgrade_level("offline_storage") * 60 * 60)
+	return OFFLINE_GAIN_MAX_SECONDS + (get_extended_upgrade_level("offline_storage") * 60 * 60) + roundi(get_advanced_upgrade_bonus("storage") * 3600.0)
 
 
 func _apply_skin_gain_bonus(amount: int, gain_type: String) -> int:
@@ -2090,12 +2927,12 @@ func _style_settings_slider(slider: HSlider, accent: Color) -> void:
 func _handle_slider_touch(event: InputEvent) -> bool:
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			for slider in [click_power_slider, click_volume_slider, ui_volume_slider]:
-				if is_instance_valid(slider) and slider.is_visible_in_tree() and slider.get_global_rect().has_point(event.position):
-					touch_slider = slider
-					touch_slider_index = event.index
-					_set_slider_from_touch(slider, event.position)
-					return true
+			var slider := _get_slider_at_position(event.position)
+			if slider != null:
+				touch_slider = slider
+				touch_slider_index = event.index
+				_set_slider_from_touch(slider, event.position)
+				return true
 		elif event.index == touch_slider_index:
 			touch_slider_index = -1
 			touch_slider = null
@@ -2107,21 +2944,60 @@ func _handle_slider_touch(event: InputEvent) -> bool:
 	return false
 
 
-func _set_slider_from_touch(slider: HSlider, global_position: Vector2) -> void:
+func _get_slider_at_position(global_position: Vector2) -> Slider:
+	# Reverse tree order mirrors Control hit testing, so the topmost slider wins.
+	var sliders := find_children("*", "Slider", true, false)
+	for index in range(sliders.size() - 1, -1, -1):
+		var slider := sliders[index] as Slider
+		if slider != null and slider.is_visible_in_tree() and slider.get_global_rect().has_point(global_position):
+			return slider
+	return null
+
+
+func _set_slider_from_touch(slider: Slider, global_position: Vector2) -> void:
 	var rect := slider.get_global_rect()
-	if rect.size.x <= 0.0:
+	var is_vertical := slider is VSlider
+	var length := rect.size.y if is_vertical else rect.size.x
+	if length <= 0.0:
 		return
-	var ratio := clampf((global_position.x - rect.position.x) / rect.size.x, 0.0, 1.0)
+	var ratio := 1.0 - ((global_position.y - rect.position.y) / length) if is_vertical else (global_position.x - rect.position.x) / length
+	ratio = clampf(ratio, 0.0, 1.0)
+	if not is_vertical and slider.is_layout_rtl():
+		ratio = 1.0 - ratio
 	slider.value = lerpf(slider.min_value, slider.max_value, ratio)
 
 
 func _build_extended_upgrades_ui() -> void:
 	var back_index := upgrades_back_button.get_index()
+	var tabs := HBoxContainer.new()
+	tabs.name = "UpgradeCategoryTabs"
+	tabs.add_theme_constant_override("separation", 10)
+	upgrades_items.add_child(tabs)
+	upgrades_items.move_child(tabs, 1)
+	for category in ["classical", "advanced"]:
+		var tab := Button.new()
+		tab.text = String(category).to_upper()
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab.custom_minimum_size = Vector2(0, 52)
+		_style_upgrade_button(tab, Color(0.3, 0.72, 1.0) if category == "classical" else Color(0.82, 0.42, 1.0))
+		tab.pressed.connect(_show_upgrade_category.bind(category))
+		tabs.add_child(tab)
+	back_index = upgrades_back_button.get_index()
 	for upgrade_data in EXTENDED_UPGRADE_DATA:
 		var card := _create_extended_upgrade_card(upgrade_data)
 		upgrades_items.add_child(card)
 		upgrades_items.move_child(card, back_index)
 		back_index += 1
+	_show_upgrade_category("classical")
+
+
+func _show_upgrade_category(category: String) -> void:
+	for card in [click_upgrade_card, bonus_chance_card, bonus_value_card, bonus_streak_card, passive_gain_card]:
+		card.visible = category == "classical"
+	for data in EXTENDED_UPGRADE_DATA:
+		var controls: Dictionary = extended_upgrade_controls.get(String(data["id"]), {})
+		if not controls.is_empty():
+			(controls["card"] as Control).visible = String(data.get("category", "classical")) == category
 
 
 func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
@@ -2146,11 +3022,11 @@ func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
 	items.add_child(header)
 
 	var badge := Label.new()
-	badge.custom_minimum_size = Vector2(62, 30)
+	badge.custom_minimum_size = Vector2(94, 40)
 	badge.text = String(upgrade_data["badge"])
 	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	badge.add_theme_font_size_override("font_size", 13)
+	badge.add_theme_font_size_override("font_size", 17)
 	header.add_child(badge)
 
 	var title := Label.new()
@@ -2171,6 +3047,14 @@ func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
 	progress_bar.custom_minimum_size = Vector2(0, 10)
 	progress_bar.show_percentage = false
 	items.add_child(progress_bar)
+
+	if upgrade_data.has("description"):
+		var description := Label.new()
+		description.text = String(upgrade_data["description"])
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		description.add_theme_font_size_override("font_size", 14)
+		description.add_theme_color_override("font_color", Color(0.68, 0.73, 0.82, 1.0))
+		items.add_child(description)
 
 	var cost_label := Label.new()
 	cost_label.text = "Loading upgrade..."
@@ -2269,6 +3153,8 @@ func _make_upgrade_style(
 	var style := StyleBoxFlat.new()
 	style.bg_color = background
 	style.border_color = border
+	style.set_meta("base_bg_color", background)
+	style.set_meta("base_border_color", border)
 	style.set_border_width_all(border_width)
 	if left_border_width >= 0:
 		style.border_width_left = left_border_width
@@ -2277,15 +3163,127 @@ func _make_upgrade_style(
 		style.shadow_color = Color(0.0, 0.0, 0.0, 0.42)
 		style.shadow_size = shadow_size
 		style.shadow_offset = Vector2(0.0, 5.0)
+	_apply_ui_tint_to_style(style)
 	return style
 
 
+func _is_default_ui_tint() -> bool:
+	return (
+		is_equal_approx(ui_tint.r, DEFAULT_UI_TINT.r)
+		and is_equal_approx(ui_tint.g, DEFAULT_UI_TINT.g)
+		and is_equal_approx(ui_tint.b, DEFAULT_UI_TINT.b)
+	)
+
+
+func _is_legacy_ui_tint() -> bool:
+	return (
+		is_equal_approx(ui_tint.r, LEGACY_UI_TINT.r)
+		and is_equal_approx(ui_tint.g, LEGACY_UI_TINT.g)
+		and is_equal_approx(ui_tint.b, LEGACY_UI_TINT.b)
+	)
+
+
+func _apply_ui_tint_to_control(control: Control) -> void:
+	for style_name in [
+		"panel",
+		"normal",
+		"hover",
+		"pressed",
+		"disabled",
+		"focus",
+		"background",
+		"fill",
+		"grabber_area",
+		"grabber_area_highlight",
+	]:
+		var stylebox := control.get_theme_stylebox(style_name)
+		if stylebox is StyleBoxFlat:
+			_apply_ui_tint_to_style(stylebox as StyleBoxFlat)
+	if control is Button:
+		_apply_ui_tint_to_button_text(control as Button)
+	elif control is Label or control is ProgressBar:
+		_apply_ui_tint_to_control_text(control)
+
+
+func _contrasting_ui_text_color(background: Color) -> Color:
+	var luminance := 0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b
+	return Color(0.055, 0.065, 0.085, 1.0) if luminance > 0.5 else Color(0.98, 0.99, 1.0, 1.0)
+
+
+func _apply_ui_tint_to_control_text(control: Control) -> void:
+	if not control.has_meta("base_font_color"):
+		control.set_meta("base_font_color", control.get_theme_color("font_color"))
+	control.add_theme_color_override("font_color", control.get_meta("base_font_color") as Color)
+	if not _is_legacy_ui_tint():
+		return
+	var stylebox := control.get_theme_stylebox("normal")
+	if stylebox is StyleBoxFlat:
+		var background := (stylebox as StyleBoxFlat).bg_color
+		if background.a > 0.5:
+			control.add_theme_color_override("font_color", _contrasting_ui_text_color(background))
+
+
+func _apply_ui_tint_to_button_text(button: Button) -> void:
+	var color_names := ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color"]
+	for color_name in color_names:
+		var meta_name := "base_%s" % color_name
+		if not button.has_meta(meta_name):
+			button.set_meta(meta_name, button.get_theme_color(color_name))
+		button.add_theme_color_override(color_name, button.get_meta(meta_name) as Color)
+	if not _is_legacy_ui_tint():
+		return
+	var state_styles := {
+		"font_color": "normal",
+		"font_hover_color": "hover",
+		"font_pressed_color": "pressed",
+		"font_disabled_color": "disabled",
+	}
+	for color_name in state_styles:
+		var stylebox := button.get_theme_stylebox(state_styles[color_name] as String)
+		if stylebox is StyleBoxFlat:
+			var background := (stylebox as StyleBoxFlat).bg_color
+			button.add_theme_color_override(color_name, _contrasting_ui_text_color(background))
+
+
+func _apply_ui_tint_to_style(style: StyleBoxFlat) -> void:
+	if not style.has_meta("base_bg_color") or not style.has_meta("base_border_color"):
+		return
+	var base_bg := style.get_meta("base_bg_color") as Color
+	var base_border := style.get_meta("base_border_color") as Color
+	if _is_default_ui_tint():
+		style.bg_color = base_bg
+		style.border_color = base_border
+		return
+	if _is_legacy_ui_tint():
+		var legacy_bg := base_bg
+		var legacy_border := base_border
+		if legacy_bg.a > 0.01:
+			legacy_bg.a = maxf(legacy_bg.a, 0.96)
+		if legacy_border.a > 0.01:
+			legacy_border.a = maxf(legacy_border.a, 0.82)
+		style.bg_color = legacy_bg
+		style.border_color = legacy_border
+		return
+	if base_bg.a > 0.01:
+		var tinted_bg := base_bg.lerp(ui_tint.darkened(0.42), 0.68)
+		tinted_bg.a = maxf(base_bg.a, 0.96)
+		style.bg_color = tinted_bg
+	else:
+		style.bg_color = base_bg
+	if base_border.a > 0.01:
+		var tinted_border := base_border.lerp(ui_tint.lightened(0.12), 0.72)
+		tinted_border.a = maxf(base_border.a, 0.92)
+		style.border_color = tinted_border
+	else:
+		style.border_color = base_border
+
+
 func _make_upgrade_card_style(accent: Color, hovered: bool) -> StyleBoxFlat:
-	var background := Color(0.075, 0.085, 0.12, 0.99)
+	var background := Color(0.055, 0.06, 0.07, 0.82)
 	if hovered:
-		background = Color(0.095, 0.11, 0.16, 1.0)
-	var border := Color(accent.r, accent.g, accent.b, 0.82 if hovered else 0.42)
-	return _make_upgrade_style(background, border, 16, 1, 5, 8 if hovered else 4)
+		background = Color(0.075, 0.08, 0.09, 0.94)
+	var border := Color(accent.r, accent.g, accent.b, 0.34 if hovered else 0.13)
+	return _make_upgrade_style(background, border, 20, 1, -1, 3 if hovered else 0)
 
 
 func _set_upgrade_card_hover(card: PanelContainer, accent: Color, hovered: bool) -> void:
@@ -2301,20 +3299,77 @@ func _style_upgrade_button(button: Button, accent: Color) -> void:
 	button.add_theme_color_override("icon_disabled_color", Color(0.68, 0.58, 0.32, 0.72))
 	button.add_theme_stylebox_override(
 		"normal",
-		_make_upgrade_style(accent.darkened(0.48), Color(accent.r, accent.g, accent.b, 0.72), 12, 2)
+		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.18), Color(accent.r, accent.g, accent.b, 0.24), 16, 1)
 	)
 	button.add_theme_stylebox_override(
 		"hover",
-		_make_upgrade_style(accent.darkened(0.28), accent.lightened(0.12), 12, 2, -1, 8)
+		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.3), Color(accent.r, accent.g, accent.b, 0.48), 16, 1, -1, 3)
 	)
 	button.add_theme_stylebox_override(
 		"pressed",
-		_make_upgrade_style(accent.darkened(0.12), Color.WHITE, 12, 2)
+		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.42), Color(1.0, 1.0, 1.0, 0.42), 16, 1)
 	)
 	button.add_theme_stylebox_override(
 		"disabled",
-		_make_upgrade_style(Color(0.09, 0.1, 0.13, 0.9), Color(0.22, 0.24, 0.3, 1.0), 12, 1)
+		_make_upgrade_style(Color(0.07, 0.075, 0.085, 0.56), Color(1.0, 1.0, 1.0, 0.07), 16, 1)
 	)
+
+
+func _apply_minimal_ui_system(node: Node) -> void:
+	# A final, quiet visual pass keeps static and runtime-built interfaces cohesive.
+	for child in node.get_children():
+		_apply_minimal_ui_system(child)
+	if node is PanelContainer:
+		var panel := node as PanelContainer
+		if panel == upgrade_alert_badge:
+			return
+		panel.add_theme_stylebox_override(
+			"panel",
+			_make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.2, 0.72, 0.95, 0.92), 22, 2, -1, 12)
+		)
+	elif node is Button:
+		var button := node as Button
+		if button.icon != null:
+			button.add_theme_constant_override("icon_max_width", 38)
+		_style_upgrade_button(button, Color(0.78, 0.62, 0.3, 1.0))
+	elif node is ItemList:
+		var list := node as ItemList
+		list.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.2, 0.72, 0.95, 0.65), 18, 1))
+	elif node is LineEdit:
+		var edit := node as LineEdit
+		edit.add_theme_stylebox_override("normal", _make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.2, 0.72, 0.95, 0.65), 14, 1))
+		edit.add_theme_stylebox_override("focus", _make_upgrade_style(Color(0.055, 0.085, 0.14, 1.0), Color(1.0, 0.82, 0.48, 0.82), 14, 2))
+
+
+func _apply_touch_target_hierarchy(node: Node) -> void:
+	for child in node.get_children():
+		_apply_touch_target_hierarchy(child)
+	if node is Button:
+		var button := node as Button
+		var action_text := button.text.to_lower()
+		var is_key_action := (
+			"upgrade" in action_text
+			or "claim" in action_text
+			or "complete" in action_text
+			or "resume" in action_text
+			or "open" in action_text
+			or "buy" in action_text
+			or "equip" in action_text
+			or "activate" in action_text
+		)
+		var target_height := 64.0 if is_key_action else 56.0
+		button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, target_height)
+		button.add_theme_constant_override("h_separation", 12)
+	elif node is TextureButton:
+		var texture_button := node as TextureButton
+		texture_button.custom_minimum_size.x = maxf(texture_button.custom_minimum_size.x, 64.0)
+		texture_button.custom_minimum_size.y = maxf(texture_button.custom_minimum_size.y, 64.0)
+	elif node is Slider:
+		var slider := node as Slider
+		slider.custom_minimum_size.y = maxf(slider.custom_minimum_size.y, 48.0)
+	elif node is VBoxContainer:
+		var column := node as VBoxContainer
+		column.add_theme_constant_override("separation", maxi(column.get_theme_constant("separation"), 10))
 
 
 func _style_upgrade_progress(progress_bar: ProgressBar, accent: Color) -> void:
@@ -3061,7 +4116,9 @@ func _release_cat_pop(is_bonus: bool = false) -> void:
 func _play_tap_haptic(is_bonus: bool) -> void:
 	if not OS.has_feature("mobile"):
 		return
-	Input.vibrate_handheld(35 if is_bonus else 12, 0.72 if is_bonus else 0.28)
+	const HAPTIC_TICK_MS := 20
+	var duration_ms := HAPTIC_TICK_MS * (2 if is_bonus else 1)
+	Input.vibrate_handheld(duration_ms, 0.72 if is_bonus else 0.28)
 
 
 func _pulse_label(label: Label, is_bonus: bool) -> void:
@@ -3141,16 +4198,16 @@ func _pop_control(control: Control, target_scale: Vector2, duration: float) -> v
 	control.set_meta("scale_tween", tween)
 
 
-func _celebrate_upgrade(card: Control, accent: Color) -> void:
+func _celebrate_upgrade(card: Control, accent: Color, success_text: String = "UPGRADED!") -> void:
 	_pop_control(card, Vector2(1.025, 1.025), 0.24)
 	card.modulate = accent.lightened(0.45)
 	var tween := create_tween()
 	tween.tween_property(card, "modulate", Color.WHITE, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_pulse_label(upgrade_coins_label, false)
-	_spawn_upgrade_burst(card, accent)
+	_spawn_upgrade_burst(card, accent, success_text)
 
 
-func _spawn_upgrade_burst(card: Control, accent: Color) -> void:
+func _spawn_upgrade_burst(card: Control, accent: Color, success_text: String = "UPGRADED!") -> void:
 	var card_rect := card.get_global_rect()
 	var center := card_rect.get_center() - click_popup_layer.global_position
 	for index in range(14):
@@ -3181,7 +4238,7 @@ func _spawn_upgrade_burst(card: Control, accent: Color) -> void:
 		spark_tween.chain().tween_callback(Callable(spark, "queue_free"))
 
 	var success_label := Label.new()
-	success_label.text = "UPGRADED!"
+	success_label.text = success_text
 	success_label.position = center - Vector2(92.0, 30.0)
 	success_label.size = Vector2(184.0, 48.0)
 	success_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3289,11 +4346,24 @@ func _animate_skins_screen() -> void:
 	if not skins_panel.visible:
 		return
 	var controls: Array[Control] = []
-	var items := skins_scroll.get_parent()
+	var items := skins_tabs_row.get_parent()
 	for child in items.get_children():
 		if child is Control and child.visible and child != skins_scroll:
 			controls.append(child as Control)
-	for child in skins_list.get_children():
+	var active_panel := skins_section_panels.get(skins_active_section) as Control
+	if active_panel != null:
+		for child in active_panel.get_children():
+			if child is Control and child.visible:
+				controls.append(child as Control)
+	var active_list: VBoxContainer = null
+	match skins_active_section:
+		"crates":
+			active_list = crates_list
+		"background":
+			active_list = room_skins_list
+		_:
+			active_list = skins_list
+	for child in active_list.get_children():
 		if child is Control and child.visible:
 			controls.append(child as Control)
 	_animate_control_sequence(controls, 0.035, 36.0)
@@ -3391,24 +4461,25 @@ func _setup_modal_navigation() -> void:
 
 	modal_close_button = Button.new()
 	modal_close_button.name = "ModalCloseButton"
-	modal_close_button.text = "X"
+	modal_close_button.text = "×"
 	modal_close_button.tooltip_text = "Close (Esc)"
 	modal_close_button.size = Vector2(48.0, 48.0)
 	modal_close_button.custom_minimum_size = Vector2(48.0, 48.0)
-	modal_close_button.flat = true
+	modal_close_button.flat = false
 	modal_close_button.focus_mode = Control.FOCUS_NONE
 	modal_close_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	modal_close_button.z_index = 20
-	modal_close_button.add_theme_font_size_override("font_size", 30)
-	modal_close_button.add_theme_color_override("font_color", Color(1.0, 0.42, 0.52, 1.0))
-	modal_close_button.add_theme_color_override("font_hover_color", Color(1.0, 0.72, 0.78, 1.0))
+	modal_close_button.add_theme_font_size_override("font_size", 28)
+	modal_close_button.add_theme_color_override("font_color", Color(0.78, 0.9, 1.0, 1.0))
+	modal_close_button.add_theme_color_override("font_hover_color", Color.WHITE)
 	modal_close_button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	modal_close_button.add_theme_color_override("font_shadow_color", Color(0.5, 0.0, 0.08, 0.72))
+	modal_close_button.add_theme_color_override("font_shadow_color", Color(0.0, 0.08, 0.18, 0.72))
 	modal_close_button.add_theme_constant_override("shadow_offset_x", 0)
 	modal_close_button.add_theme_constant_override("shadow_offset_y", 2)
-	var empty_button_style := StyleBoxEmpty.new()
-	for style_name in ["normal", "hover", "pressed", "focus", "disabled"]:
-		modal_close_button.add_theme_stylebox_override(style_name, empty_button_style)
+	modal_close_button.add_theme_stylebox_override("normal", _make_upgrade_style(Color(0.055, 0.085, 0.14, 0.98), Color(0.3, 0.7, 1.0, 0.82), 12, 2, -1, 7))
+	modal_close_button.add_theme_stylebox_override("hover", _make_upgrade_style(Color(0.09, 0.16, 0.26, 1.0), Color(0.48, 0.84, 1.0, 1.0), 12, 2, -1, 9))
+	modal_close_button.add_theme_stylebox_override("pressed", _make_upgrade_style(Color(0.04, 0.07, 0.13, 1.0), Color(0.72, 0.56, 1.0, 1.0), 12, 2, -1, 4))
+	modal_close_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	modal_close_button.pressed.connect(_hide_menu)
 	modal_close_button.mouse_entered.connect(_animate_modal_close_hover.bind(true))
 	modal_close_button.mouse_exited.connect(_animate_modal_close_hover.bind(false))
@@ -3447,6 +4518,7 @@ func _get_overlay_panels() -> Array[Control]:
 		stats_panel,
 		skins_panel,
 		boosts_panel,
+		food_panel,
 		museum_panel,
 	]
 	if bottomless_bowl_logic != null and is_instance_valid(bottomless_bowl_logic.panel):
@@ -3584,13 +4656,64 @@ func _configure_touch_scroll(scroll: ScrollContainer) -> void:
 	scroll.follow_focus = true
 
 
+func _get_scroll_at_position(global_position: Vector2) -> ScrollContainer:
+	var candidate_scrolls: Array[ScrollContainer] = []
+	if skins_panel.visible:
+		if skins_active_section == "background" and is_instance_valid(room_skins_scroll):
+			candidate_scrolls.append(room_skins_scroll)
+		elif skins_active_section == "crates" and is_instance_valid(crates_scroll):
+			candidate_scrolls.append(crates_scroll)
+		elif is_instance_valid(skins_scroll):
+			candidate_scrolls.append(skins_scroll)
+		if is_instance_valid(room_skins_scroll):
+			candidate_scrolls.append(room_skins_scroll)
+		if is_instance_valid(crates_scroll):
+			candidate_scrolls.append(crates_scroll)
+		if is_instance_valid(skins_scroll):
+			candidate_scrolls.append(skins_scroll)
+	if boosts_panel.visible and is_instance_valid(boosts_scroll):
+		candidate_scrolls.append(boosts_scroll)
+	if food_panel.visible and is_instance_valid(food_scroll):
+		candidate_scrolls.append(food_scroll)
+	if stats_panel.visible and is_instance_valid(stats_cards):
+		candidate_scrolls.append(stats_cards.get_parent() as ScrollContainer)
+	if crate_logic != null and is_instance_valid(crate_logic.panel) and crate_logic.panel.visible and is_instance_valid(crate_logic.scroll):
+		candidate_scrolls.append(crate_logic.scroll)
+	if mission_logic != null and is_instance_valid(mission_logic.panel) and mission_logic.panel.visible:
+		var mission_scroll := _find_scroll_container(mission_logic.panel)
+		if mission_scroll != null:
+			candidate_scrolls.append(mission_scroll)
+	if museum_panel.visible and is_instance_valid(museum_scroll):
+		candidate_scrolls.append(museum_scroll)
+	if bottomless_bowl_logic != null and is_instance_valid(bottomless_bowl_logic.panel) and bottomless_bowl_logic.panel.visible:
+		var bowl_scroll := _find_scroll_container(bottomless_bowl_logic.panel)
+		if bowl_scroll != null:
+			candidate_scrolls.append(bowl_scroll)
+	for panel in [menu_panel, settings_panel, upgrades_panel, achievements_panel]:
+		if panel.visible:
+			var panel_scroll := _find_scroll_container(panel)
+			if panel_scroll != null:
+				candidate_scrolls.append(panel_scroll)
+
+	for scroll in candidate_scrolls:
+		if scroll != null and scroll.is_visible_in_tree() and scroll.get_global_rect().has_point(global_position):
+			return scroll
+	return _get_visible_menu_scroll()
+
+
 func _get_visible_menu_scroll() -> ScrollContainer:
 	if stats_panel.visible:
 		return stats_cards.get_parent() as ScrollContainer
 	if skins_panel.visible:
+		if skins_active_section == "background" and is_instance_valid(room_skins_scroll):
+			return room_skins_scroll
+		if skins_active_section == "crates" and is_instance_valid(crates_scroll):
+			return crates_scroll
 		return skins_scroll
 	if boosts_panel.visible:
 		return boosts_scroll
+	if food_panel.visible:
+		return food_scroll
 	if crate_logic != null and is_instance_valid(crate_logic.panel) and crate_logic.panel.visible:
 		return crate_logic.scroll
 	for panel in [menu_panel, settings_panel, upgrades_panel, achievements_panel]:
@@ -3614,6 +4737,7 @@ func _apply_mobile_layout() -> void:
 	_set_responsive_panel_size(stats_panel, Vector2(610.0, 900.0), panel_width, panel_height)
 	_set_responsive_panel_size(skins_panel, Vector2(640.0, 1080.0), panel_width, panel_height)
 	_set_responsive_panel_size(boosts_panel, Vector2(640.0, 1080.0), panel_width, panel_height)
+	_set_responsive_panel_size(food_panel, Vector2(640.0, 980.0), panel_width, panel_height)
 	_set_responsive_panel_size(museum_panel, Vector2(640.0, 1080.0), panel_width, panel_height)
 	if bottomless_bowl_logic != null and is_instance_valid(bottomless_bowl_logic.panel):
 		_set_responsive_panel_size(bottomless_bowl_logic.panel, Vector2(640.0, 1080.0), panel_width, panel_height)
@@ -3653,6 +4777,10 @@ func _apply_mobile_layout() -> void:
 	hud_wallet.offset_top = -hud_height - side_margin
 	hud_wallet.offset_right = hud_row_left + hud_width
 	hud_wallet.offset_bottom = -side_margin
+	if is_instance_valid(compact_inventory_panel):
+		compact_inventory_panel.offset_left = hud_row_left
+		compact_inventory_panel.offset_right = hud_row_left + hud_width
+		compact_inventory_panel.offset_bottom = hud_wallet.offset_top - 10.0
 	upgrade_button.offset_left = -(viewport_size.x - hud_row_right + upgrade_width)
 	upgrade_button.offset_top = -hud_height - side_margin
 	upgrade_button.offset_right = -(viewport_size.x - hud_row_right)
@@ -3662,13 +4790,25 @@ func _apply_mobile_layout() -> void:
 	call_deferred("_animate_hud_coin_text")
 	upgrade_button.add_theme_font_size_override("font_size", 18 if phone_layout else 21)
 
-	var boost_height := 54.0 if short_phone else 60.0
+	var boost_height := 64.0
 	boosts_button.custom_minimum_size = Vector2(upgrade_width, boost_height)
 	boosts_button.offset_left = upgrade_button.offset_left
 	boosts_button.offset_top = upgrade_button.offset_top - boost_height - 12.0
 	boosts_button.offset_right = upgrade_button.offset_right
 	boosts_button.offset_bottom = upgrade_button.offset_top - 12.0
 	boosts_button.add_theme_font_size_override("font_size", 17 if phone_layout else 19)
+
+	if is_instance_valid(inventory_shop_bar):
+		var food_button_height := 58.0
+		var food_bar_width := upgrade_width
+		inventory_shop_bar.offset_left = upgrade_button.offset_left
+		inventory_shop_bar.offset_top = boosts_button.offset_top - food_button_height - 12.0
+		inventory_shop_bar.offset_right = upgrade_button.offset_right
+		inventory_shop_bar.offset_bottom = boosts_button.offset_top - 12.0
+		inventory_button.custom_minimum_size = Vector2((food_bar_width - 10.0) * 0.5, food_button_height)
+		shop_button.custom_minimum_size = Vector2((food_bar_width - 10.0) * 0.5, food_button_height)
+		inventory_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
+		shop_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
 
 	var menu_size := 78.0 if short_phone else 92.0
 	menu_button.custom_minimum_size = Vector2(menu_size, menu_size)
@@ -3677,33 +4817,16 @@ func _apply_mobile_layout() -> void:
 	menu_button.offset_right = -(viewport_size.x - content_right + side_margin)
 	menu_button.offset_bottom = side_margin + menu_size
 
-	var museum_width := 142.0 if short_phone else 154.0
-	var museum_height := 56.0 if short_phone else 62.0
-	museum_button.custom_minimum_size = Vector2(museum_width, museum_height)
-	museum_button.offset_left = -(viewport_size.x - content_right + side_margin + museum_width)
-	museum_button.offset_top = side_margin + menu_size + 10.0
-	museum_button.offset_right = -(viewport_size.x - content_right + side_margin)
-	museum_button.offset_bottom = side_margin + menu_size + 10.0 + museum_height
-	museum_button.add_theme_font_size_override("font_size", 16 if phone_layout else 18)
-
-	var bowl_height := 54.0 if short_phone else 60.0
-	bottomless_bowl_button.custom_minimum_size = Vector2(museum_width, bowl_height)
-	bottomless_bowl_button.offset_left = museum_button.offset_left
-	bottomless_bowl_button.offset_top = museum_button.offset_bottom + 10.0
-	bottomless_bowl_button.offset_right = museum_button.offset_right
-	bottomless_bowl_button.offset_bottom = museum_button.offset_bottom + 10.0 + bowl_height
-	bottomless_bowl_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
-
 	var skins_width := 142.0 if short_phone else 154.0
-	var skins_height := 56.0 if short_phone else 62.0
+	var skins_height := 64.0
 	skins_button.custom_minimum_size = Vector2(skins_width, skins_height)
 	skins_button.offset_left = content_left + side_margin
 	skins_button.offset_top = side_margin
 	skins_button.offset_right = content_left + side_margin + skins_width
 	skins_button.offset_bottom = side_margin + skins_height
 
-	if crate_logic != null and is_instance_valid(crate_logic.button):
-		var crates_height := 54.0 if short_phone else 60.0
+	if crate_logic != null and is_instance_valid(crate_logic.button) and crate_logic.button.visible:
+		var crates_height := 64.0
 		crate_logic.button.custom_minimum_size = Vector2(skins_width, crates_height)
 		crate_logic.button.offset_left = content_left + side_margin
 		crate_logic.button.offset_top = side_margin + skins_height + 10.0
@@ -3712,26 +4835,49 @@ func _apply_mobile_layout() -> void:
 		crate_logic.button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
 
 	if mission_logic != null and is_instance_valid(mission_logic.button):
-		var missions_height := 54.0 if short_phone else 60.0
+		var missions_height := 72.0
 		var missions_top := side_margin + skins_height + 10.0
-		if crate_logic != null and is_instance_valid(crate_logic.button):
+		if crate_logic != null and is_instance_valid(crate_logic.button) and crate_logic.button.visible:
 			missions_top = crate_logic.button.offset_bottom + 10.0
 		mission_logic.button.custom_minimum_size = Vector2(skins_width, missions_height)
 		mission_logic.button.offset_left = content_left + side_margin
 		mission_logic.button.offset_top = missions_top
 		mission_logic.button.offset_right = content_left + side_margin + skins_width
 		mission_logic.button.offset_bottom = missions_top + missions_height
-		mission_logic.button.add_theme_font_size_override("font_size", 14 if phone_layout else 16)
+		mission_logic.button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
 
-	upgrade_alert_badge.offset_left = -(viewport_size.x - hud_row_right + 46.0)
-	upgrade_alert_badge.offset_top = -hud_height - side_margin - 24.0
-	upgrade_alert_badge.offset_right = -(viewport_size.x - hud_row_right) + 2.0
-	upgrade_alert_badge.offset_bottom = -hud_height - side_margin + 24.0
+	var museum_width := 142.0 if short_phone else 154.0
+	var museum_height := 64.0
+	var museum_top := side_margin + skins_height + 10.0
+	if mission_logic != null and is_instance_valid(mission_logic.button) and mission_logic.button.visible:
+		museum_top = mission_logic.button.offset_bottom + 10.0
+	elif crate_logic != null and is_instance_valid(crate_logic.button) and crate_logic.button.visible:
+		museum_top = crate_logic.button.offset_bottom + 10.0
+	museum_button.custom_minimum_size = Vector2(museum_width, museum_height)
+	museum_button.offset_left = content_left + side_margin
+	museum_button.offset_top = museum_top
+	museum_button.offset_right = content_left + side_margin + museum_width
+	museum_button.offset_bottom = museum_top + museum_height
+	museum_button.add_theme_font_size_override("font_size", 16 if phone_layout else 18)
+
+	var bowl_height := 64.0
+	bottomless_bowl_button.custom_minimum_size = Vector2(museum_width, bowl_height)
+	bottomless_bowl_button.offset_left = museum_button.offset_left
+	bottomless_bowl_button.offset_top = museum_button.offset_bottom + 10.0
+	bottomless_bowl_button.offset_right = museum_button.offset_right
+	bottomless_bowl_button.offset_bottom = museum_button.offset_bottom + 10.0 + bowl_height
+	bottomless_bowl_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
+
+	upgrade_alert_badge.offset_left = -(viewport_size.x - hud_row_right + 44.0)
+	upgrade_alert_badge.offset_top = -hud_height - side_margin + 8.0
+	upgrade_alert_badge.offset_right = -(viewport_size.x - hud_row_right) - 8.0
+	upgrade_alert_badge.offset_bottom = -hud_height - side_margin + 44.0
 	var visible_panel := _get_visible_overlay_panel()
 	if visible_panel != null:
 		call_deferred("_position_modal_close_button", visible_panel)
 	if tutorial_active or tutorial_prompt_visible:
 		call_deferred("_update_tutorial_layout")
+	_apply_touch_target_hierarchy(self)
 
 
 func _set_responsive_panel_size(panel: Control, preferred_size: Vector2, max_width: float, max_height: float) -> void:
@@ -3870,6 +5016,7 @@ func _show_skins() -> void:
 	_play_ui_sound()
 	var skin_data := _get_skin_data(equipped_skin_id)
 	skins_status_label.text = "Equipped: %s. %s" % [_get_equipped_skin_name(), _get_skin_bonus_text(skin_data)]
+	_set_skins_section("skins")
 	_update_skins_ui()
 	_show_overlay_panel(skins_panel)
 	call_deferred("_animate_skins_screen")
@@ -3881,6 +5028,22 @@ func _show_boosts() -> void:
 	boost_logic.update_ui()
 	_show_overlay_panel(boosts_panel)
 	call_deferred("_animate_boost_screen")
+
+
+func _show_inventory() -> void:
+	_play_ui_sound()
+	food_panel_mode = "inventory"
+	_refresh_compact_inventory()
+	compact_inventory_panel.visible = not compact_inventory_panel.visible
+
+
+func _show_shop() -> void:
+	_play_ui_sound()
+	food_panel_mode = "shop"
+	food_status_label.text = "Every food costs %s kibbles." % _format_number(FOOD_COST)
+	_update_food_ui()
+	_show_overlay_panel(food_panel)
+	call_deferred("_animate_food_screen")
 
 
 func _show_crates() -> void:
@@ -3934,6 +5097,16 @@ func _animate_boost_screen() -> void:
 	_animate_control_sequence(controls, 0.035, 36.0)
 
 
+func _animate_food_screen() -> void:
+	if not food_panel.visible:
+		return
+	var controls: Array[Control] = [food_panel_title, food_wallet_label, food_status_label]
+	for child in food_list.get_children():
+		if child is Control and child.visible:
+			controls.append(child as Control)
+	_animate_control_sequence(controls, 0.015, 22.0)
+
+
 func _show_overlay_panel(panel: Control) -> void:
 	upgrade_alert_elapsed = 0.0
 	var overlay_was_visible := menu_overlay.visible
@@ -3957,6 +5130,7 @@ func _show_overlay_panel(panel: Control) -> void:
 	stats_panel.hide()
 	skins_panel.hide()
 	boosts_panel.hide()
+	food_panel.hide()
 	if is_instance_valid(museum_panel):
 		museum_panel.hide()
 	if bottomless_bowl_logic != null and is_instance_valid(bottomless_bowl_logic.panel):
@@ -4012,6 +5186,7 @@ func _hide_menu() -> void:
 	touch_scroll_index = -1
 	touch_scroll_dragging = false
 	touch_scroll_distance = 0.0
+	touch_scroll = null
 	upgrade_alert_elapsed = 0.0
 	modal_close_button.disabled = true
 	var panel := _get_visible_overlay_panel()
