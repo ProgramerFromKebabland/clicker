@@ -37,10 +37,15 @@ func save_game() -> void:
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_BEST_DAILY_REWARD_STREAK_KEY, game.best_daily_reward_streak)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_CLICK_VOLUME_KEY, game.click_volume)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_UI_VOLUME_KEY, game.ui_volume)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_LOW_QUALITY_ENABLED_KEY, game.low_quality_enabled)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_OPTIMIZED_TAP_EFFECTS_KEY, game.optimized_tap_effects)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_PARTICLE_LIMIT_KEY, game.particle_limit)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_HAPTICS_ENABLED_KEY, game.haptics_enabled)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_EVENTS_ENABLED_KEY, game.events_enabled)
+	save_file.set_value(game.SAVE_SECTION, game.SAVE_SLIDER_SOUND_STYLE_KEY, game.slider_sound_style)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_OWNED_SKINS_KEY, PackedStringArray(game.owned_skin_ids))
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EQUIPPED_SKIN_KEY, game.equipped_skin_id)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EQUIPPED_ROOM_SKIN_KEY, game.equipped_room_skin_id)
-	save_file.set_value(game.SAVE_SECTION, game.SAVE_UI_TINT_KEY, game.ui_tint.to_html(false))
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EXTENDED_UPGRADES_KEY, game.extended_upgrade_levels)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_FOOD_INVENTORY_KEY, game.food_inventory)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_TUTORIAL_COMPLETED_KEY, game.tutorial_completed)
@@ -95,6 +100,12 @@ func load_game() -> void:
 	game.best_daily_reward_streak = maxi(game.daily_reward_streak, int(save_file.get_value(game.SAVE_SECTION, game.SAVE_BEST_DAILY_REWARD_STREAK_KEY, game.daily_reward_streak)))
 	game.click_volume = clamp(float(save_file.get_value(game.SAVE_SECTION, game.SAVE_CLICK_VOLUME_KEY, 1.0)), 0.0, 1.0)
 	game.ui_volume = clamp(float(save_file.get_value(game.SAVE_SECTION, game.SAVE_UI_VOLUME_KEY, 1.0)), 0.0, 1.0)
+	game.low_quality_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_LOW_QUALITY_ENABLED_KEY, false))
+	game.optimized_tap_effects = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_OPTIMIZED_TAP_EFFECTS_KEY, false))
+	game.particle_limit = clampi(int(save_file.get_value(game.SAVE_SECTION, game.SAVE_PARTICLE_LIMIT_KEY, game.PARTICLE_LIMIT_INFINITE)), 1, game.PARTICLE_LIMIT_INFINITE)
+	game.haptics_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_HAPTICS_ENABLED_KEY, true))
+	game.events_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_EVENTS_ENABLED_KEY, true))
+	game.slider_sound_style = clampi(int(save_file.get_value(game.SAVE_SECTION, game.SAVE_SLIDER_SOUND_STYLE_KEY, 0)), 0, game.UI_SOUND_VARIANTS.size() - 1)
 	game.tutorial_completed = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_TUTORIAL_COMPLETED_KEY, false))
 	game.owned_skin_ids.clear()
 	var saved_owned_skins: PackedStringArray = save_file.get_value(game.SAVE_SECTION, game.SAVE_OWNED_SKINS_KEY, PackedStringArray())
@@ -108,8 +119,7 @@ func load_game() -> void:
 	game.equipped_room_skin_id = String(save_file.get_value(game.SAVE_SECTION, game.SAVE_EQUIPPED_ROOM_SKIN_KEY, game.DEFAULT_ROOM_SKIN_ID))
 	if game._get_room_skin_data(game.equipped_room_skin_id).is_empty():
 		game.equipped_room_skin_id = game.DEFAULT_ROOM_SKIN_ID
-	var saved_ui_tint := String(save_file.get_value(game.SAVE_SECTION, game.SAVE_UI_TINT_KEY, game.DEFAULT_UI_TINT.to_html(false)))
-	game.ui_tint = Color.from_string(saved_ui_tint, game.DEFAULT_UI_TINT)
+	game.ui_tint = game.DEFAULT_UI_TINT
 	var saved_extended_upgrades: Dictionary = save_file.get_value(game.SAVE_SECTION, game.SAVE_EXTENDED_UPGRADES_KEY, {})
 	for raw_upgrade_data in game.EXTENDED_UPGRADE_DATA:
 		var upgrade_data: Dictionary = raw_upgrade_data

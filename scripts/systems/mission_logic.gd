@@ -19,6 +19,7 @@ var claimed: Dictionary = {}
 var board_bonus_claimed := false
 var reroll_used := false
 var last_ui_second := -1
+var last_cards_signature := ""
 
 var button: Button
 var panel: PanelContainer
@@ -209,7 +210,7 @@ func update_ui() -> void:
 	if panel == null:
 		return
 	var now: int = int(game._get_unix_time())
-	if now == last_ui_second:
+	if now == last_ui_second and not panel.visible:
 		return
 	last_ui_second = now
 	_refresh_cycle()
@@ -220,7 +221,7 @@ func update_ui() -> void:
 	for id in active_ids:
 		if bool(claimed.get(str(id), false)): completed += 1
 		elif _progress(id) >= int(missions[id]["target"]): ready += 1
-	button.text = "MISSIONS\n%d REWARD%s READY!" % [ready, "" if ready == 1 else "S"] if ready > 0 else "MISSIONS\n%d / %d CLEARED" % [completed, SLOT_COUNT]
+	button.text = "%d/%d" % [mini(SLOT_COUNT, completed + ready), SLOT_COUNT]
 	button.add_theme_color_override("font_color", Color(1.0, 0.86, 0.38) if ready > 0 else Color.WHITE)
 	completion_label.text = _cycle_status_text(completed, ready)
 	cycle_progress.value = completed
@@ -230,6 +231,10 @@ func update_ui() -> void:
 	reroll_button.disabled = reroll_used or completed > 0
 	if not panel.visible and list.get_child_count() > 0:
 		return
+	var card_signature := _get_cards_signature()
+	if card_signature == last_cards_signature and list.get_child_count() > 0:
+		return
+	last_cards_signature = card_signature
 	_rebuild_cards()
 
 
@@ -290,6 +295,17 @@ func _rebuild_cards() -> void:
 		game._style_upgrade_button(complete, accent)
 		complete.pressed.connect(claim.bind(id))
 		items.add_child(complete)
+
+
+func _get_cards_signature() -> String:
+	var parts: Array[String] = []
+	for id in active_ids:
+		var mission := missions[id]
+		var progress := mini(_progress(id), int(mission["target"]))
+		parts.append("%d:%d:%s" % [id, progress, str(claimed.get(str(id), false))])
+	parts.append("bonus:%s" % str(board_bonus_claimed))
+	parts.append("reroll:%s" % str(reroll_used))
+	return "|".join(parts)
 
 
 func _kind_name(kind: String) -> String:

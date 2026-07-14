@@ -106,17 +106,18 @@ func update_extended_upgrade_ui() -> void:
 		var cost_label := controls["cost"] as Label
 		var progress_bar := controls["progress"] as ProgressBar
 		var button := controls["button"] as Button
-		value_label.text = get_extended_upgrade_value_text(upgrade_id, level)
+		value_label.text = get_extended_upgrade_value_text(upgrade_data, level)
 		if level >= max_level:
 			cost_label.text = "Maximum level reached"
 			game._set_upgrade_progress(progress_bar, 1, true)
 			set_upgrade_button_state(button, "MAX LEVEL", true)
 			continue
 		var cost: int = get_extended_upgrade_cost(upgrade_data, level)
-		cost_label.text = "%s  |  %s kibbles" % [get_extended_upgrade_next_text(upgrade_id, level + 1), game._format_number(cost)]
+		cost_label.text = "%s  |  %s kibbles" % [get_extended_upgrade_next_text(upgrade_data, level + 1), game._format_number(cost)]
 		game._set_upgrade_progress(progress_bar, cost)
-		var button_text := "%s KIBBLES" % game._format_number(cost) if String(upgrade_data.get("category", "classical")) == "advanced" else "UPGRADE TO LEVEL %d" % (level + 1)
-		var displayed_cost := -1 if String(upgrade_data.get("category", "classical")) == "advanced" else cost
+		var is_classical := String(upgrade_data.get("category", "classical")) == "classical"
+		var button_text := "UPGRADE TO LEVEL %d" % (level + 1) if is_classical else "%s KIBBLES" % game._format_number(cost)
+		var displayed_cost := cost if is_classical else -1
 		set_upgrade_button_state(button, button_text, game.coins < cost, displayed_cost)
 
 
@@ -152,7 +153,8 @@ func get_extended_upgrade_cost(upgrade_data: Dictionary, current_level: int) -> 
 	return int(upgrade_data["base_cost"]) * int(pow(2.0, current_level))
 
 
-func get_extended_upgrade_value_text(upgrade_id: String, level: int) -> String:
+func get_extended_upgrade_value_text(upgrade_data: Dictionary, level: int) -> String:
+	var upgrade_id := String(upgrade_data["id"])
 	match upgrade_id:
 		"tap_mastery":
 			return "+%d%%" % (level * 5)
@@ -170,10 +172,13 @@ func get_extended_upgrade_value_text(upgrade_id: String, level: int) -> String:
 			return "+%.1f%% luck" % (level * 0.5)
 		"dream_engine":
 			return "+%d%% idle" % (level * 10)
+	if String(upgrade_data.get("category", "classical")) != "classical":
+		return _format_extended_effect_value(upgrade_data, level)
 	return "Lv. %d" % level
 
 
-func get_extended_upgrade_next_text(upgrade_id: String, next_level: int) -> String:
+func get_extended_upgrade_next_text(upgrade_data: Dictionary, next_level: int) -> String:
+	var upgrade_id := String(upgrade_data["id"])
 	match upgrade_id:
 		"tap_mastery":
 			return "Tap gain +%d%%" % (next_level * 5)
@@ -191,6 +196,56 @@ func get_extended_upgrade_next_text(upgrade_id: String, next_level: int) -> Stri
 			return "Bonus luck +%.1f%%" % (next_level * 0.5)
 		"dream_engine":
 			return "Offline income +%d%%" % (next_level * 10)
+	if String(upgrade_data.get("category", "classical")) != "classical":
+		return _format_extended_effect_next_text(upgrade_data, next_level)
+	return "Level %d" % next_level
+
+
+func _format_extended_effect_value(upgrade_data: Dictionary, level: int) -> String:
+	var amount := float(upgrade_data.get("amount", 0.0)) * float(level)
+	match String(upgrade_data.get("effect", "")):
+		"tap":
+			return "+%d%% tap" % roundi(amount * 100.0)
+		"all":
+			return "+%d%% all" % roundi(amount * 100.0)
+		"luck":
+			return "+%.1f%% luck" % amount
+		"combo":
+			return "x+%.2f" % amount
+		"idle":
+			return "+%d%% idle" % roundi(amount * 100.0)
+		"bonus":
+			return "+%d%% bonus" % roundi(amount * 100.0)
+		"daily":
+			return "+%d%% daily" % roundi(amount * 100.0)
+		"storage":
+			return "+%dh" % roundi(amount)
+		"streak":
+			return "+%d streak" % roundi(amount)
+	return "Lv. %d" % level
+
+
+func _format_extended_effect_next_text(upgrade_data: Dictionary, next_level: int) -> String:
+	var amount := float(upgrade_data.get("amount", 0.0)) * float(next_level)
+	match String(upgrade_data.get("effect", "")):
+		"tap":
+			return "Tap gain +%d%%" % roundi(amount * 100.0)
+		"all":
+			return "All kibble gain +%d%%" % roundi(amount * 100.0)
+		"luck":
+			return "Bonus luck +%.1f%%" % amount
+		"combo":
+			return "Max combo +%.2f" % amount
+		"idle":
+			return "Offline income +%d%%" % roundi(amount * 100.0)
+		"bonus":
+			return "Bonus payout +%d%%" % roundi(amount * 100.0)
+		"daily":
+			return "Daily reward +%d%%" % roundi(amount * 100.0)
+		"storage":
+			return "Offline cap +%dh" % roundi(amount)
+		"streak":
+			return "Streak bonus +%d" % roundi(amount)
 	return "Level %d" % next_level
 
 

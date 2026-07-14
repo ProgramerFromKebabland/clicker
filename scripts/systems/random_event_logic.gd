@@ -32,12 +32,35 @@ var icon_tween: Tween
 var sparkle_tween: Tween
 var button_tween: Tween
 var card_tween: Tween
+var active_boosts_refresh_elapsed := 0.0
+var active_boosts_signature := ""
+var event_timer_display := -1
 
 const EVENT_IMAGES := {
 	"golden_mouse": preload("res://assets/events/golden_mouse.png"),
 	"kibble_storm": preload("res://assets/events/kibble_storm.png"),
 	"sleepy_time": preload("res://assets/events/sleepy_time.png"),
 	"merchant": preload("res://assets/events/merchant.png"),
+	"yarn_comet": preload("res://assets/events/yarn_comet.png"),
+	"tuna_jackpot": preload("res://assets/events/tuna_jackpot.png"),
+	"crystal_paw": preload("res://assets/events/crystal_paw.png"),
+	"moon_milk": preload("res://assets/events/moon_milk.png"),
+	"laser_dot": preload("res://assets/events/laser_dot.png"),
+	"royal_cushion": preload("res://assets/events/royal_cushion.png"),
+	"fish_fountain": preload("res://assets/events/fish_fountain.png"),
+	"star_nap": preload("res://assets/events/star_nap.png"),
+	"biscuit_meteor": preload("res://assets/events/biscuit_meteor.png"),
+	"toy_rocket": preload("res://assets/events/toy_rocket.png"),
+	"collar_bell": preload("res://assets/events/collar_bell.png"),
+	"sugar_cloud": preload("res://assets/events/sugar_cloud.png"),
+	"treasure_whiskers": preload("res://assets/events/treasure_whiskers.png"),
+	"time_hourglass": preload("res://assets/events/time_hourglass.png"),
+	"magic_box": preload("res://assets/events/magic_box.png"),
+	"neon_scratch": preload("res://assets/events/neon_scratch.png"),
+	"sunbeam_window": preload("res://assets/events/sunbeam_window.png"),
+	"frosty_treat": preload("res://assets/events/frosty_treat.png"),
+	"lucky_pawprint": preload("res://assets/events/lucky_pawprint.png"),
+	"cosmic_yarn": preload("res://assets/events/cosmic_yarn.png"),
 }
 const EVENT_SOUNDS := {
 	"golden_mouse": preload("res://assets/events/sounds/golden_mouse.wav"),
@@ -51,6 +74,33 @@ const INTERACTION_SOUNDS := {
 	"sleepy_time": preload("res://assets/events/sounds/sleepy_time_tap.wav"),
 	"merchant": preload("res://assets/events/sounds/merchant_tap.wav"),
 }
+
+const EVENT_DATA := [
+	{"id": "golden_mouse", "kind": "collect", "duration": 12.0, "goal": 3, "reward_mult": 90.0, "badge": "LEGENDARY CHASE", "badge_color": Color(1.0, 0.83, 0.22), "title": "GOLDEN MOUSE!", "detail": "Catch it 3 times. Prize scales with your level.", "button": "CATCH"},
+	{"id": "kibble_storm", "kind": "storm", "duration": 16.0, "tick": 0.55, "reward_mult": 1.0, "tap_mult": 3.0, "badge": "BONUS WEATHER", "badge_color": Color(0.35, 0.9, 1.0), "title": "KIBBLE STORM", "detail": "Scoop level-scaled drops before the clouds clear.", "button": "SCOOP"},
+	{"id": "sleepy_time", "kind": "multiplier", "duration": 20.0, "gain_mult": 3.0, "tap_mult": 5.0, "badge": "DREAM RUSH", "badge_color": Color(0.78, 0.58, 1.0), "title": "SLEEPY TIME x3", "detail": "x3 gains. Pet the moon for level-scaled bonuses.", "button": "DREAM"},
+	{"id": "merchant", "kind": "merchant", "duration": 18.0, "cost_mult": 28.0, "reward_mult": 2.15, "badge": "RARE MERCHANT", "badge_color": Color(1.0, 0.55, 0.28), "title": "TRAVELING CAT MERCHANT", "detail": "Mystery sack: value rises with your level.", "button": "BUY"},
+	{"id": "yarn_comet", "kind": "collect", "duration": 14.0, "goal": 4, "reward_mult": 72.0, "badge": "SKY TREASURE", "badge_color": Color(1.0, 0.48, 0.82), "title": "YARN COMET", "detail": "Catch the comet before it burns out.", "button": "CATCH"},
+	{"id": "tuna_jackpot", "kind": "instant", "duration": 10.0, "reward_mult": 62.0, "badge": "TIN LUCK", "badge_color": Color(0.45, 0.9, 1.0), "title": "TUNA JACKPOT", "detail": "Pop the can for a level-scaled jackpot.", "button": "OPEN"},
+	{"id": "crystal_paw", "kind": "collect", "duration": 15.0, "goal": 5, "reward_mult": 84.0, "badge": "GEM PAWS", "badge_color": Color(0.55, 0.95, 1.0), "title": "CRYSTAL PAW", "detail": "Charge each toe bean for a bigger payout.", "button": "CHARGE"},
+	{"id": "moon_milk", "kind": "multiplier", "duration": 18.0, "gain_mult": 2.25, "tap_mult": 4.0, "badge": "LUNAR BOWL", "badge_color": Color(0.92, 0.78, 1.0), "title": "MOON MILK", "detail": "Soft moonlight boosts every kibble source.", "button": "SIP"},
+	{"id": "laser_dot", "kind": "collect", "duration": 11.0, "goal": 6, "reward_mult": 68.0, "badge": "FAST PAWS", "badge_color": Color(1.0, 0.32, 0.5), "title": "LASER DOT", "detail": "Pounce quickly for a level-scaled prize.", "button": "POUNCE"},
+	{"id": "royal_cushion", "kind": "instant", "duration": 12.0, "reward_mult": 95.0, "badge": "ROYAL REST", "badge_color": Color(1.0, 0.76, 0.22), "title": "ROYAL CUSHION", "detail": "Claim a regal pile of kibbles.", "button": "CLAIM"},
+	{"id": "fish_fountain", "kind": "storm", "duration": 14.0, "tick": 0.5, "reward_mult": 1.35, "tap_mult": 3.5, "badge": "SPLASH BONUS", "badge_color": Color(0.35, 0.85, 1.0), "title": "FISH FOUNTAIN", "detail": "Fountain drops scale with your level.", "button": "SPLASH"},
+	{"id": "star_nap", "kind": "multiplier", "duration": 16.0, "gain_mult": 2.0, "tap_mult": 4.5, "badge": "NAP POWER", "badge_color": Color(0.95, 0.72, 1.0), "title": "STAR NAP", "detail": "Dreamy gains and bonus sleepy taps.", "button": "NUDGE"},
+	{"id": "biscuit_meteor", "kind": "collect", "duration": 13.0, "goal": 4, "reward_mult": 88.0, "badge": "CRUNCH IMPACT", "badge_color": Color(1.0, 0.54, 0.18), "title": "BISCUIT METEOR", "detail": "Break the meteor into tasty rewards.", "button": "CRACK"},
+	{"id": "toy_rocket", "kind": "instant", "duration": 9.0, "reward_mult": 74.0, "badge": "BOOST LAUNCH", "badge_color": Color(0.55, 0.7, 1.0), "title": "TOY ROCKET", "detail": "Launch it for a fast kibble burst.", "button": "LAUNCH"},
+	{"id": "collar_bell", "kind": "collect", "duration": 14.0, "goal": 5, "reward_mult": 76.0, "badge": "LUCKY RING", "badge_color": Color(0.35, 1.0, 0.48), "title": "COLLAR BELL", "detail": "Ring up level-scaled bonus kibbles.", "button": "RING"},
+	{"id": "sugar_cloud", "kind": "storm", "duration": 15.0, "tick": 0.6, "reward_mult": 1.55, "tap_mult": 4.0, "badge": "SWEET WEATHER", "badge_color": Color(1.0, 0.62, 0.82), "title": "SUGAR CLOUD", "detail": "Sweet drops rain from the sky.", "button": "PUFF"},
+	{"id": "treasure_whiskers", "kind": "collect", "duration": 16.0, "goal": 4, "reward_mult": 105.0, "badge": "HIDDEN LOOT", "badge_color": Color(1.0, 0.66, 0.2), "title": "TREASURE WHISKERS", "detail": "Tug the whiskers to reveal the stash.", "button": "TUG"},
+	{"id": "time_hourglass", "kind": "multiplier", "duration": 22.0, "gain_mult": 1.75, "tap_mult": 6.0, "badge": "TIME BONUS", "badge_color": Color(0.42, 0.82, 1.0), "title": "TIME HOURGLASS", "detail": "Slow time and gather extra kibbles.", "button": "FLIP"},
+	{"id": "magic_box", "kind": "instant", "duration": 13.0, "reward_mult": 82.0, "badge": "BOX MAGIC", "badge_color": Color(0.86, 0.58, 1.0), "title": "MAGIC BOX", "detail": "Open the box. It probably contains kibbles.", "button": "OPEN"},
+	{"id": "neon_scratch", "kind": "collect", "duration": 15.0, "goal": 7, "reward_mult": 70.0, "badge": "NEON CLAWS", "badge_color": Color(0.82, 0.42, 1.0), "title": "NEON SCRATCH", "detail": "Scratch fast for an electric payout.", "button": "SCRATCH"},
+	{"id": "sunbeam_window", "kind": "multiplier", "duration": 18.0, "gain_mult": 2.5, "tap_mult": 3.5, "badge": "SUNBEAM", "badge_color": Color(1.0, 0.72, 0.24), "title": "SUNBEAM WINDOW", "detail": "Warm light boosts your kibble gain.", "button": "BASK"},
+	{"id": "frosty_treat", "kind": "instant", "duration": 12.0, "reward_mult": 78.0, "badge": "COOL TREAT", "badge_color": Color(0.55, 0.95, 1.0), "title": "FROSTY TREAT", "detail": "Grab a chilly level-scaled snack.", "button": "LICK"},
+	{"id": "lucky_pawprint", "kind": "collect", "duration": 13.0, "goal": 3, "reward_mult": 112.0, "badge": "LUCKY PRINT", "badge_color": Color(0.72, 1.0, 0.28), "title": "LUCKY PAWPRINT", "detail": "Tap the lucky print for a big prize.", "button": "PRESS"},
+	{"id": "cosmic_yarn", "kind": "storm", "duration": 17.0, "tick": 0.48, "reward_mult": 1.8, "tap_mult": 5.0, "badge": "COSMIC THREAD", "badge_color": Color(0.58, 0.78, 1.0), "title": "COSMIC YARN", "detail": "Unwind space itself into kibbles.", "button": "UNWIND"},
+]
 
 func _init(game_ref) -> void:
 	game = game_ref
@@ -186,71 +236,88 @@ func build_ui() -> void:
 	_build_active_boosts_panel()
 
 func process(delta: float) -> void:
-	if game.menu_overlay.visible or game.tutorial_active or game.tutorial_prompt_visible:
-		_update_active_boosts_panel()
+	active_boosts_refresh_elapsed += delta
+	if not game.events_enabled:
+		if not active_event.is_empty() or (is_instance_valid(banner) and banner.visible):
+			set_events_enabled(false)
+		if active_boosts_refresh_elapsed >= 1.0:
+			active_boosts_refresh_elapsed = 0.0
+			_update_active_boosts_panel()
 		return
-	_update_active_boosts_panel()
+	if game.menu_overlay.visible or game.tutorial_active or game.tutorial_prompt_visible:
+		if active_boosts_refresh_elapsed >= 1.0:
+			active_boosts_refresh_elapsed = 0.0
+			_update_active_boosts_panel()
+		return
+	if active_boosts_refresh_elapsed >= 0.5:
+		active_boosts_refresh_elapsed = 0.0
+		_update_active_boosts_panel()
 	if active_event.is_empty():
 		next_event_time -= delta
 		if next_event_time <= 0.0:
 			_start_random_event()
 		return
 	event_time_left -= delta
-	timer_label.text = "%ds remaining" % ceili(event_time_left)
+	var shown_seconds := ceili(event_time_left)
+	if shown_seconds != event_timer_display:
+		event_timer_display = shown_seconds
+		timer_label.text = "%ds remaining" % shown_seconds
 	progress_bar.value = event_time_left
-	if active_event == "merchant":
+	var data := _get_active_event_data()
+	if String(data.get("kind", "")) == "merchant":
 		action_button.disabled = game.coins < merchant_cost
-	if active_event == "kibble_storm":
+	if String(data.get("kind", "")) == "storm":
 		storm_tick += delta
-		while storm_tick >= 0.55:
-			storm_tick -= 0.55
+		var tick_seconds := float(data.get("tick", 0.55))
+		while storm_tick >= tick_seconds:
+			storm_tick -= tick_seconds
 			_storm_payout()
 	if event_time_left <= 0.0:
 		_end_event()
 
 func get_global_gain_multiplier() -> float:
-	return 3.0 if active_event == "sleepy_time" else 1.0
+	if not game.events_enabled:
+		return 1.0
+	if active_event.is_empty():
+		return 1.0
+	var data := _get_active_event_data()
+	return float(data.get("gain_mult", 1.0)) if String(data.get("kind", "")) == "multiplier" else 1.0
+
+
+func set_events_enabled(enabled: bool) -> void:
+	if enabled:
+		if next_event_time <= 0.0:
+			next_event_time = randf_range(FIRST_EVENT_MIN, FIRST_EVENT_MAX)
+		return
+	_cancel_active_event()
 
 func _start_random_event() -> void:
-	active_event = ["golden_mouse", "kibble_storm", "sleepy_time", "merchant"].pick_random()
-	event_time_left = {"golden_mouse": 12.0, "kibble_storm": 16.0, "sleepy_time": 20.0, "merchant": 18.0}[active_event]
+	if not game.events_enabled:
+		next_event_time = randf_range(EVENT_DELAY_MIN, EVENT_DELAY_MAX)
+		return
+	var data := EVENT_DATA.pick_random() as Dictionary
+	active_event = String(data["id"])
+	event_timer_display = -1
+	event_time_left = float(data.get("duration", 14.0))
 	progress_bar.max_value = event_time_left
 	progress_bar.value = event_time_left
 	interaction_count = 0
 	event_icon.texture = EVENT_IMAGES[active_event]
-	event_audio.stream = EVENT_SOUNDS[active_event]
-	interaction_audio.stream = INTERACTION_SOUNDS[active_event]
+	event_audio.stream = EVENT_SOUNDS.get(active_event, EVENT_SOUNDS["golden_mouse"])
+	interaction_audio.stream = INTERACTION_SOUNDS.get(active_event, INTERACTION_SOUNDS["golden_mouse"])
 	event_audio.pitch_scale = 1.0
 	event_audio.play()
 	storm_tick = 0.0
 	action_button.show()
-	match active_event:
-		"golden_mouse":
-			live_badge.text = "✦  LEGENDARY CHASE  ✦"
-			live_badge.add_theme_color_override("font_color", Color(1.0, 0.83, 0.22))
-			title_label.text = "GOLDEN MOUSE!"
-			detail_label.text = "Catch it 3 times. Your tap power sets the prize!"
-			action_button.text = "✦  CATCH  •  0/3  ✦"
-		"kibble_storm":
-			live_badge.text = "◆  BONUS WEATHER  ◆"
-			live_badge.add_theme_color_override("font_color", Color(0.35, 0.9, 1.0))
-			title_label.text = "KIBBLE STORM"
-			detail_label.text = "Tap SCOOP for bonus drops scaled to your clicks."
-			action_button.text = "◆  SCOOP KIBBLE  ◆"
-		"sleepy_time":
-			live_badge.text = "✧  DREAM RUSH  ✧"
-			live_badge.add_theme_color_override("font_color", Color(0.78, 0.58, 1.0))
-			title_label.text = "SLEEPY TIME  x3"
-			detail_label.text = "x3 gains. Pet the moon for a click-scaled bonus."
-			action_button.text = "✧  PET THE MOON  ✧"
-		"merchant":
-			live_badge.text = "★  RARE MERCHANT  ★"
-			live_badge.add_theme_color_override("font_color", Color(1.0, 0.55, 0.28))
-			merchant_cost = maxi(25, game.click_value * 30)
-			title_label.text = "TRAVELING CAT MERCHANT"
-			detail_label.text = "Mystery sack: guaranteed double value."
-			action_button.text = "★  BUY  •  %s  ★" % game._format_number(merchant_cost)
-			action_button.disabled = game.coins < merchant_cost
+	action_button.disabled = false
+	live_badge.text = "*  %s  *" % String(data.get("badge", "LIMITED EVENT"))
+	live_badge.add_theme_color_override("font_color", data.get("badge_color", Color(1.0, 0.83, 0.22)) as Color)
+	title_label.text = String(data.get("title", active_event)).to_upper()
+	detail_label.text = String(data.get("detail", "Earn a level-scaled kibble reward."))
+	if String(data.get("kind", "")) == "merchant":
+		merchant_cost = _level_scaled_reward(float(data.get("cost_mult", 28.0)))
+		action_button.disabled = game.coins < merchant_cost
+	_update_action_button_text(data)
 	timer_label.text = "%ds remaining" % ceili(event_time_left)
 	banner.show()
 	_update_active_boosts_panel()
@@ -268,51 +335,90 @@ func _start_random_event() -> void:
 
 func _on_action_pressed() -> void:
 	_flash_interaction()
-	match active_event:
-		"golden_mouse":
+	var data := _get_active_event_data()
+	match String(data.get("kind", "")):
+		"collect":
 			interaction_count += 1
-			action_button.text = "✦  CATCH  •  %d/3  ✦" % interaction_count
+			_update_action_button_text(data)
 			_bounce_icon()
-			if interaction_count >= 3:
-				var reward := _click_scaled_reward(90)
+			if interaction_count >= int(data.get("goal", 3)):
+				var reward := _level_scaled_reward(float(data.get("reward_mult", 80.0)))
 				game._gain_coins(reward, action_button.get_global_rect().get_center())
 				game._play_bonus_sound()
-				_end_event("Mouse caught! +%s kibbles" % game._format_number(reward))
-		"kibble_storm":
+				_end_event("%s complete! +%s kibbles" % [String(data.get("title", "Event")).capitalize(), game._format_number(reward)])
+		"storm":
 			interaction_count += 1
-			var reward := _click_scaled_reward(3)
+			var reward := _level_scaled_reward(float(data.get("tap_mult", 3.0)))
 			game._gain_coins(reward, action_button.get_global_rect().get_center())
-			action_button.text = "◆  SCOOPED  •  %d  ◆" % interaction_count
+			_update_action_button_text(data)
 			_bounce_icon()
-		"sleepy_time":
+		"multiplier":
 			interaction_count += 1
-			var reward := _click_scaled_reward(5)
+			var reward := _level_scaled_reward(float(data.get("tap_mult", 4.0)))
 			game._gain_coins(reward, action_button.get_global_rect().get_center())
-			action_button.text = "✧  DREAMS  •  %d  ✧" % interaction_count
+			_update_action_button_text(data)
 			_bounce_icon()
+		"instant":
+			var reward := _level_scaled_reward(float(data.get("reward_mult", 75.0)))
+			game._gain_coins(reward, action_button.get_global_rect().get_center())
+			game._play_bonus_sound()
+			_end_event("%s! +%s kibbles" % [String(data.get("title", "Bonus")).capitalize(), game._format_number(reward)])
 		"merchant":
 			if not game._spend_coins(merchant_cost):
 				return
-			game._gain_coins(merchant_cost * 2, action_button.get_global_rect().get_center())
+			var merchant_reward := maxi(merchant_cost + 1, roundi(float(merchant_cost) * float(data.get("reward_mult", 2.0))))
+			game._gain_coins(merchant_reward, action_button.get_global_rect().get_center())
 			game._update_coins()
 			game._queue_save()
 			game._play_bonus_sound()
-			_end_event("A fine bargain! +%s net kibbles" % game._format_number(merchant_cost))
-
+			_end_event("A fine bargain! +%s net kibbles" % game._format_number(merchant_reward - merchant_cost))
 func _storm_payout() -> void:
-	var reward := _click_scaled_reward(1)
+	var data := _get_active_event_data()
+	var reward := _level_scaled_reward(float(data.get("reward_mult", 1.0)))
 	var origin := Vector2(randf_range(80.0, game.size.x - 80.0), randf_range(260.0, game.size.y * 0.68))
 	game._gain_coins(reward, origin)
 	game._spawn_click_popup(reward, 1, 1, 0.0)
 	game._queue_save()
 
-func _click_scaled_reward(multiplier: int) -> int:
-	# Tap value drives progression; lifetime taps add a gentle mastery bonus.
+func _level_scaled_reward(multiplier: float) -> int:
+	var player_level := _get_player_level()
+	var level_bonus := 1.0 + (pow(float(player_level), 0.72) * 0.055)
 	var mastery := 1.0 + minf(2.0, sqrt(float(maxi(0, game.total_taps))) / 100.0)
 	var active_bonus := 1.0 + minf(1.5, float(interaction_count) * 0.08)
-	return maxi(1, roundi((game.click_value + game._get_effective_passive_gain()) * multiplier * mastery * active_bonus))
+	var income_power := float(game.click_value + game._get_effective_passive_gain())
+	return maxi(1, roundi(income_power * multiplier * level_bonus * mastery * active_bonus))
+
+func _get_player_level() -> int:
+	var upgrade_total := maxi(1, game.click_value)
+	upgrade_total += game.bonus_chance_level
+	upgrade_total += game.bonus_value_index + 1
+	upgrade_total += game.bonus_streak_multiplier
+	upgrade_total += game.passive_clicks_per_minute
+	for upgrade_data in game.EXTENDED_UPGRADE_DATA:
+		upgrade_total += game.get_extended_upgrade_level(String(upgrade_data["id"]))
+	return maxi(1, upgrade_total + int(sqrt(float(maxi(0, game.total_taps))) / 6.0))
+
+func _get_active_event_data() -> Dictionary:
+	for data in EVENT_DATA:
+		if String(data["id"]) == active_event:
+			return data
+	return {}
+
+func _update_action_button_text(data: Dictionary) -> void:
+	var verb := String(data.get("button", "GO"))
+	match String(data.get("kind", "")):
+		"collect":
+			action_button.text = "*  %s  %d/%d  *" % [verb, interaction_count, int(data.get("goal", 3))]
+		"merchant":
+			action_button.text = "*  %s  %s  *" % [verb, game._format_number(merchant_cost)]
+		"storm", "multiplier":
+			action_button.text = "*  %s  %d  *" % [verb, interaction_count]
+		_:
+			action_button.text = "*  %s  *" % verb
 
 func _start_icon_animation() -> void:
+	if game.low_quality_mode:
+		return
 	if icon_tween != null:
 		icon_tween.kill()
 	event_icon.rotation = -0.04
@@ -327,6 +433,8 @@ func _bounce_icon() -> void:
 	tween.tween_property(event_icon, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK)
 
 func _start_sparkle_animation() -> void:
+	if game.low_quality_mode:
+		return
 	if sparkle_tween != null:
 		sparkle_tween.kill()
 	sparkle_label.modulate = Color(1, 1, 1, 0.35)
@@ -341,6 +449,8 @@ func _start_sparkle_animation() -> void:
 	sparkle_tween.tween_property(sparkle_label, "scale", Vector2(0.85, 0.85), 0.7).set_trans(Tween.TRANS_SINE)
 
 func _start_button_animation() -> void:
+	if game.low_quality_mode:
+		return
 	if button_tween != null:
 		button_tween.kill()
 	action_button.pivot_offset = action_button.size * 0.5
@@ -349,6 +459,8 @@ func _start_button_animation() -> void:
 	button_tween.tween_property(action_button, "scale", Vector2.ONE, 0.65).set_trans(Tween.TRANS_SINE)
 
 func _start_card_animation() -> void:
+	if game.low_quality_mode:
+		return
 	if card_tween != null:
 		card_tween.kill()
 	live_badge.modulate = Color(1, 0.65, 0.2, 0.65)
@@ -374,6 +486,8 @@ func _flash_interaction() -> void:
 	_spawn_confetti_burst()
 
 func _spawn_confetti_burst() -> void:
+	if game.low_quality_mode:
+		return
 	var center := action_button.get_global_rect().get_center() - layer.global_position
 	var glyphs := ["✦", "★", "◆", "+", "✧"]
 	var colors := [Color(1.0, 0.78, 0.1), Color(1.0, 0.3, 0.2), Color(0.35, 0.9, 1.0), Color(0.85, 0.45, 1.0)]
@@ -411,6 +525,28 @@ func _end_event(message := "") -> void:
 		tween.tween_interval(2.5)
 		tween.tween_callback(func(): game.hint_label.text = "Tap the cat")
 	banner.hide()
+	_update_active_boosts_panel()
+
+
+func _cancel_active_event() -> void:
+	active_event = ""
+	event_time_left = 0.0
+	event_timer_display = -1
+	next_event_time = randf_range(EVENT_DELAY_MIN, EVENT_DELAY_MAX)
+	if icon_tween != null:
+		icon_tween.kill()
+	if sparkle_tween != null:
+		sparkle_tween.kill()
+	if button_tween != null:
+		button_tween.kill()
+	if card_tween != null:
+		card_tween.kill()
+	if is_instance_valid(event_audio):
+		event_audio.stop()
+	if is_instance_valid(interaction_audio):
+		interaction_audio.stop()
+	if is_instance_valid(banner):
+		banner.hide()
 	_update_active_boosts_panel()
 
 func _build_active_boosts_panel() -> void:
@@ -460,6 +596,23 @@ func _build_active_boosts_panel() -> void:
 func _update_active_boosts_panel() -> void:
 	if not is_instance_valid(active_boosts_panel) or game.boost_logic == null:
 		return
+	var signature_parts: Array[String] = [active_event]
+	for data in BoostLogic.BOOST_DATA:
+		var boost_id_for_signature := String(data["id"])
+		var remaining_for_signature: float = game.boost_logic.get_remaining_seconds(boost_id_for_signature)
+		var is_tap_boost_for_signature: bool = boost_id_for_signature == "nine_lives" and game.nine_lives_taps_left > 0
+		if remaining_for_signature > 0.0 or is_tap_boost_for_signature:
+			signature_parts.append("%s:%d" % [boost_id_for_signature, game.nine_lives_taps_left if is_tap_boost_for_signature else ceili(remaining_for_signature)])
+	game._cleanup_food_boosts()
+	for data in game.FOOD_BOOSTS:
+		var food_boost_id_for_signature := String(data["id"])
+		var food_remaining_for_signature: float = float(game.active_food_boosts.get(food_boost_id_for_signature, 0.0)) - float(game._get_unix_time())
+		if food_remaining_for_signature > 0.0:
+			signature_parts.append("%s:%d" % [food_boost_id_for_signature, ceili(food_remaining_for_signature)])
+	var new_signature := "|".join(signature_parts)
+	if new_signature == active_boosts_signature:
+		return
+	active_boosts_signature = new_signature
 	for index in range(active_boosts_list.get_child_count() - 1, 1, -1):
 		active_boosts_list.get_child(index).free()
 	var has_active_boost := false
@@ -497,7 +650,7 @@ func _update_active_boosts_panel() -> void:
 	game._cleanup_food_boosts()
 	for data in game.FOOD_BOOSTS:
 		var boost_id := String(data["id"])
-		var remaining := float(game.active_food_boosts.get(boost_id, 0.0)) - Time.get_unix_time_from_system()
+		var remaining: float = float(game.active_food_boosts.get(boost_id, 0.0)) - float(game._get_unix_time())
 		if remaining <= 0.0:
 			continue
 		has_active_boost = true

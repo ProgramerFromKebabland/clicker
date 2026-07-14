@@ -16,6 +16,7 @@ func update_score() -> void:
 
 
 func update_coins(animated: bool = true) -> void:
+	game._sync_resource_bounds()
 	if game.displayed_coins < 0:
 		game.displayed_coins = game.coins
 		set_coin_display(game.displayed_coins)
@@ -32,11 +33,17 @@ func update_coins(animated: bool = true) -> void:
 
 
 func set_coin_display(value: float) -> void:
-	game.displayed_coins = roundi(value)
+	if value <= 0.0:
+		game.displayed_coins = 0
+	elif value >= float(game.MAX_RESOURCE_VALUE):
+		game.displayed_coins = game.MAX_RESOURCE_VALUE
+	else:
+		game.displayed_coins = roundi(value)
 	var formatted = game._format_number(game.displayed_coins)
 	game.coins_label.text = formatted
 	game.coins_label.tooltip_text = formatted
-	game.call_deferred("_animate_hud_coin_text")
+	if not game.low_quality_mode:
+		game.call_deferred("_animate_hud_coin_text")
 	game.menu_wallet_coins_label.text = "%s KIBBLES" % formatted
 	game.menu_coins_label.text = formatted
 	game.upgrade_coins_label.text = formatted
@@ -46,7 +53,8 @@ func set_coin_display(value: float) -> void:
 		game.boost_wallet_label.text = "%s KIBBLES" % formatted
 	if is_instance_valid(game.food_wallet_label):
 		game.food_wallet_label.text = "%s KIBBLES" % formatted
-		game._update_food_ui()
+		if game.food_panel.visible:
+			game._update_food_ui()
 	if game.crate_logic != null:
 		game.crate_logic.update_wallet()
 
@@ -54,6 +62,9 @@ func set_coin_display(value: float) -> void:
 func animate_coin_counter(from_value: int, to_value: int, duration: float = 0.32) -> void:
 	if game.coin_counter_tween != null and game.coin_counter_tween.is_valid():
 		game.coin_counter_tween.kill()
+	if from_value < 0 or to_value < 0 or abs(to_value - from_value) > 1000000000000000:
+		set_coin_display(to_value)
+		return
 	game.coin_counter_tween = game.create_tween()
 	game.coin_counter_tween.tween_method(game._set_coin_display, float(from_value), float(to_value), duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
@@ -72,7 +83,7 @@ func spawn_coin_stream(amount: int, origin_global: Vector2) -> void:
 	if amount <= 0 or not game.is_inside_tree():
 		return
 
-	var particle_count := mini(game.MAX_COIN_PARTICLES, maxi(1, ceili(sqrt(float(amount)))))
+	var particle_count := mini(game._get_effective_particle_limit(game.MAX_COIN_PARTICLES), maxi(1, ceili(sqrt(float(amount)))))
 	var layer_inverse: Transform2D = game.click_popup_layer.get_global_transform().affine_inverse()
 	var destination: Vector2 = layer_inverse * game.hud_coin_icon.get_global_rect().get_center()
 	var start: Vector2 = layer_inverse * origin_global
@@ -107,6 +118,8 @@ func spawn_coin_stream(amount: int, origin_global: Vector2) -> void:
 func coin_particle_arrived(particle: TextureRect) -> void:
 	if is_instance_valid(particle):
 		particle.queue_free()
+	if game.low_quality_mode:
+		return
 	animate_hud_coin()
 	animate_hud_wallet()
 	var now := Time.get_ticks_msec()
@@ -116,7 +129,7 @@ func coin_particle_arrived(particle: TextureRect) -> void:
 
 
 func spawn_bowl_impact() -> void:
-	if not game.is_inside_tree():
+	if game.low_quality_mode or not game.is_inside_tree():
 		return
 	var center: Vector2 = game.hud_coin_icon.get_global_rect().get_center() - game.click_popup_layer.global_position
 
@@ -218,6 +231,7 @@ func update_volume_ui() -> void:
 	game.ui_volume_slider.value = round(game.ui_volume * 100.0)
 	game.click_volume_label.text = "Click sound: %d%%" % int(game.click_volume_slider.value)
 	game.ui_volume_label.text = "UI sound: %d%%" % int(game.ui_volume_slider.value)
+	game._refresh_runtime_settings_ui()
 
 
 func update_stats_ui() -> void:

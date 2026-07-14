@@ -101,7 +101,7 @@ func _grant_reward() -> void:
 	match (rewards_earned - 1) % 6:
 		0: _grant_gem()
 		1: cozy_crates += 1
-		2: boost_end_time = maxi(boost_end_time, int(Time.get_unix_time_from_system())) + 600
+		2: boost_end_time = maxi(boost_end_time, int(game._get_unix_time())) + 600
 		3: _grant_food()
 		4:
 			var kibble_reward: int = maxi(1000, get_cost(maxi(0, level - 1)) / 4)
@@ -111,23 +111,28 @@ func _grant_reward() -> void:
 
 func _grant_gem() -> void:
 	if game.crate_logic == null: return
-	var candidates: Array[String] = []
+	var candidates: Array[Dictionary] = []
 	for skin: Dictionary in game.SKIN_DATA:
 		var skin_id: String = String(skin["id"])
-		if game.crate_logic.get_fragments(skin_id) < game.crate_logic.MAX_GEM_FRAGMENTS: candidates.append(skin_id)
+		if game.crate_logic.get_fragments(skin_id) < game.crate_logic.MAX_GEM_FRAGMENTS: candidates.append(skin)
 	if candidates.is_empty(): return
-	var skin_id: String = candidates.pick_random()
+	var skin_data: Dictionary = candidates.pick_random()
+	var skin_id: String = String(skin_data["id"])
 	game.crate_logic.gem_fragments[skin_id] = game.crate_logic.get_fragments(skin_id) + 1
+	if game.crate_logic.get_fragments(skin_id) >= game.crate_logic.get_skin_unlock_cost(skin_data) and skin_id != game.DEFAULT_SKIN_ID and skin_id not in game.owned_skin_ids:
+		game.owned_skin_ids.append(skin_id)
+		game._update_skins_ui()
+	game.crate_logic.update_ui(true)
 
 func _grant_food() -> void:
 	var food_id: String = "food_%02d" % randi_range(0, game.FOOD_NAMES.size() - 1)
 	game.food_inventory[food_id] = int(game.food_inventory.get(food_id, 0)) + 1
 
 func get_gain_multiplier() -> float:
-	return 1.5 if int(Time.get_unix_time_from_system()) < boost_end_time else 1.0
+	return 1.5 if int(game._get_unix_time()) < boost_end_time else 1.0
 
 func _check_week() -> void:
-	var current: int = int(Time.get_unix_time_from_system()) / WEEK_SECONDS
+	var current: int = int(game._get_unix_time()) / WEEK_SECONDS
 	if week_id == 0: week_id = current
 	elif week_id != current: week_id = current; level = 0; progress = 0
 

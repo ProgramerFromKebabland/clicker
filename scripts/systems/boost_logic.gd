@@ -189,8 +189,20 @@ const BOOST_DATA: Array[Dictionary] = [
 	{"id": "jackpot_overdrive", "category": "advanced", "name": "JACKPOT OVERDRIVE", "badge": "x2 BONUS", "cost": 140000000, "duration": 7.0, "description": "Doubles all successful bonus payouts.", "accent": Color(1.0, 0.55, 0.15)},
 	{"id": "combo_singularity", "category": "advanced", "name": "COMBO SINGULARITY", "badge": "x2 COMBO", "cost": 180000000, "duration": 9.0, "description": "Doubles current combo power.", "accent": Color(1.0, 0.32, 0.72)},
 	{"id": "time_emperor", "category": "advanced", "name": "TIME EMPEROR", "badge": "TIME", "cost": 250000000, "duration": 12.0, "description": "Freezes combo and grants x2.5 global income.", "accent": Color(0.3, 0.82, 1.0)},
+	{"id": "prismatic_frenzy", "category": "legendary", "name": "PRISMATIC FRENZY", "badge": "x4 TAP", "cost": 1000000000, "duration": 10.0, "description": "Quadruples tap power during a short ascension burst.", "accent": Color(0.25, 1.0, 0.78)},
+	{"id": "solar_fortune", "category": "legendary", "name": "SOLAR FORTUNE", "badge": "+60%", "cost": 1500000000, "duration": 10.0, "description": "Adds 60 percentage points to bonus chance.", "accent": Color(1.0, 0.84, 0.28)},
+	{"id": "nebula_rain", "category": "legendary", "name": "NEBULA RAIN", "badge": "x3 ALL", "cost": 2250000000, "duration": 12.0, "description": "Triples every source of kibble income.", "accent": Color(0.45, 0.78, 1.0)},
+	{"id": "citadel_jackpot", "category": "legendary", "name": "CITADEL JACKPOT", "badge": "x3 BONUS", "cost": 3400000000, "duration": 9.0, "description": "Triples all successful bonus payouts.", "accent": Color(1.0, 0.48, 0.28)},
+	{"id": "gravity_surge", "category": "legendary", "name": "GRAVITY SURGE", "badge": "x3 COMBO", "cost": 5100000000, "duration": 10.0, "description": "Triples current combo power.", "accent": Color(0.78, 0.52, 1.0)},
+	{"id": "starlight_army", "category": "legendary", "name": "STARLIGHT ARMY", "badge": "+5 GHOST", "cost": 7600000000, "duration": 10.0, "description": "Each press fires five additional ghost taps.", "accent": Color(0.38, 0.92, 1.0)},
+	{"id": "galaxy_frenzy", "category": "mythic", "name": "GALAXY FRENZY", "badge": "x8 TAP", "cost": 1000000000000, "duration": 12.0, "description": "Multiplies tap power by eight during a galaxy burst.", "accent": Color(0.52, 1.0, 0.72)},
+	{"id": "miracle_fortune", "category": "mythic", "name": "MIRACLE FORTUNE", "badge": "+100%", "cost": 1500000000000, "duration": 12.0, "description": "Adds 100 percentage points to bonus chance.", "accent": Color(1.0, 0.9, 0.34)},
+	{"id": "infinity_rain", "category": "mythic", "name": "INFINITY RAIN", "badge": "x6 ALL", "cost": 2250000000000, "duration": 14.0, "description": "Multiplies every source of kibble income by six.", "accent": Color(0.52, 0.84, 1.0)},
+	{"id": "crown_overdrive", "category": "mythic", "name": "CROWN OVERDRIVE", "badge": "x6 BONUS", "cost": 3400000000000, "duration": 11.0, "description": "Multiplies all successful bonus payouts by six.", "accent": Color(1.0, 0.54, 0.3)},
+	{"id": "singularity_surge", "category": "mythic", "name": "SINGULARITY SURGE", "badge": "x6 COMBO", "cost": 5100000000000, "duration": 12.0, "description": "Multiplies current combo power by six.", "accent": Color(0.82, 0.6, 1.0)},
+	{"id": "eternity_army", "category": "mythic", "name": "ETERNITY ARMY", "badge": "+10 GHOST", "cost": 7600000000000, "duration": 12.0, "description": "Each press fires ten additional ghost taps.", "accent": Color(0.42, 0.96, 1.0)},
 ]
-const MAX_COMBINED_CLICK_BOOST := 3.0
+const MAX_COMBINED_CLICK_BOOST := 10.0
 
 var game
 var ui_elapsed := 0.0
@@ -206,6 +218,11 @@ func process(delta: float) -> void:
 	var protects_combo: bool = is_active("time_freeze") or is_active("time_emperor") or game.nine_lives_taps_left > 0
 	if game.combo_timer != null and game.combo_timer.paused != protects_combo:
 		game.combo_timer.paused = protects_combo
+
+	if game.is_menu_time_paused():
+		if is_instance_valid(game.boosts_panel) and game.boosts_panel.visible:
+			update_ui()
+		return
 
 	if is_active("kibble_storm"):
 		storm_elapsed += delta
@@ -240,12 +257,12 @@ func is_active(boost_id: String) -> bool:
 
 func get_remaining_seconds(boost_id: String) -> float:
 	var end_time := float(game.active_boost_end_times.get(boost_id, 0.0))
-	return maxf(0.0, end_time - Time.get_unix_time_from_system())
+	return maxf(0.0, end_time - game._get_unix_time())
 
 
 func get_recharge_seconds(boost_id: String) -> float:
 	var end_time := float(game.boost_recharge_end_times.get(boost_id, 0.0))
-	return maxf(0.0, end_time - Time.get_unix_time_from_system())
+	return maxf(0.0, end_time - game._get_unix_time())
 
 
 func is_recharging(boost_id: String) -> bool:
@@ -267,6 +284,10 @@ func get_temporary_bonus_chance() -> float:
 		bonus += 20.0
 	if is_active("infinite_fortune"):
 		bonus += 40.0
+	if is_active("solar_fortune"):
+		bonus += 60.0
+	if is_active("miracle_fortune"):
+		bonus += 100.0
 	return bonus
 
 
@@ -276,6 +297,10 @@ func get_tap_multiplier() -> float:
 		multiplier *= 2.0
 	if is_active("quantum_frenzy"):
 		multiplier *= 3.0
+	if is_active("prismatic_frenzy"):
+		multiplier *= 4.0
+	if is_active("galaxy_frenzy"):
+		multiplier *= 8.0
 	return multiplier
 
 
@@ -287,15 +312,19 @@ func get_bonus_payout_multiplier() -> float:
 		multiplier *= 1.1
 	if is_active("jackpot_overdrive"):
 		multiplier *= 2.0
+	if is_active("citadel_jackpot"):
+		multiplier *= 3.0
+	if is_active("crown_overdrive"):
+		multiplier *= 6.0
 	return multiplier
 
 
 func get_extra_ghost_taps() -> int:
-	return (1 if is_active("purrstorm") else 0) + (3 if is_active("ghost_army") else 0)
+	return (1 if is_active("purrstorm") else 0) + (3 if is_active("ghost_army") else 0) + (5 if is_active("starlight_army") else 0) + (10 if is_active("eternity_army") else 0)
 
 
 func get_combo_power_multiplier() -> float:
-	return (1.15 if is_active("combo_nova") else 1.0) * (2.0 if is_active("combo_singularity") else 1.0)
+	return (1.15 if is_active("combo_nova") else 1.0) * (2.0 if is_active("combo_singularity") else 1.0) * (3.0 if is_active("gravity_surge") else 1.0) * (6.0 if is_active("singularity_surge") else 1.0)
 
 
 func get_streak_multiplier() -> float:
@@ -332,6 +361,10 @@ func get_global_gain_multiplier() -> float:
 		multiplier *= 2.0
 	if is_active("time_emperor"):
 		multiplier *= 2.5
+	if is_active("nebula_rain"):
+		multiplier *= 3.0
+	if is_active("infinity_rain"):
+		multiplier *= 6.0
 	return multiplier
 
 
@@ -345,7 +378,7 @@ func consume_protected_tap() -> void:
 		return
 	game.nine_lives_taps_left -= 1
 	if game.nine_lives_taps_left == 0 and game.nine_lives_recharge_duration > 0.0:
-		game.boost_recharge_end_times["nine_lives"] = Time.get_unix_time_from_system() + game.nine_lives_recharge_duration
+		game.boost_recharge_end_times["nine_lives"] = game._get_unix_time() + game.nine_lives_recharge_duration
 		game.nine_lives_recharge_duration = 0.0
 		game._queue_save()
 	update_ui()
@@ -368,7 +401,7 @@ func purchase(boost_id: String, tier: int) -> void:
 	var duration := float(data["duration"])
 	if duration > 0.0:
 		var active_duration := duration * float(tier)
-		var active_end := Time.get_unix_time_from_system() + active_duration
+		var active_end: float = float(game._get_unix_time()) + active_duration
 		game.active_boost_end_times[boost_id] = active_end
 		game.boost_recharge_end_times[boost_id] = active_end + active_duration * 2.0
 	else:
@@ -384,6 +417,7 @@ func purchase(boost_id: String, tier: int) -> void:
 	update_ui()
 	game._play_purchase_sound()
 	game._save_game()
+	game._tutorial_notify("boost_used")
 
 	var card := game.boost_cards.get(boost_id) as Control
 	if card != null:
@@ -432,7 +466,7 @@ func update_ui() -> void:
 			elif recharging:
 				button.text = "RECHARGE\n%s" % format_seconds(recharge_remaining)
 			else:
-				button.text = "%s KIBBLES" % game._format_number(cost) if String(data.get("category", "classical")) == "advanced" else "%s\n%s" % [get_tier_name(tier), game._format_number(cost)]
+				button.text = "%s KIBBLES" % game._format_number(cost) if String(data.get("category", "classical")) != "classical" else "%s\n%s" % [get_tier_name(tier), game._format_number(cost)]
 
 func get_data(boost_id: String) -> Dictionary:
 	for data in BOOST_DATA:

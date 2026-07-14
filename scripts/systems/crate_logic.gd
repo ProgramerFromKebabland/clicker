@@ -70,6 +70,90 @@ const CRATE_DATA: Array[Dictionary] = [
 		"open_art": "res://assets/generated/chests/void_open.png",
 		"rarities": [["mythic", 0.45], ["legendary", 0.55]],
 	},
+	{
+		"id": "prismatic",
+		"name": "PRISMATIC CRATE",
+		"tagline": "Rainbow gems with endgame shine",
+		"cost": 25000000000,
+		"picks": 6,
+		"fragments": 14,
+		"accent": Color(0.3, 1.0, 0.78, 1.0),
+		"art": "res://assets/generated/chests/prismatic.png",
+		"open_art": "res://assets/generated/chests/prismatic_open.png",
+		"rarities": [["mythic", 0.24], ["legendary", 0.76]],
+	},
+	{
+		"id": "eternity",
+		"name": "ETERNITY CRATE",
+		"tagline": "The trillion-kibble treasure",
+		"cost": 1000000000000,
+		"picks": 8,
+		"fragments": 22,
+		"accent": Color(1.0, 0.84, 0.26, 1.0),
+		"art": "res://assets/generated/chests/eternity.png",
+		"open_art": "res://assets/generated/chests/eternity_open.png",
+		"rarities": [["legendary", 0.92], ["mega", 0.08]],
+	},
+	{
+		"id": "solar_crown",
+		"name": "SOLAR CROWN CRATE",
+		"tagline": "Sunlit treasure beyond eternity",
+		"cost": 10000000000000,
+		"picks": 9,
+		"fragments": 28,
+		"accent": Color(1.0, 0.68, 0.12, 1.0),
+		"art": "res://assets/generated/chests/solar_crown.png",
+		"open_art": "res://assets/generated/chests/solar_crown_open.png",
+		"rarities": [["legendary", 0.86], ["mega", 0.14]],
+	},
+	{
+		"id": "quantum_yarn",
+		"name": "QUANTUM YARN CRATE",
+		"tagline": "A tangled vault of impossible gems",
+		"cost": 100000000000000,
+		"picks": 10,
+		"fragments": 36,
+		"accent": Color(0.16, 0.92, 1.0, 1.0),
+		"art": "res://assets/generated/chests/quantum_yarn.png",
+		"open_art": "res://assets/generated/chests/quantum_yarn_open.png",
+		"rarities": [["legendary", 0.78], ["mega", 0.22]],
+	},
+	{
+		"id": "aurora_monarch",
+		"name": "AURORA MONARCH CRATE",
+		"tagline": "Regal gems under northern light",
+		"cost": 1000000000000000,
+		"picks": 11,
+		"fragments": 46,
+		"accent": Color(0.5, 1.0, 0.82, 1.0),
+		"art": "res://assets/generated/chests/aurora_monarch.png",
+		"open_art": "res://assets/generated/chests/aurora_monarch_open.png",
+		"rarities": [["legendary", 0.68], ["mega", 0.32]],
+	},
+	{
+		"id": "chrono_paw",
+		"name": "CHRONO PAW CRATE",
+		"tagline": "Clockwork treasure from every minute",
+		"cost": 10000000000000000,
+		"picks": 12,
+		"fragments": 58,
+		"accent": Color(0.34, 0.72, 1.0, 1.0),
+		"art": "res://assets/generated/chests/chrono_paw.png",
+		"open_art": "res://assets/generated/chests/chrono_paw_open.png",
+		"rarities": [["legendary", 0.55], ["mega", 0.45]],
+	},
+	{
+		"id": "infinity_galaxy",
+		"name": "INFINITY GALAXY CRATE",
+		"tagline": "The far edge of the gem vault",
+		"cost": 100000000000000000,
+		"picks": 14,
+		"fragments": 75,
+		"accent": Color(0.88, 0.4, 1.0, 1.0),
+		"art": "res://assets/generated/chests/infinity_galaxy.png",
+		"open_art": "res://assets/generated/chests/infinity_galaxy_open.png",
+		"rarities": [["legendary", 0.35], ["mega", 0.65]],
+	},
 ]
 
 const WORKSHOP_DATA: Array[Dictionary] = [
@@ -650,6 +734,7 @@ func open_crate(crate_id: String) -> void:
 	update_ui(true)
 	game._play_ui_sound()
 	game._save_game()
+	game._tutorial_notify("crate_opened")
 	show_reward_overlay(crate_data, rewards)
 
 
@@ -945,6 +1030,8 @@ func roll_skin(crate_data: Dictionary) -> Dictionary:
 
 
 func get_skin_rarity(skin_data: Dictionary) -> String:
+	if skin_data.has("rarity"):
+		return String(skin_data["rarity"])
 	var cost := int(skin_data.get("cost", 0))
 	if cost <= 10000:
 		return "common"
@@ -958,12 +1045,15 @@ func get_skin_rarity(skin_data: Dictionary) -> String:
 
 
 func get_skin_unlock_cost(skin_data: Dictionary) -> int:
+	if skin_data.has("gem_cost"):
+		return maxi(1, int(skin_data["gem_cost"]))
 	var spread: int = absi(hash(String(skin_data.get("id", ""))))
 	match get_skin_rarity(skin_data):
 		"rare": return 1 + (spread % 3)
 		"epic": return 3 + (spread % 3)
 		"mythic": return 5 + (spread % 3)
 		"legendary": return 7 + (spread % 4)
+		"mega": return 20
 	return 1
 
 
@@ -977,6 +1067,8 @@ func get_rarity_color(rarity: String) -> Color:
 			return Color(1.0, 0.68, 0.18, 1.0)
 		"legendary":
 			return Color(1.0, 0.3, 0.16, 1.0)
+		"mega":
+			return Color(0.95, 0.42, 1.0, 1.0)
 	return Color(0.28, 0.9, 0.86, 1.0)
 
 
