@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://y2jnpnlksrmh"
-path="res://.godot/imported/commando_cat.png-f863af1424b697805abbfe16c97cacce.ctex"
+uid="uid://co47juqyoenln"
+path="res://.godot/imported/03_open_rare_crates_iphone.png-5a8c024eda35aae59e092223bd16b08f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://tools/image_backups/commando_cat.png"
-dest_files=["res://.godot/imported/commando_cat.png-f863af1424b697805abbfe16c97cacce.ctex"]
+source_file="res://Preview/Iphone/03_open_rare_crates_iphone.png"
+dest_files=["res://.godot/imported/03_open_rare_crates_iphone.png-5a8c024eda35aae59e092223bd16b08f.ctex"]
 
 [params]
 
