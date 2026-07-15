@@ -8,7 +8,17 @@ func _init(game_ref) -> void:
 	game = game_ref
 
 
+func _is_ui_test_session() -> bool:
+	return (
+		game != null
+		and game.get_tree() != null
+		and game.get_tree().root.has_meta("codex_ui_test_session")
+	)
+
+
 func queue_save() -> void:
+	if _is_ui_test_session():
+		return
 	if game.save_timer == null:
 		save_game()
 		return
@@ -17,6 +27,8 @@ func queue_save() -> void:
 
 
 func save_game() -> void:
+	if _is_ui_test_session():
+		return
 	var save_file = ConfigFile.new()
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_SCORE_KEY, game.score)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_COINS_KEY, game.coins)
@@ -190,68 +202,92 @@ func show_offline_gain_message() -> void:
 	if game.last_offline_gain <= 0:
 		return
 	var cap_text = " (max time reached)" if game.last_offline_was_capped else ""
-	var popup = Control.new()
+	var popup = PanelContainer.new()
+	popup.name = "OfflineGainBulletin"
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.z_index = 30
 	game.click_popup_layer.add_child(popup)
 
-	var popup_width = minf(game.size.x - 48.0, 520.0)
-	popup.size = Vector2(popup_width, 170.0)
-	popup.position = Vector2((game.size.x - popup_width) * 0.5, 150.0)
+	var side_margin := clampf(game.size.x * 0.045, 16.0, 28.0)
+	var popup_width := minf(game.size.x - side_margin * 2.0, 440.0)
+	popup.size = Vector2(popup_width, 136.0)
+	var shell_top := float(game.get("telegram_top_height")) if game.get("telegram_top_height") != null else 0.0
+	popup.position = Vector2((game.size.x - popup_width) * 0.5, shell_top + 12.0)
 	popup.modulate.a = 0.0
-	popup.scale = Vector2(0.9, 0.9)
+	popup.scale = Vector2(0.97, 0.97)
 	popup.pivot_offset = popup.size * 0.5
 
-	var background = Panel.new()
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box = StyleBoxFlat.new()
-	box.bg_color = Color(0.045, 0.055, 0.07, 0.96)
-	box.border_color = Color(1.0, 0.84, 0.28, 0.95)
-	box.set_border_width_all(3)
-	box.set_corner_radius_all(8)
-	box.shadow_color = Color(0.0, 0.0, 0.0, 0.45)
-	box.shadow_size = 12
-	background.add_theme_stylebox_override("panel", box)
-	popup.add_child(background)
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color("#253443")
+	box.set_corner_radius_all(10)
+	box.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
+	box.shadow_size = 6
+	box.content_margin_left = 18.0
+	box.content_margin_right = 18.0
+	box.content_margin_top = 14.0
+	box.content_margin_bottom = 14.0
+	popup.add_theme_stylebox_override("panel", box)
 
-	var message = Label.new()
-	message.text = "Welcome back!\nOffline gain: +%s kibbles\n%d min counted%s" % [game._format_number(game.last_offline_gain), game.last_offline_minutes, cap_text]
-	message.position = Vector2(24.0, 28.0)
-	message.size = Vector2(popup.size.x - 48.0, 104.0)
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	message.add_theme_font_size_override("font_size", 28)
-	message.add_theme_color_override("font_color", Color(1.0, 0.95, 0.62, 1.0))
-	message.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.75))
-	message.add_theme_constant_override("shadow_offset_x", 2)
-	message.add_theme_constant_override("shadow_offset_y", 2)
-	popup.add_child(message)
+	var body_margin := MarginContainer.new()
+	body_margin.add_theme_constant_override("margin_right", 40)
+	popup.add_child(body_margin)
+	var text_stack := VBoxContainer.new()
+	text_stack.add_theme_constant_override("separation", 2)
+	body_margin.add_child(text_stack)
+	var title := Label.new()
+	title.text = "Welcome back"
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color("#f2f5f7"))
+	text_stack.add_child(title)
+	var amount := Label.new()
+	amount.text = "+%s kibbles while you were away" % game._format_number(game.last_offline_gain)
+	amount.add_theme_font_size_override("font_size", 16)
+	amount.add_theme_color_override("font_color", Color("#64b5ef"))
+	text_stack.add_child(amount)
+	var detail := Label.new()
+	detail.text = "%d min counted%s" % [game.last_offline_minutes, cap_text]
+	detail.add_theme_font_size_override("font_size", 14)
+	detail.add_theme_color_override("font_color", Color("#8d9baa"))
+	text_stack.add_child(detail)
 	game._animate_coin_counter(maxi(0, game.coins - game.last_offline_gain), game.coins, 0.9)
 	game._spawn_coin_stream(game.last_offline_gain, popup.get_global_rect().get_center())
 
-	var close_button = Button.new()
-	close_button.text = "X"
+	var close_button := Button.new()
+	close_button.name = "CloseButton"
+	close_button.text = "×"
 	close_button.tooltip_text = "Close"
-	close_button.position = Vector2(popup.size.x - 58.0, 12.0)
-	close_button.size = Vector2(42.0, 42.0)
-	close_button.add_theme_font_size_override("font_size", 20)
-	popup.add_child(close_button)
-	close_button.pressed.connect(func() -> void:
-		if is_instance_valid(popup):
-			popup.queue_free()
-	)
-
+	var close_layer := Control.new()
+	close_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup.add_child(close_layer)
+	close_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	close_button.offset_left = -38.0
+	close_button.offset_top = -6.0
+	close_button.offset_bottom = 32.0
+	close_button.flat = true
+	close_button.focus_mode = Control.FOCUS_NONE
+	close_button.add_theme_font_size_override("font_size", 22)
+	close_button.add_theme_color_override("font_color", Color("#8d9baa"))
+	close_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	close_layer.add_child(close_button)
 	var tween = game.create_tween()
+	popup.set_meta("dismiss_tween", tween)
+	close_button.pressed.connect(_dismiss_offline_bulletin.bind(popup))
 	tween.set_parallel(true)
-	tween.tween_property(popup, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(popup, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	tween.tween_property(popup, "modulate:a", 1.0, 0.16)
+	tween.tween_property(popup, "scale", Vector2.ONE, 0.20)
 	tween.chain().tween_interval(3.0)
-	tween.chain().tween_property(popup, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(func() -> void:
-		if is_instance_valid(popup):
-			popup.queue_free()
-	)
+	tween.chain().tween_property(popup, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(Callable(popup, "queue_free"))
+
+
+func _dismiss_offline_bulletin(popup: PanelContainer) -> void:
+	if not is_instance_valid(popup):
+		return
+	var dismiss_tween := popup.get_meta("dismiss_tween") as Tween
+	if dismiss_tween != null and dismiss_tween.is_valid():
+		dismiss_tween.kill()
+	popup.queue_free()
 
 
 func get_offline_info_text() -> String:

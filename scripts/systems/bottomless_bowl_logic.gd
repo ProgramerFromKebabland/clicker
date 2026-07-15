@@ -39,32 +39,41 @@ func build_ui() -> void:
 	game.menu_panel.get_parent().add_child(panel)
 	panel.add_theme_stylebox_override("panel", game._make_upgrade_style(Color(0.055, 0.035, 0.075, 0.99), Color(1.0, 0.66, 0.2), 24, 2, -1, 18))
 	var margin := MarginContainer.new()
+	margin.name = "BowlRootMargin"
 	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]: margin.add_theme_constant_override(side, 18)
 	panel.add_child(margin)
 	var root := VBoxContainer.new()
+	root.name = "BowlRoot"
 	root.add_theme_constant_override("separation", 10)
 	margin.add_child(root)
 	var title := Label.new()
+	title.name = "BowlTitle"
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.text = "THE BOTTOMLESS CAT BOWL"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 29)
 	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.46))
 	root.add_child(title)
 	var subtitle := Label.new()
+	subtitle.name = "BowlSubtitle"
 	subtitle.text = "Donate any amount. Fill forever. Weekly progress resets; permanent milestones remain."
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subtitle.add_theme_font_size_override("font_size", 14)
 	root.add_child(subtitle)
 	scroll = ScrollContainer.new()
+	scroll.name = "BowlScroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	game._configure_touch_scroll(scroll)
 	root.add_child(scroll)
 	var content := VBoxContainer.new()
+	content.name = "BowlContent"
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 12)
 	scroll.add_child(content)
 	var bowl := TextureRect.new()
+	bowl.name = "BowlArt"
 	bowl.texture = BOWL_TEXTURE
 	bowl.custom_minimum_size = Vector2(0, 310)
 	bowl.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -74,7 +83,7 @@ func build_ui() -> void:
 	progress_bar = ProgressBar.new(); progress_bar.custom_minimum_size = Vector2(0, 38); progress_bar.show_percentage = false; content.add_child(progress_bar)
 	progress_label = Label.new(); progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; content.add_child(progress_label)
 	wallet_label = Label.new(); wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; wallet_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.46)); content.add_child(wallet_label)
-	var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 10); content.add_child(row)
+	var row := HBoxContainer.new(); row.name = "DonateRow"; row.add_theme_constant_override("separation", 10); content.add_child(row)
 	donate_edit = LineEdit.new(); donate_edit.placeholder_text = "Amount of kibble"; donate_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER; donate_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL; row.add_child(donate_edit)
 	donate_button = Button.new(); donate_button.text = "DONATE"; donate_button.custom_minimum_size = Vector2(170, 54); game._style_upgrade_button(donate_button, Color(0.94, 0.55, 0.16)); row.add_child(donate_button)
 	donate_button.pressed.connect(_donate)
@@ -83,6 +92,59 @@ func build_ui() -> void:
 	milestone_label = Label.new(); milestone_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; milestone_label.add_theme_color_override("font_color", Color(0.82, 0.72, 1.0)); content.add_child(milestone_label)
 	var back := Button.new(); back.text = "BACK TO MUSEUM"; back.custom_minimum_size = Vector2(0, 56); game._style_upgrade_button(back, Color(0.65, 0.4, 0.18)); root.add_child(back); back.pressed.connect(game._show_museum)
 	update_ui()
+	apply_responsive_layout()
+
+
+func apply_responsive_layout(viewport_width: float = -1.0) -> void:
+	if panel == null or not is_instance_valid(panel):
+		return
+	if viewport_width <= 0.0:
+		viewport_width = game.get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	var root_margin := panel.find_child("BowlRootMargin", true, false) as MarginContainer
+	if root_margin != null:
+		game._set_telegram_margins(root_margin, 8 if compact else 12, 8 if compact else 10, 8 if compact else 12, 12 if compact else 14)
+	var title := panel.find_child("BowlTitle", true, false) as Label
+	if title != null:
+		title.custom_minimum_size = Vector2(0.0, 62.0 if compact else 0.0)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.add_theme_font_size_override("font_size", 23 if compact else 29)
+	var subtitle := panel.find_child("BowlSubtitle", true, false) as Label
+	if subtitle != null:
+		subtitle.custom_minimum_size.x = 0.0
+		subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		subtitle.add_theme_font_size_override("font_size", 16 if compact else 18)
+	if is_instance_valid(scroll):
+		scroll.custom_minimum_size = Vector2.ZERO
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var content := panel.find_child("BowlContent", true, false) as VBoxContainer
+	if content != null:
+		content.custom_minimum_size.x = 0.0
+	var bowl := panel.find_child("BowlArt", true, false) as TextureRect
+	if bowl != null:
+		bowl.custom_minimum_size = Vector2(0.0, 250.0 if compact else 310.0)
+	var donate_row := panel.find_child("DonateRow", true, false) as HBoxContainer
+	if donate_row != null:
+		donate_row.custom_minimum_size.x = 0.0
+		donate_row.add_theme_constant_override("separation", 8 if compact else 10)
+	if is_instance_valid(donate_edit):
+		donate_edit.custom_minimum_size.x = 0.0
+		donate_edit.add_theme_font_size_override("font_size", 16 if compact else 20)
+	if is_instance_valid(donate_button):
+		donate_button.custom_minimum_size = Vector2(112.0 if compact else 170.0, 52.0 if compact else 54.0)
+	for label_node in panel.find_children("*", "Label", true, false):
+		var label := label_node as Label
+		if label == null or label == title or label == subtitle:
+			continue
+		label.custom_minimum_size.x = 0.0
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.add_theme_font_size_override("font_size", 16 if compact else maxi(18, label.get_theme_font_size("font_size")))
+	for button_node in panel.find_children("*", "Button", true, false):
+		var action := button_node as Button
+		if action == null:
+			continue
+		action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		action.add_theme_font_size_override("font_size", 16 if compact else 20)
 
 func get_cost(for_level: int = level) -> int:
 	return mini(game.MAX_RESOURCE_VALUE, int(round(BASE_COST * pow(2.35, for_level))))

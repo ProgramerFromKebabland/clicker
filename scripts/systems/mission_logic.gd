@@ -118,30 +118,37 @@ func build_ui() -> void:
 	game.menu_panel.get_parent().add_child(panel)
 	panel.add_theme_stylebox_override("panel", game._make_upgrade_style(Color(0.04, 0.035, 0.085, 0.99), Color(0.65, 0.48, 1.0), 24, 2, -1, 16))
 	var margin := MarginContainer.new()
+	margin.name = "MissionRootMargin"
 	margin.add_theme_constant_override("margin_left", 20)
 	margin.add_theme_constant_override("margin_top", 22)
 	margin.add_theme_constant_override("margin_right", 20)
 	margin.add_theme_constant_override("margin_bottom", 20)
 	panel.add_child(margin)
 	var root := VBoxContainer.new()
+	root.name = "MissionRoot"
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
 	var title := Label.new()
+	title.name = "MissionTitle"
 	title.text = "MISSION BOARD"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 34)
 	title.add_theme_color_override("font_color", Color(0.86, 0.8, 1.0))
 	root.add_child(title)
 	var subtitle := Label.new()
+	subtitle.name = "MissionSubtitle"
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subtitle.text = "Three challenges. One glorious haul."
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 15)
 	subtitle.add_theme_color_override("font_color", Color(0.68, 0.66, 0.82))
 	root.add_child(subtitle)
 	var status_card := PanelContainer.new()
+	status_card.name = "MissionStatusCard"
 	status_card.add_theme_stylebox_override("panel", game._make_upgrade_style(Color(0.08, 0.065, 0.14, 0.98), Color(0.47, 0.34, 0.82), 14, 1, -1, 6))
 	root.add_child(status_card)
 	var status_margin := MarginContainer.new()
+	status_margin.name = "MissionStatusMargin"
 	for side in ["left", "top", "right", "bottom"]: status_margin.add_theme_constant_override("margin_" + side, 10)
 	status_card.add_child(status_margin)
 	var status_items := VBoxContainer.new()
@@ -174,6 +181,8 @@ func build_ui() -> void:
 	timer_label.add_theme_color_override("font_color", Color(0.78, 0.75, 0.9))
 	status_items.add_child(timer_label)
 	var scroll := ScrollContainer.new()
+	scroll.name = "MissionScroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
 	list = VBoxContainer.new()
@@ -247,27 +256,32 @@ func _rebuild_cards() -> void:
 		var progress := mini(_progress(id), int(mission["target"]))
 		var is_ready := not done and progress >= int(mission["target"])
 		var card := PanelContainer.new()
+		card.set_meta("mission_card", true)
 		var accent := Color(0.4, 0.85, 0.55) if mission["difficulty"] == "Easy" else (Color(0.35, 0.7, 1.0) if mission["difficulty"] == "Medium" else Color(0.85, 0.48, 1.0))
 		var card_fill := Color(0.075, 0.11, 0.09, 0.99) if is_ready else Color(0.055, 0.06, 0.105, 0.98)
 		card.add_theme_stylebox_override("panel", game._make_upgrade_style(card_fill, accent, 18, 3 if is_ready else 2, -1, 10 if is_ready else 8))
 		list.add_child(card)
 		var margin := MarginContainer.new()
+		margin.name = "MissionCardMargin"
 		for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 14)
 		card.add_child(margin)
 		var items := VBoxContainer.new()
 		items.add_theme_constant_override("separation", 9)
 		margin.add_child(items)
 		var eyebrow := Label.new()
+		eyebrow.set_meta("mission_role", "eyebrow")
 		eyebrow.text = "MISSION %d OF %d   /   %s   /   %s" % [slot + 1, SLOT_COUNT, String(mission["difficulty"]).to_upper(), _kind_name(String(mission["kind"]))]
 		eyebrow.add_theme_font_size_override("font_size", 13)
 		eyebrow.add_theme_color_override("font_color", accent)
 		items.add_child(eyebrow)
 		var heading := Label.new()
+		heading.set_meta("mission_role", "heading")
 		heading.text = String(mission["title"])
 		heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		heading.add_theme_font_size_override("font_size", 21)
 		items.add_child(heading)
 		var objective := Label.new()
+		objective.set_meta("mission_role", "objective")
 		objective.text = String(mission["text"])
 		objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		objective.add_theme_font_size_override("font_size", 16)
@@ -275,6 +289,7 @@ func _rebuild_cards() -> void:
 		items.add_child(objective)
 		var percent := int(round(100.0 * float(progress) / float(maxi(1, int(mission["target"])))))
 		var detail := Label.new()
+		detail.set_meta("mission_role", "detail")
 		detail.text = "REWARD CLAIMED - nicely done!" if done else "%s / %s  (%d%%)" % [game._format_number(progress), game._format_number(int(mission["target"])), percent]
 		detail.add_theme_color_override("font_color", Color(0.72, 0.75, 0.86))
 		items.add_child(detail)
@@ -285,6 +300,7 @@ func _rebuild_cards() -> void:
 		bar.show_percentage = false
 		items.add_child(bar)
 		var reward := Label.new()
+		reward.set_meta("mission_role", "reward")
 		reward.text = "TREASURE  >>  %s" % _reward_text(mission["reward"])
 		reward.add_theme_font_size_override("font_size", 16)
 		reward.add_theme_color_override("font_color", Color(1.0, 0.82, 0.34) if not done else Color(0.55, 0.7, 0.58))
@@ -295,6 +311,77 @@ func _rebuild_cards() -> void:
 		game._style_upgrade_button(complete, accent)
 		complete.pressed.connect(claim.bind(id))
 		items.add_child(complete)
+	apply_responsive_layout()
+
+
+func apply_responsive_layout(viewport_width: float = -1.0) -> void:
+	if panel == null or not is_instance_valid(panel):
+		return
+	if viewport_width <= 0.0:
+		viewport_width = game.get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	var root_margin := panel.find_child("MissionRootMargin", true, false) as MarginContainer
+	if root_margin != null:
+		game._set_telegram_margins(root_margin, 8 if compact else 12, 8 if compact else 10, 8 if compact else 12, 12 if compact else 14)
+	var title := panel.find_child("MissionTitle", true, false) as Label
+	if title != null:
+		title.custom_minimum_size.x = 0.0
+		title.clip_text = true
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		title.add_theme_font_size_override("font_size", 27 if compact else 30)
+	var subtitle := panel.find_child("MissionSubtitle", true, false) as Label
+	if subtitle != null:
+		subtitle.custom_minimum_size.x = 0.0
+		subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		subtitle.add_theme_font_size_override("font_size", 16 if compact else 18)
+	var status_margin := panel.find_child("MissionStatusMargin", true, false) as MarginContainer
+	if status_margin != null:
+		game._set_telegram_margins(status_margin, 9 if compact else 10, 8 if compact else 10, 9 if compact else 10, 8 if compact else 10)
+	for status_label in [completion_label, board_bonus_label, timer_label]:
+		if status_label == null:
+			continue
+		status_label.custom_minimum_size.x = 0.0
+		status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		status_label.add_theme_font_size_override("font_size", 16 if compact else 20)
+	if reroll_button != null:
+		reroll_button.custom_minimum_size.x = 0.0
+		reroll_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		reroll_button.add_theme_font_size_override("font_size", 17 if compact else 20)
+	var scroll := panel.find_child("MissionScroll", true, false) as ScrollContainer
+	if scroll != null:
+		scroll.custom_minimum_size = Vector2.ZERO
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	list.custom_minimum_size.x = 0.0
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for card_node in list.get_children():
+		var card := card_node as PanelContainer
+		if card == null:
+			continue
+		card.custom_minimum_size.x = 0.0
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var card_margin := card.find_child("MissionCardMargin", true, false) as MarginContainer
+		if card_margin != null:
+			game._set_telegram_margins(card_margin, 10 if compact else 14, 10 if compact else 14, 10 if compact else 14, 10 if compact else 14)
+		for label_node in card.find_children("*", "Label", true, false):
+			var label := label_node as Label
+			if label == null:
+				continue
+			label.custom_minimum_size.x = 0.0
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			var role := String(label.get_meta("mission_role", ""))
+			if role == "heading":
+				label.add_theme_font_size_override("font_size", 22 if compact else 24)
+			elif role in ["objective", "detail", "reward"]:
+				label.add_theme_font_size_override("font_size", 17 if compact else 20)
+			else:
+				label.add_theme_font_size_override("font_size", 15 if compact else 18)
+		for button_node in card.find_children("*", "Button", true, false):
+			var action := button_node as Button
+			if action == null:
+				continue
+			action.custom_minimum_size.x = 0.0
+			action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			action.add_theme_font_size_override("font_size", 17 if compact else 20)
 
 
 func _get_cards_signature() -> String:

@@ -4,3 +4,12 @@
 builds/
 tmp/
 clicker-gh-pages/
+
+# Local UI references and Codex visual-regression tooling.
+telegram-mobile-ui/
+telegram-godot-clone/
+tools/capture_telegram_ui.gd
+tools/capture_telegram_ui.gd.uid
+tools/test_telegram_navigation.gd
+tools/test_telegram_navigation.gd.uid
+build/**/*.idsig

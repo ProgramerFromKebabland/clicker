@@ -383,11 +383,13 @@ func _add_section_title(parent: VBoxContainer, title_text: String, body_text: St
 	block.add_theme_constant_override("separation", 2)
 	parent.add_child(block)
 	var title := Label.new()
+	title.set_meta("crate_role", "section_title")
 	title.text = title_text
 	title.add_theme_font_size_override("font_size", 21)
 	title.add_theme_color_override("font_color", accent)
 	block.add_child(title)
 	var body := Label.new()
+	body.set_meta("crate_role", "section_body")
 	body.text = body_text
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_font_size_override("font_size", 13)
@@ -398,11 +400,13 @@ func _add_section_title(parent: VBoxContainer, title_text: String, body_text: St
 func _add_crate_card(parent: VBoxContainer, crate_data: Dictionary) -> void:
 	var accent: Color = crate_data["accent"]
 	var card := PanelContainer.new()
+	card.set_meta("crate_role", "crate_card")
 	card.custom_minimum_size = Vector2(0.0, 176.0)
 	card.add_theme_stylebox_override("panel", game._make_upgrade_card_style(accent, false))
 	parent.add_child(card)
 
 	var margin := MarginContainer.new()
+	margin.name = "CrateCardMargin"
 	margin.add_theme_constant_override("margin_left", 12)
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_right", 12)
@@ -410,10 +414,12 @@ func _add_crate_card(parent: VBoxContainer, crate_data: Dictionary) -> void:
 	card.add_child(margin)
 
 	var row := HBoxContainer.new()
+	row.name = "CrateCardRow"
 	row.add_theme_constant_override("separation", 12)
 	margin.add_child(row)
 
 	var art := TextureRect.new()
+	art.name = "CrateCardArt"
 	art.texture = _get_crate_texture(crate_data)
 	art.custom_minimum_size = Vector2(132.0, 132.0)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -426,18 +432,23 @@ func _add_crate_card(parent: VBoxContainer, crate_data: Dictionary) -> void:
 	row.add_child(details)
 
 	var name_label := Label.new()
+	name_label.set_meta("crate_role", "card_name")
 	name_label.text = String(crate_data["name"])
 	name_label.add_theme_font_size_override("font_size", 20)
 	name_label.add_theme_color_override("font_color", accent.lightened(0.18))
 	details.add_child(name_label)
 
 	var tagline := Label.new()
+	tagline.set_meta("crate_role", "card_detail")
+	tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tagline.text = String(crate_data["tagline"])
 	tagline.add_theme_font_size_override("font_size", 14)
 	tagline.add_theme_color_override("font_color", Color(0.72, 0.76, 0.83, 1.0))
 	details.add_child(tagline)
 
 	var drop_label := Label.new()
+	drop_label.set_meta("crate_role", "card_detail")
+	drop_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	drop_label.text = "%d pick%s • %d fragment%s each" % [
 		int(crate_data["picks"]),
 		"s" if int(crate_data["picks"]) != 1 else "",
@@ -460,10 +471,12 @@ func _add_crate_card(parent: VBoxContainer, crate_data: Dictionary) -> void:
 func _add_workshop_card(parent: VBoxContainer, upgrade_data: Dictionary) -> void:
 	var accent: Color = upgrade_data["accent"]
 	var card := PanelContainer.new()
+	card.set_meta("crate_role", "workshop_card")
 	card.add_theme_stylebox_override("panel", game._make_upgrade_card_style(accent, false))
 	parent.add_child(card)
 
 	var margin := MarginContainer.new()
+	margin.name = "WorkshopCardMargin"
 	margin.add_theme_constant_override("margin_left", 13)
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_right", 13)
@@ -475,6 +488,7 @@ func _add_workshop_card(parent: VBoxContainer, upgrade_data: Dictionary) -> void
 	margin.add_child(items)
 
 	var header := HBoxContainer.new()
+	header.name = "WorkshopHeader"
 	header.add_theme_constant_override("separation", 8)
 	items.add_child(header)
 	var badge := Label.new()
@@ -539,7 +553,7 @@ func update_wallet() -> void:
 		var cost := get_crate_cost(crate_data)
 		var has_free_crate := bowl_keys > 0 or (crate_id == "cozy" and cozy_crates > 0)
 		open_button.disabled = game.coins < cost and not has_free_crate
-		open_button.text = "FREE • USE KEY" if bowl_keys > 0 else ("FREE • USE CRATE" if crate_id == "cozy" and cozy_crates > 0 else game._format_number(cost))
+		open_button.text = "FREE • USE KEY" if bowl_keys > 0 else ("FREE • USE CRATE" if crate_id == "cozy" and cozy_crates > 0 else "OPEN  •  %s" % game._format_number(cost))
 
 	for upgrade_data in WORKSHOP_DATA:
 		var upgrade_id := String(upgrade_data["id"])
@@ -568,6 +582,81 @@ func rebuild_collection_grid() -> void:
 	for raw_skin_data in game.SKIN_DATA:
 		var skin_data: Dictionary = raw_skin_data
 		collection_grid.add_child(_create_gem_card(skin_data))
+	apply_responsive_layout()
+
+
+func apply_responsive_layout(viewport_width: float = -1.0) -> void:
+	if viewport_width <= 0.0:
+		viewport_width = game.get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	if is_instance_valid(scroll):
+		scroll.custom_minimum_size.y = 0.0 if compact or game.get_viewport_rect().size.y < 900.0 else 760.0
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	if is_instance_valid(collection_grid):
+		collection_grid.columns = 1 if compact else 2
+		collection_grid.custom_minimum_size.x = 0.0
+	var host: Node = panel
+	if game != null and is_instance_valid(game.crates_list):
+		host = game.crates_list
+	if host == null or not is_instance_valid(host):
+		return
+	for label_node in host.find_children("*", "Label", true, false):
+		var label := label_node as Label
+		if label == null:
+			continue
+		var role := String(label.get_meta("crate_role", ""))
+		if role.is_empty():
+			continue
+		label.custom_minimum_size.x = 0.0
+		if role in ["section_body", "card_detail"]:
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		elif role == "section_title":
+			label.clip_text = true
+			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		label.add_theme_font_size_override("font_size", 17 if compact else (22 if role == "section_title" else 18))
+	for panel_node in host.find_children("*", "PanelContainer", true, false):
+		var card := panel_node as PanelContainer
+		if card == null:
+			continue
+		var role := String(card.get_meta("crate_role", ""))
+		if role.is_empty():
+			continue
+		card.custom_minimum_size.x = 0.0
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if role == "crate_card":
+			card.custom_minimum_size.y = 166.0 if compact else 176.0
+			var margin := card.find_child("CrateCardMargin", true, false) as MarginContainer
+			if margin != null:
+				game._set_telegram_margins(margin, 8 if compact else 12, 9 if compact else 10, 8 if compact else 12, 9 if compact else 10)
+			var row := card.find_child("CrateCardRow", true, false) as HBoxContainer
+			if row != null:
+				row.custom_minimum_size.x = 0.0
+				row.add_theme_constant_override("separation", 8 if compact else 12)
+			var art := card.find_child("CrateCardArt", true, false) as TextureRect
+			if art != null:
+				art.custom_minimum_size = Vector2(96.0 if compact else 132.0, 138.0 if compact else 132.0)
+		elif role == "workshop_card":
+			var workshop_margin := card.find_child("WorkshopCardMargin", true, false) as MarginContainer
+			if workshop_margin != null:
+				game._set_telegram_margins(workshop_margin, 9 if compact else 13, 9 if compact else 10, 9 if compact else 13, 9 if compact else 10)
+			var header := card.find_child("WorkshopHeader", true, false) as HBoxContainer
+			if header != null:
+				header.custom_minimum_size.x = 0.0
+				header.add_theme_constant_override("separation", 5 if compact else 8)
+		for card_label_node in card.find_children("*", "Label", true, false):
+			var card_label := card_label_node as Label
+			if card_label == null:
+				continue
+			card_label.custom_minimum_size.x = 0.0
+			card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			card_label.add_theme_font_size_override("font_size", 15 if compact else maxi(18, card_label.get_theme_font_size("font_size")))
+		for button_node in card.find_children("*", "Button", true, false):
+			var action := button_node as Button
+			if action == null:
+				continue
+			action.custom_minimum_size.x = 0.0
+			action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			action.add_theme_font_size_override("font_size", 16 if compact else 20)
 
 
 func _create_gem_card(skin_data: Dictionary) -> PanelContainer:
@@ -577,6 +666,7 @@ func _create_gem_card(skin_data: Dictionary) -> PanelContainer:
 	var rarity := get_skin_rarity(skin_data)
 	var accent := get_rarity_color(rarity)
 	var card := PanelContainer.new()
+	card.set_meta("crate_role", "gem_card")
 	card.custom_minimum_size = Vector2(0.0, 162.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.add_theme_stylebox_override("panel", game._make_upgrade_card_style(accent, false))

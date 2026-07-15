@@ -36,6 +36,8 @@ func update_achievements_ui() -> void:
 	game.achievements_filter.set_item_text(0, "ALL %d" % achievements.size())
 	game.achievements_filter.set_item_text(1, "UNLOCKED %d" % unlocked_count)
 	game.achievements_filter.set_item_text(2, "LOCKED %d" % (achievements.size() - unlocked_count))
+	if game.achievements_filter.selected < 0:
+		game.achievements_filter.select(0)
 	if game.achievements_panel.visible:
 		rebuild_achievement_list(achievements)
 	# Keep unlock tracking current without interrupting play with achievement toasts.

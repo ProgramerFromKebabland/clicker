@@ -16,10 +16,69 @@ const CrateLogic = preload("res://scripts/systems/crate_logic.gd")
 const MissionLogic = preload("res://scripts/systems/mission_logic.gd")
 const RandomEventLogic = preload("res://scripts/systems/random_event_logic.gd")
 const BottomlessBowlLogic = preload("res://scripts/systems/bottomless_bowl_logic.gd")
+const TelegramNavigation = preload("res://scripts/telegram_navigation.gd")
 const BOOSTS_UI_ICON = preload("res://assets/ui/boosts.png")
 const MUSEUM_UI_ICON = preload("res://assets/ui/museum.png")
 const SKINS_UI_ICON = preload("res://assets/ui/skins.png")
 const SETTINGS_ICON_SHEET_PATH := "res://assets/ui/settings_icons.png"
+const SETTINGS_PAGE_LABELS: Array[String] = ["General", "Performance", "Audio", "Controls"]
+
+var telegram_navigation: Control
+var telegram_page_transition: Tween
+var telegram_pager_host: Control
+var telegram_current_panel: Control
+var telegram_pending_direction := 0
+var telegram_transition_serial := 0
+var telegram_main_transition_nodes: Array[Control] = []
+var telegram_main_base_positions: Dictionary = {}
+var telegram_swipe_dragging := false
+var telegram_swipe_direction := 0
+var telegram_swipe_neighbor_destination := ""
+var telegram_swipe_outgoing_panel: Control
+var telegram_swipe_incoming_panel: Control
+var telegram_swipe_drag_x := 0.0
+var telegram_swipe_velocity_x := 0.0
+var telegram_top_height := 132.0
+var telegram_bottom_height := 78.0
+var pause_dim: ColorRect
+var pause_popup_open := false
+var pause_opened_over_page := false
+var settings_shell: ColorRect
+var settings_action_bar: PanelContainer
+var settings_action_safe_margin: MarginContainer
+var settings_tabs_bar: PanelContainer
+var settings_tabs_scroll: ScrollContainer
+var settings_tabs_row: HBoxContainer
+var settings_tab_indicator: PanelContainer
+var settings_tab_buttons: Array[Button] = []
+var settings_pager_host: Control
+var settings_pages: Array[Control] = []
+var settings_page_contents: Array[VBoxContainer] = []
+var settings_page_margins: Array[MarginContainer] = []
+var settings_general_group: PanelContainer
+var settings_current_page := 0
+var settings_page_tween: Tween
+var settings_shell_tween: Tween
+var settings_swipe_start := Vector2.ZERO
+var settings_swipe_tracking := false
+var settings_swipe_dragging := false
+var settings_swipe_direction := 0
+var settings_swipe_neighbor := -1
+var settings_swipe_drag_x := 0.0
+var settings_swipe_velocity_x := 0.0
+var settings_back_to_pause := false
+var pause_detail_shell: ColorRect
+var pause_detail_action_bar: PanelContainer
+var pause_detail_action_safe_margin: MarginContainer
+var pause_detail_title: Label
+var pause_detail_host: Control
+var pause_detail_current: Control
+var pause_detail_tween: Tween
+var pause_detail_back_to_pause := false
+var upgrade_category_buttons: Dictionary = {}
+var boost_category_buttons: Dictionary = {}
+var upgrade_active_category := "classical"
+var boost_active_category := "classical"
 
 @onready var score_label: Label = %ScoreLabel
 @onready var room_background: TextureRect = %RoomBackground
@@ -478,6 +537,7 @@ var food_panel: PanelContainer
 var food_panel_title: Label
 var food_wallet_label: Label
 var food_status_label: Label
+var food_empty_state: PanelContainer
 var food_list: GridContainer
 var food_scroll: ScrollContainer
 var food_back_button: Button
@@ -580,12 +640,12 @@ var mission_update_elapsed := 0.0
 var runtime_quality_reason := ""
 var performance_settings_card: PanelContainer
 var touch_settings_card: PanelContainer
-var low_quality_check_box: CheckBox
-var optimized_tap_check_box: CheckBox
+var low_quality_check_box: CheckButton
+var optimized_tap_check_box: CheckButton
 var particle_limit_slider: HSlider
 var particle_limit_value_label: Label
-var haptics_check_box: CheckBox
-var events_check_box: CheckBox
+var haptics_check_box: CheckButton
+var events_check_box: CheckButton
 var slider_sound_option: OptionButton
 var settings_icon_sheet_texture: Texture2D
 
@@ -701,7 +761,7 @@ func _ready() -> void:
 	achievement_tracking_ready = true
 	_apply_volume()
 	last_cat_press_global_position = cat_button.get_global_rect().get_center()
-	cat_button.button_down.connect(_on_cat_pressed)
+	cat_button.pressed.connect(_on_cat_pressed)
 	menu_button.pressed.connect(_show_menu)
 	skins_button.pressed.connect(_show_skins)
 	boosts_button.pressed.connect(_show_boosts)
@@ -729,7 +789,7 @@ func _ready() -> void:
 	click_power_slider.value_changed.connect(_on_click_power_changed)
 	click_volume_slider.value_changed.connect(_on_click_volume_changed)
 	ui_volume_slider.value_changed.connect(_on_ui_volume_changed)
-	resume_button.pressed.connect(_hide_menu)
+	resume_button.pressed.connect(_hide_pause_popup)
 	exit_button.pressed.connect(_exit_game)
 	skins_back_button.pressed.connect(_hide_menu)
 	boosts_back_button.pressed.connect(_hide_menu)
@@ -738,6 +798,7 @@ func _ready() -> void:
 	_build_admin_panel()
 	_prepare_mobile_panels()
 	_setup_modal_navigation()
+	_build_telegram_navigation()
 	_apply_mobile_layout()
 	# Several setup passes above replace styleboxes. Reapply the loaded preference
 	# last so a restarted game looks exactly like the selected UI style.
@@ -796,6 +857,19 @@ func _process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if _handle_slider_touch(event):
 		get_viewport().set_input_as_handled()
+		return
+	if is_instance_valid(settings_shell) and settings_shell.visible:
+		if event.is_action_pressed("ui_cancel"):
+			_close_settings_shell()
+			get_viewport().set_input_as_handled()
+			return
+		if _handle_settings_shell_swipe(event):
+			get_viewport().set_input_as_handled()
+		return
+	if is_instance_valid(pause_detail_shell) and pause_detail_shell.visible:
+		if event.is_action_pressed("ui_cancel"):
+			_close_pause_detail_shell()
+			get_viewport().set_input_as_handled()
 		return
 	if event is InputEventScreenDrag and event.index == dragged_food_touch_index and not dragged_food_id.is_empty():
 		_update_food_drag_preview(event.position)
@@ -886,18 +960,8 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		if _should_close_overlay_at(event.position):
-			_hide_menu()
-			get_viewport().set_input_as_handled()
-			return
-
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			if _should_close_overlay_at(event.position):
-				_hide_menu()
-				get_viewport().set_input_as_handled()
-				return
 			touch_scroll_index = event.index
 			touch_scroll_dragging = false
 			touch_scroll_distance = 0.0
@@ -1018,6 +1082,11 @@ func _has_affordable_upgrade() -> bool:
 
 func _update_upgrade_alert() -> void:
 	var affordable := _has_affordable_upgrade()
+	if is_instance_valid(telegram_navigation):
+		upgrade_alert_active = affordable
+		upgrade_alert_elapsed = 0.0
+		upgrade_alert_badge.hide()
+		return
 	if affordable == upgrade_alert_active:
 		return
 
@@ -1035,7 +1104,7 @@ func _update_upgrade_alert() -> void:
 
 
 func _shake_upgrade_button() -> void:
-	if menu_overlay.visible or not upgrade_alert_active:
+	if is_instance_valid(telegram_navigation) or menu_overlay.visible or not upgrade_alert_active:
 		return
 	if upgrade_alert_shake_tween != null and upgrade_alert_shake_tween.is_valid():
 		upgrade_alert_shake_tween.kill()
@@ -1165,6 +1234,7 @@ func _build_skins_ui() -> void:
 	)
 
 	var outer_margin := MarginContainer.new()
+	outer_margin.name = "SkinsOuterMargin"
 	outer_margin.add_theme_constant_override("margin_left", 18)
 	outer_margin.add_theme_constant_override("margin_top", 18)
 	outer_margin.add_theme_constant_override("margin_right", 18)
@@ -1172,10 +1242,12 @@ func _build_skins_ui() -> void:
 	skins_panel.add_child(outer_margin)
 
 	var items := VBoxContainer.new()
+	items.name = "SkinsItems"
 	items.add_theme_constant_override("separation", 12)
 	outer_margin.add_child(items)
 
 	var header := PanelContainer.new()
+	header.name = "SkinsHero"
 	header.add_theme_stylebox_override(
 		"panel",
 		_make_upgrade_style(Color(0.045, 0.105, 0.16, 1.0), Color(0.32, 0.82, 1.0, 0.75), 18, 2, 5, 8)
@@ -1183,6 +1255,7 @@ func _build_skins_ui() -> void:
 	items.add_child(header)
 
 	var header_margin := MarginContainer.new()
+	header_margin.name = "SkinsHeroMargin"
 	header_margin.add_theme_constant_override("margin_left", 18)
 	header_margin.add_theme_constant_override("margin_top", 13)
 	header_margin.add_theme_constant_override("margin_right", 18)
@@ -1194,6 +1267,7 @@ func _build_skins_ui() -> void:
 	header_margin.add_child(header_items)
 
 	var title := Label.new()
+	title.name = "SkinsTitle"
 	title.text = "CAT SKINS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 32)
@@ -1201,6 +1275,8 @@ func _build_skins_ui() -> void:
 	header_items.add_child(title)
 
 	skins_status_label = Label.new()
+	skins_status_label.name = "SkinsStatus"
+	skins_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	skins_status_label.text = "Find a cat's gem in crates, then equip the skin."
 	skins_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	skins_status_label.add_theme_font_size_override("font_size", 14)
@@ -1208,6 +1284,7 @@ func _build_skins_ui() -> void:
 	header_items.add_child(skins_status_label)
 
 	var wallet := PanelContainer.new()
+	wallet.name = "SkinsWallet"
 	wallet.add_theme_stylebox_override(
 		"panel",
 		_make_upgrade_style(Color(0.14, 0.105, 0.035, 0.92), Color(1.0, 0.72, 0.16, 0.75), 14, 1, -1, 5)
@@ -1253,11 +1330,13 @@ func _build_skins_ui() -> void:
 		tab_button.text = String(tab_data["text"])
 		tab_button.add_theme_font_size_override("font_size", 13)
 		_style_upgrade_button(tab_button, tab_data["accent"] as Color)
+		tab_button.set_meta("telegram_segment_accent", tab_data["accent"] as Color)
 		tab_button.pressed.connect(_set_skins_section.bind(String(tab_data["id"])))
 		skins_tabs_row.add_child(tab_button)
 		skins_tab_buttons[String(tab_data["id"])] = tab_button
 
 	var sections_root := VBoxContainer.new()
+	sections_root.name = "SkinsSections"
 	sections_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	items.add_child(sections_root)
 
@@ -1362,8 +1441,9 @@ func _set_skins_section(section_id: String) -> void:
 		var button := skins_tab_buttons[entry_id] as Button
 		if button == null:
 			continue
-		button.disabled = entry_id == skins_active_section
-		button.modulate = Color(1.0, 1.0, 1.0, 1.0) if entry_id == skins_active_section else Color(0.82, 0.86, 0.94, 0.92)
+		button.disabled = false
+		button.modulate = Color.WHITE
+	_refresh_telegram_segment_buttons(skins_tab_buttons, skins_active_section)
 	match skins_active_section:
 		"crates":
 			_tutorial_notify("crates_opened")
@@ -1410,10 +1490,12 @@ func _build_museum_ui() -> void:
 	museum_panel.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.055, 0.042, 0.03, 0.99), Color(0.92, 0.62, 0.28, 1.0), 24, 2, -1, 18))
 
 	var margin := MarginContainer.new()
+	margin.name = "MuseumRootMargin"
 	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
 		margin.add_theme_constant_override(side, 18)
 	museum_panel.add_child(margin)
 	var root := VBoxContainer.new()
+	root.name = "MuseumRoot"
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
 	museum_scroll = ScrollContainer.new()
@@ -1452,13 +1534,15 @@ func _add_museum_title(text: String, subtitle: String, accent: Color) -> VBoxCon
 	section.add_theme_constant_override("separation", 7)
 	museum_content.add_child(section)
 	var title := Label.new()
+	title.set_meta("museum_role", "section_title")
 	title.text = text
-	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", accent)
 	section.add_child(title)
 	var detail := Label.new()
+	detail.set_meta("museum_role", "section_detail")
 	detail.text = subtitle
-	detail.add_theme_font_size_override("font_size", 14)
+	detail.add_theme_font_size_override("font_size", 18)
 	detail.add_theme_color_override("font_color", Color(0.72, 0.72, 0.7, 1.0))
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	section.add_child(detail)
@@ -1467,10 +1551,12 @@ func _add_museum_title(text: String, subtitle: String, accent: Color) -> VBoxCon
 
 func _museum_plaque(text: String, accent: Color, locked: bool = false) -> PanelContainer:
 	var plaque := PanelContainer.new()
-	plaque.custom_minimum_size = Vector2(190.0, 82.0)
+	plaque.custom_minimum_size = Vector2(0.0, 82.0)
+	plaque.set_meta("museum_role", "plaque")
 	plaque.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	plaque.add_theme_stylebox_override("panel", _make_upgrade_card_style(accent if not locked else Color(0.28, 0.29, 0.32, 1.0), false))
 	var label := Label.new()
+	label.set_meta("museum_role", "plaque_label")
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1507,11 +1593,15 @@ func _rebuild_museum() -> void:
 	var room_names := ["", "Cozy Gallery", "Curator's Hall", "Grand Cat Museum", "Legendary Collection"]
 
 	var hero := PanelContainer.new()
+	hero.name = "MuseumHero"
 	hero.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.12 + room_tier * 0.025, 0.075, 0.035, 1.0), Color(0.78 + room_tier * 0.05, 0.48 + room_tier * 0.06, 0.2, 1.0), 18, 2, 4, 8))
 	museum_content.add_child(hero)
 	var hero_label := Label.new()
+	hero_label.name = "MuseumHeroLabel"
+	hero_label.set_meta("museum_role", "hero")
 	hero_label.text = "THE CAT MUSEUM\n%s  •  ROOM LEVEL %d\n%d%% COMPLETE" % [room_names[room_tier], room_tier, int(round(completion * 100.0))]
 	hero_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hero_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hero_label.add_theme_font_size_override("font_size", 25)
 	hero_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.52, 1.0))
 	hero_label.custom_minimum_size = Vector2(0.0, 126.0)
@@ -1519,6 +1609,7 @@ func _rebuild_museum() -> void:
 	hero.add_child(hero_label)
 
 	var bowl_button := Button.new()
+	bowl_button.name = "MuseumBowlButton"
 	bowl_button.text = "VISIT THE BOTTOMLESS CAT BOWL"
 	bowl_button.custom_minimum_size = Vector2(0.0, 64.0)
 	bowl_button.add_theme_font_size_override("font_size", 18)
@@ -1528,33 +1619,48 @@ func _rebuild_museum() -> void:
 
 	var cat_section := _add_museum_title("CAT GALLERY", "%d / %d portraits on display" % [found_cats, SKIN_DATA.size()], Color(0.4, 0.84, 1.0, 1.0))
 	var cat_grid := GridContainer.new()
-	cat_grid.columns = 4
-	cat_grid.add_theme_constant_override("h_separation", 8)
-	cat_grid.add_theme_constant_override("v_separation", 8)
+	cat_grid.name = "MuseumCatGrid"
+	var viewport_width := get_viewport_rect().size.x
+	cat_grid.columns = 2 if viewport_width < 520.0 else (3 if viewport_width < 900.0 else 4)
+	cat_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cat_grid.add_theme_constant_override("h_separation", 10)
+	cat_grid.add_theme_constant_override("v_separation", 10)
 	cat_section.add_child(cat_grid)
 	for skin_data in SKIN_DATA:
 		var owned := _owns_skin(String(skin_data["id"]))
 		var portrait := PanelContainer.new()
-		portrait.custom_minimum_size = Vector2(126.0, 136.0)
+		portrait.set_meta("museum_role", "portrait")
+		portrait.custom_minimum_size = Vector2(0.0, 172.0)
+		portrait.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		portrait.add_theme_stylebox_override("panel", _make_upgrade_card_style(SKIN_ACCENT if owned else Color(0.22, 0.23, 0.26, 1.0), false))
+		var portrait_margin := MarginContainer.new()
+		_set_telegram_margins(portrait_margin, 8, 8, 8, 8)
+		portrait.add_child(portrait_margin)
 		var stack := VBoxContainer.new()
-		portrait.add_child(stack)
+		stack.add_theme_constant_override("separation", 4)
+		portrait_margin.add_child(stack)
 		var image := TextureRect.new()
-		image.custom_minimum_size = Vector2(108.0, 100.0)
+		image.custom_minimum_size = Vector2(0.0, 126.0)
+		image.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		image.texture = load(String(skin_data["texture"])) as Texture2D if owned else null
 		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		stack.add_child(image)
 		var cat_name := Label.new()
-		cat_name.text = String(skin_data["name"]) if owned else "UNDISCOVERED"
+		cat_name.set_meta("museum_role", "portrait_name")
+		cat_name.text = String(skin_data["name"]) if owned else "Locked"
+		cat_name.custom_minimum_size.y = 28.0
 		cat_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cat_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		cat_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		cat_name.add_theme_font_size_override("font_size", 11)
+		cat_name.add_theme_font_size_override("font_size", 18)
+		cat_name.add_theme_color_override("font_color", Color("#d9e3ec") if owned else Color("#81909e"))
 		stack.add_child(cat_name)
 		cat_grid.add_child(portrait)
 
 	var treasure_section := _add_museum_title("TREASURE VAULT", "%d / 4 crate relics recovered" % treasures, Color(1.0, 0.72, 0.24, 1.0))
 	var treasure_grid := GridContainer.new()
+	treasure_grid.name = "MuseumTreasureGrid"
 	treasure_grid.columns = 2
 	treasure_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	treasure_grid.add_theme_constant_override("h_separation", 10)
@@ -1567,6 +1673,7 @@ func _rebuild_museum() -> void:
 
 	var achievement_section := _add_museum_title("ACHIEVEMENT WALL", "%d / %d medals earned" % [unlocked_achievements.size(), achievements.size()], Color(0.92, 0.72, 0.3, 1.0))
 	var achievement_grid := GridContainer.new()
+	achievement_grid.name = "MuseumAchievementGrid"
 	achievement_grid.columns = 2
 	achievement_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	achievement_grid.add_theme_constant_override("h_separation", 10)
@@ -1581,6 +1688,7 @@ func _rebuild_museum() -> void:
 	for set_data in SKIN_SET_DATA:
 		var complete := _is_skin_set_complete(set_data)
 		set_section.add_child(_museum_plaque((String(set_data["icon"]) + "  " + String(set_data["name"]).to_upper() + "\n" + String(set_data["bonus_text"])) if complete else "LOCKED TROPHY  •  %d / %d cats" % [_get_owned_set_member_count(set_data), (set_data["members"] as Array).size()], set_data["accent"] as Color, not complete))
+	_apply_museum_responsive_layout()
 
 
 func _build_boosts_ui() -> void:
@@ -1612,6 +1720,7 @@ func _build_boosts_ui() -> void:
 	)
 
 	var outer_margin := MarginContainer.new()
+	outer_margin.name = "BoostsOuterMargin"
 	outer_margin.add_theme_constant_override("margin_left", 18)
 	outer_margin.add_theme_constant_override("margin_top", 18)
 	outer_margin.add_theme_constant_override("margin_right", 18)
@@ -1619,10 +1728,12 @@ func _build_boosts_ui() -> void:
 	boosts_panel.add_child(outer_margin)
 
 	var items := VBoxContainer.new()
+	items.name = "BoostsItems"
 	items.add_theme_constant_override("separation", 12)
 	outer_margin.add_child(items)
 
 	var header := PanelContainer.new()
+	header.name = "BoostsHero"
 	header.add_theme_stylebox_override(
 		"panel",
 		_make_upgrade_style(Color(0.09, 0.055, 0.16, 1.0), Color(0.72, 0.48, 1.0, 0.78), 18, 2, 5, 8)
@@ -1630,6 +1741,7 @@ func _build_boosts_ui() -> void:
 	items.add_child(header)
 
 	var header_margin := MarginContainer.new()
+	header_margin.name = "BoostsHeroMargin"
 	header_margin.add_theme_constant_override("margin_left", 18)
 	header_margin.add_theme_constant_override("margin_top", 12)
 	header_margin.add_theme_constant_override("margin_right", 18)
@@ -1641,6 +1753,7 @@ func _build_boosts_ui() -> void:
 	header_margin.add_child(header_items)
 
 	var title := Label.new()
+	title.name = "BoostsTitle"
 	title.text = "BOOSTS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 34)
@@ -1648,6 +1761,8 @@ func _build_boosts_ui() -> void:
 	header_items.add_child(title)
 
 	var subtitle := Label.new()
+	subtitle.name = "BoostsSubtitle"
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subtitle.text = "NORMAL price, DOUBLE +50%, TRIPLE +100%"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 14)
@@ -1655,6 +1770,7 @@ func _build_boosts_ui() -> void:
 	header_items.add_child(subtitle)
 
 	var wallet := PanelContainer.new()
+	wallet.name = "BoostsWallet"
 	wallet.add_theme_stylebox_override(
 		"panel",
 		_make_upgrade_style(Color(0.14, 0.105, 0.035, 0.92), Color(1.0, 0.72, 0.16, 0.75), 14, 1, -1, 5)
@@ -1686,6 +1802,7 @@ func _build_boosts_ui() -> void:
 	wallet_row.add_child(boost_wallet_label)
 
 	var boost_tabs := HBoxContainer.new()
+	boost_tabs.name = "BoostCategoryTabs"
 	boost_tabs.add_theme_constant_override("separation", 10)
 	items.add_child(boost_tabs)
 	for category in ["classical", "advanced", "legendary", "mythic"]:
@@ -1701,8 +1818,10 @@ func _build_boosts_ui() -> void:
 		elif category == "mythic":
 			accent = Color(0.45, 0.95, 0.82)
 		_style_upgrade_button(tab, accent)
+		tab.set_meta("telegram_segment_accent", accent)
 		tab.pressed.connect(_show_boost_category.bind(category))
 		boost_tabs.add_child(tab)
+		boost_category_buttons[category] = tab
 
 	boosts_scroll = ScrollContainer.new()
 	boosts_scroll.custom_minimum_size = Vector2(0.0, 360.0)
@@ -1730,12 +1849,14 @@ func _build_boosts_ui() -> void:
 
 
 func _show_boost_category(category: String) -> void:
+	boost_active_category = category
 	for data in BoostLogic.BOOST_DATA:
 		var card := boost_cards.get(String(data["id"])) as Control
 		if card != null:
 			card.visible = String(data.get("category", "classical")) == category
 	if is_instance_valid(boosts_scroll):
 		boosts_scroll.scroll_vertical = 0
+	_refresh_telegram_segment_buttons(boost_category_buttons, boost_active_category)
 
 
 func _get_upgrade_category_label(category: String) -> String:
@@ -1796,13 +1917,56 @@ func _build_food_ui() -> void:
 	food_scroll.custom_minimum_size = Vector2(0.0, 470.0)
 	food_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(food_scroll)
+	var food_scroll_content := VBoxContainer.new()
+	food_scroll_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	food_scroll_content.add_theme_constant_override("separation", 12)
+	food_scroll.add_child(food_scroll_content)
+
+	food_empty_state = PanelContainer.new()
+	food_empty_state.name = "FoodEmptyState"
+	food_empty_state.custom_minimum_size.y = 260.0
+	food_empty_state.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 12))
+	food_scroll_content.add_child(food_empty_state)
+	var empty_margin := MarginContainer.new()
+	_set_telegram_margins(empty_margin, 24, 28, 24, 28)
+	food_empty_state.add_child(empty_margin)
+	var empty_content := VBoxContainer.new()
+	empty_content.alignment = BoxContainer.ALIGNMENT_CENTER
+	empty_content.add_theme_constant_override("separation", 12)
+	empty_margin.add_child(empty_content)
+	var empty_icon := Label.new()
+	empty_icon.text = "◇"
+	empty_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	empty_icon.add_theme_font_size_override("font_size", 38)
+	empty_icon.add_theme_color_override("font_color", Color("#64b5ef"))
+	empty_content.add_child(empty_icon)
+	var empty_title := Label.new()
+	empty_title.text = "NO BOOSTS YET"
+	empty_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	empty_title.add_theme_font_size_override("font_size", 24)
+	empty_title.add_theme_color_override("font_color", Color("#d9e3ec"))
+	empty_content.add_child(empty_title)
+	var empty_caption := Label.new()
+	empty_caption.text = "Buy a snack in Shop. It will appear here when it is ready to use."
+	empty_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	empty_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	empty_caption.add_theme_font_size_override("font_size", 18)
+	empty_caption.add_theme_color_override("font_color", Color("#9eabb7"))
+	empty_content.add_child(empty_caption)
+	var empty_shop_button := Button.new()
+	empty_shop_button.name = "EmptyInventoryShopButton"
+	empty_shop_button.text = "OPEN SHOP"
+	empty_shop_button.custom_minimum_size.y = 60.0
+	_style_upgrade_button(empty_shop_button, Color("#4b9bd3"))
+	empty_shop_button.pressed.connect(_open_shop_from_inventory)
+	empty_content.add_child(empty_shop_button)
 
 	food_list = GridContainer.new()
 	food_list.columns = 3
 	food_list.add_theme_constant_override("h_separation", 10)
 	food_list.add_theme_constant_override("v_separation", 10)
 	food_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	food_scroll.add_child(food_list)
+	food_scroll_content.add_child(food_list)
 
 	for index in range(FOOD_NAMES.size()):
 		var food_id := _get_food_id(index)
@@ -1950,7 +2114,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	var food_id := _get_food_id(index)
 	var data := _get_food_data(index)
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(186.0, 154.0)
+	card.custom_minimum_size = Vector2(0.0, 154.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(data["accent"] as Color, false))
 	food_cards[food_id] = card
@@ -1975,23 +2139,34 @@ func _create_food_card(index: int) -> PanelContainer:
 	name_label.text = String(data["name"]).to_upper()
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_label.custom_minimum_size.x = 0.0
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.add_theme_font_size_override("font_size", 13)
 	content.add_child(name_label)
 	var boost: Dictionary = _get_food_boost(index)
 	var boost_label := Label.new()
 	boost_label.text = String(boost["text"])
 	boost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boost_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	boost_label.custom_minimum_size.x = 0.0
+	boost_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	boost_label.add_theme_font_size_override("font_size", 12)
 	boost_label.add_theme_color_override("font_color", Color(0.72, 0.9, 1.0, 1.0))
 	content.add_child(boost_label)
 	var count_label := Label.new()
 	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count_label.clip_text = true
+	count_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	count_label.custom_minimum_size.x = 0.0
 	count_label.add_theme_font_size_override("font_size", 14)
 	count_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
 	content.add_child(count_label)
 	food_card_counts[food_id] = count_label
 	var action := Button.new()
 	action.custom_minimum_size = Vector2(0.0, 42.0)
+	action.clip_text = true
+	action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	action.add_theme_font_size_override("font_size", 14)
 	action.pressed.connect(_on_food_card_action_pressed.bind(food_id))
 	content.add_child(action)
@@ -2294,6 +2469,11 @@ func _update_food_ui() -> void:
 			button.disabled = count <= 0
 	if food_panel_mode == "inventory":
 		food_status_label.text = "Choose an owned boost." if owned_types > 0 else "No boosts owned yet — buy one in the shop."
+	food_empty_state.visible = food_panel_mode == "inventory" and owned_types == 0
+
+
+func _open_shop_from_inventory() -> void:
+	_on_telegram_destination_requested("shop", 0)
 
 
 func _cleanup_food_boosts() -> void:
@@ -2332,6 +2512,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	var boost_id := String(boost_data["id"])
 	var accent := boost_data["accent"] as Color
 	var card := PanelContainer.new()
+	card.name = "%sCard" % boost_id.to_pascal_case()
 	card.custom_minimum_size = Vector2(0.0, 218.0)
 	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(accent, false))
 	card.mouse_entered.connect(_set_upgrade_card_hover.bind(card, accent, true))
@@ -2340,6 +2521,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	boost_cards[boost_id] = card
 
 	var margin := MarginContainer.new()
+	margin.name = "CardMargin"
 	margin.add_theme_constant_override("margin_left", 14)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_right", 14)
@@ -2347,14 +2529,17 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	card.add_child(margin)
 
 	var card_items := VBoxContainer.new()
+	card_items.name = "CardItems"
 	card_items.add_theme_constant_override("separation", 7)
 	margin.add_child(card_items)
 
 	var header := HBoxContainer.new()
+	header.name = "Header"
 	header.add_theme_constant_override("separation", 10)
 	card_items.add_child(header)
 
 	var badge := Label.new()
+	badge.name = "Badge"
 	badge.text = String(boost_data["badge"])
 	badge.custom_minimum_size = Vector2(64.0, 30.0)
 	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2368,6 +2553,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	header.add_child(badge)
 
 	var name_label := Label.new()
+	name_label.name = "Name"
 	name_label.text = String(boost_data["name"])
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.add_theme_font_size_override("font_size", 19)
@@ -2376,6 +2562,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	header.add_child(name_label)
 
 	var status_label := Label.new()
+	status_label.name = "Status"
 	status_label.text = "READY TO ACTIVATE"
 	status_label.add_theme_font_size_override("font_size", 13)
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -2383,6 +2570,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	boost_status_labels[boost_id] = status_label
 
 	var description := Label.new()
+	description.name = "Description"
 	description.text = String(boost_data["description"])
 	description.add_theme_font_size_override("font_size", 15)
 	description.add_theme_color_override("font_color", Color(0.78, 0.83, 0.91, 1.0))
@@ -2391,6 +2579,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 
 	var duration := float(boost_data["duration"])
 	var tier_info := Label.new()
+	tier_info.name = "TierInfo"
 	if duration > 0.0:
 		tier_info.text = "TIME: %ds  |  %ds  |  %ds" % [roundi(duration), roundi(duration * 2.0), roundi(duration * 3.0)]
 	elif boost_id == "nine_lives":
@@ -2402,6 +2591,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	card_items.add_child(tier_info)
 
 	var actions := HBoxContainer.new()
+	actions.name = "Actions"
 	actions.add_theme_constant_override("separation", 8)
 	card_items.add_child(actions)
 
@@ -2416,11 +2606,20 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 		actions.add_child(action)
 		buttons.append(action)
 	boost_action_buttons[boost_id] = buttons
+	card.set_meta("margin", margin)
+	card.set_meta("header", header)
+	card.set_meta("badge", badge)
+	card.set_meta("name_label", name_label)
+	card.set_meta("status_label", status_label)
+	card.set_meta("description", description)
+	card.set_meta("tier_info", tier_info)
+	card.set_meta("actions", actions)
 
 
 func _add_skin_card(skin_data: Dictionary) -> void:
 	var skin_id := String(skin_data["id"])
 	var card := PanelContainer.new()
+	card.set_meta("skins_role", "skin_card")
 	card.custom_minimum_size = Vector2(0.0, 214.0)
 	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(SKIN_ACCENT, false))
 	card.mouse_entered.connect(_set_upgrade_card_hover.bind(card, SKIN_ACCENT, true))
@@ -2428,6 +2627,7 @@ func _add_skin_card(skin_data: Dictionary) -> void:
 	skins_list.add_child(card)
 
 	var margin := MarginContainer.new()
+	margin.name = "SkinCardMargin"
 	margin.add_theme_constant_override("margin_left", 12)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_right", 12)
@@ -2435,10 +2635,12 @@ func _add_skin_card(skin_data: Dictionary) -> void:
 	card.add_child(margin)
 
 	var row := HBoxContainer.new()
+	row.name = "SkinCardRow"
 	row.add_theme_constant_override("separation", 14)
 	margin.add_child(row)
 
 	var preview := TextureRect.new()
+	preview.name = "SkinPreview"
 	preview.custom_minimum_size = Vector2(150.0, 150.0)
 	preview.texture = load(String(skin_data["texture"])) as Texture2D
 	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -2461,6 +2663,7 @@ func _add_skin_card(skin_data: Dictionary) -> void:
 	preview.add_child(lock_label)
 
 	var info := VBoxContainer.new()
+	info.name = "SkinInfo"
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.alignment = BoxContainer.ALIGNMENT_CENTER
 	info.add_theme_constant_override("separation", 8)
@@ -2500,16 +2703,19 @@ func _add_skin_set_card(set_data: Dictionary) -> void:
 	var set_id := String(set_data["id"])
 	var accent := set_data["accent"] as Color
 	var card := PanelContainer.new()
+	card.set_meta("skins_role", "set_card")
 	card.custom_minimum_size = Vector2(0.0, 116.0)
 	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(accent, false))
 	skins_list.add_child(card)
 
 	var margin := MarginContainer.new()
+	margin.name = "SkinSetMargin"
 	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
 		margin.add_theme_constant_override(side, 12)
 	card.add_child(margin)
 
 	var row := HBoxContainer.new()
+	row.name = "SkinSetRow"
 	row.add_theme_constant_override("separation", 14)
 	margin.add_child(row)
 	var icon := Label.new()
@@ -2544,10 +2750,12 @@ func _add_room_skin_card(room_skin_data: Dictionary) -> void:
 	var room_skin_id := String(room_skin_data["id"])
 	var accent := room_skin_data["accent"] as Color
 	var card := PanelContainer.new()
+	card.set_meta("skins_role", "room_card")
 	card.custom_minimum_size = Vector2(152.0, 184.0)
 	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(accent, false))
 	room_skins_list.add_child(card)
 	var margin := MarginContainer.new()
+	margin.name = "RoomSkinMargin"
 	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
 		margin.add_theme_constant_override(side, 7)
 	card.add_child(margin)
@@ -2555,6 +2763,7 @@ func _add_room_skin_card(room_skin_data: Dictionary) -> void:
 	content.add_theme_constant_override("separation", 5)
 	margin.add_child(content)
 	var preview := TextureRect.new()
+	preview.name = "RoomSkinPreview"
 	preview.custom_minimum_size = Vector2(138.0, 110.0)
 	preview.texture = load(String(room_skin_data["texture"])) as Texture2D
 	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -3111,12 +3320,21 @@ func _build_slider_sound_setting() -> void:
 	audio_items.add_child(sound_row)
 
 
-func _create_settings_check(text: String, accent: Color) -> CheckBox:
-	var check := CheckBox.new()
+func _create_settings_check(text: String, accent: Color) -> CheckButton:
+	var check := CheckButton.new()
 	check.text = text
-	check.add_theme_font_size_override("font_size", 15)
+	check.custom_minimum_size.y = 64.0
+	check.focus_mode = Control.FOCUS_NONE
+	check.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	check.add_theme_font_size_override("font_size", 20)
 	check.add_theme_color_override("font_color", Color(0.88, 0.92, 1.0))
 	check.add_theme_color_override("font_pressed_color", accent.lightened(0.2))
+	var switch_off := load("res://assets/ui/navigation/switch_off.svg") as Texture2D
+	var switch_on := load("res://assets/ui/navigation/switch_on.svg") as Texture2D
+	for state in ["unchecked", "unchecked_hover", "unchecked_pressed", "unchecked_disabled"]:
+		check.add_theme_icon_override(state, switch_off)
+	for state in ["checked", "checked_hover", "checked_pressed", "checked_disabled"]:
+		check.add_theme_icon_override(state, switch_on)
 	return check
 
 
@@ -3224,8 +3442,10 @@ func _build_extended_upgrades_ui() -> void:
 		elif category == "mythic":
 			accent = Color(0.45, 0.95, 0.82)
 		_style_upgrade_button(tab, accent)
+		tab.set_meta("telegram_segment_accent", accent)
 		tab.pressed.connect(_show_upgrade_category.bind(category))
 		tabs.add_child(tab)
+		upgrade_category_buttons[category] = tab
 	back_index = upgrades_back_button.get_index()
 	for upgrade_data in EXTENDED_UPGRADE_DATA:
 		var card := _create_extended_upgrade_card(upgrade_data)
@@ -3236,12 +3456,14 @@ func _build_extended_upgrades_ui() -> void:
 
 
 func _show_upgrade_category(category: String) -> void:
+	upgrade_active_category = category
 	for card in [click_upgrade_card, bonus_chance_card, bonus_value_card, bonus_streak_card, passive_gain_card]:
 		card.visible = category == "classical"
 	for data in EXTENDED_UPGRADE_DATA:
 		var controls: Dictionary = extended_upgrade_controls.get(String(data["id"]), {})
 		if not controls.is_empty():
 			(controls["card"] as Control).visible = String(data.get("category", "classical")) == category
+	_refresh_telegram_segment_buttons(upgrade_category_buttons, upgrade_active_category)
 
 
 func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
@@ -3251,6 +3473,7 @@ func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
 	card.name = "%sCard" % upgrade_id.to_pascal_case()
 
 	var margin := MarginContainer.new()
+	margin.name = "CardMargin"
 	margin.add_theme_constant_override("margin_left", 14)
 	margin.add_theme_constant_override("margin_top", 11)
 	margin.add_theme_constant_override("margin_right", 14)
@@ -3258,14 +3481,17 @@ func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
 	card.add_child(margin)
 
 	var items := VBoxContainer.new()
+	items.name = "CardItems"
 	items.add_theme_constant_override("separation", 5)
 	margin.add_child(items)
 
 	var header := HBoxContainer.new()
+	header.name = "Header"
 	header.add_theme_constant_override("separation", 10)
 	items.add_child(header)
 
 	var badge := Label.new()
+	badge.name = "Badge"
 	badge.custom_minimum_size = Vector2(94, 40)
 	badge.text = String(upgrade_data["badge"])
 	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3274,6 +3500,7 @@ func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
 	header.add_child(badge)
 
 	var title := Label.new()
+	title.name = "Name"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.text = String(upgrade_data["name"])
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -3783,7 +4010,11 @@ func _skip_tutorial() -> void:
 
 func _replay_tutorial_from_settings() -> void:
 	_play_ui_sound()
-	_hide_menu()
+	if is_instance_valid(settings_shell) and settings_shell.visible:
+		settings_back_to_pause = false
+		_hide_settings_shell_immediate()
+	else:
+		_hide_menu()
 	call_deferred("_show_tutorial_prompt", true)
 
 
@@ -4634,6 +4865,16 @@ func _release_cat_pop(is_bonus: bool = false) -> void:
 	cat_tween.parallel().tween_property(cat_button, "rotation", 0.0, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
+func _cancel_cat_press_for_navigation() -> void:
+	cat_button.set_pressed_no_signal(false)
+	if cat_tween != null and cat_tween.is_valid():
+		cat_tween.kill()
+	cat_tween = create_tween().set_parallel(true)
+	cat_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	cat_tween.tween_property(cat_button, "scale", cat_base_scale, 0.12)
+	cat_tween.tween_property(cat_button, "rotation", 0.0, 0.12)
+
+
 func _play_tap_haptic(is_bonus: bool) -> void:
 	if not haptics_enabled:
 		return
@@ -4674,18 +4915,9 @@ func _setup_ui_animations(node: Node) -> void:
 	if node is Button:
 		var button := node as Button
 		button.pivot_offset = button.size * 0.5
-		button.mouse_entered.connect(func() -> void:
-			_tween_control_scale(button, Vector2(1.035, 1.035), 0.09)
-		)
-		button.mouse_exited.connect(func() -> void:
-			_tween_control_scale(button, Vector2.ONE, 0.12)
-		)
-		button.button_down.connect(func() -> void:
-			_tween_control_scale(button, Vector2(0.97, 0.97), 0.045)
-		)
-		button.button_up.connect(func() -> void:
-			_tween_control_scale(button, Vector2(1.035, 1.035), 0.09)
-		)
+		button.scale = Vector2.ONE
+		button.rotation = 0.0
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	elif node is TextureButton and node != cat_button:
 		var texture_button := node as TextureButton
 		texture_button.pivot_offset = texture_button.size * 0.5
@@ -4903,16 +5135,17 @@ func _animate_control_sequence(
 		if not is_instance_valid(control) or not control.visible:
 			continue
 		control.pivot_offset = control.size * 0.5
-		control.scale = Vector2(0.78, 0.78)
-		control.rotation = -0.025 if index % 2 == 0 else 0.025
+		# Telegram fragments keep content motion quiet: a short, bounded fade
+		# and nearly imperceptible settle instead of elastic card rotation.
+		control.scale = Vector2(0.985, 0.985)
+		control.rotation = 0.0
 		control.modulate = Color(1.0, 1.0, 1.0, 0.0)
 		entrance_controls.append(control)
-		var delay := float(index) * delay_step
+		var delay := minf(float(index) * delay_step * 0.22, 0.12)
 		var entrance_tween := create_tween().set_parallel(true)
 		entrance_tweens.append(entrance_tween)
-		entrance_tween.tween_property(control, "modulate:a", 1.0, 0.2).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		entrance_tween.tween_property(control, "scale", Vector2.ONE, 0.42).set_delay(delay).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-		entrance_tween.tween_property(control, "rotation", 0.0, 0.34).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		entrance_tween.tween_property(control, "modulate:a", 1.0, 0.16).set_delay(delay).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		entrance_tween.tween_property(control, "scale", Vector2.ONE, 0.18).set_delay(delay).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
 func _stop_entrance_animations() -> void:
@@ -5058,13 +5291,6 @@ func _get_visible_overlay_panel() -> Control:
 		if panel.visible:
 			return panel
 	return null
-
-
-func _should_close_overlay_at(global_position: Vector2) -> bool:
-	if is_instance_valid(admin_panel) and admin_panel.visible and admin_panel.get_global_rect().has_point(global_position):
-		return false
-	var visible_panel := _get_visible_overlay_panel()
-	return visible_panel != null and not visible_panel.get_global_rect().has_point(global_position)
 
 
 func _position_modal_close_button(panel: Control) -> void:
@@ -5253,6 +5479,9 @@ func _apply_mobile_layout() -> void:
 	var side_margin := clampf(content_width * 0.045, 18.0, 32.0)
 	var panel_width := maxf(280.0, content_width - side_margin * 2.0)
 	var panel_height := maxf(400.0, viewport_size.y - 96.0)
+	if is_instance_valid(food_list):
+		food_list.columns = 2 if viewport_size.x < 520.0 else 3
+		_apply_food_grid_responsive_style(viewport_size.x)
 	_set_responsive_panel_size(menu_panel, Vector2(510.0, 760.0), panel_width, panel_height)
 	_set_responsive_panel_size(settings_panel, Vector2(560.0, 920.0), panel_width, panel_height)
 	_set_responsive_panel_size(upgrades_panel, Vector2(640.0, 1080.0), panel_width, panel_height)
@@ -5262,12 +5491,32 @@ func _apply_mobile_layout() -> void:
 	_set_responsive_panel_size(boosts_panel, Vector2(640.0, 1080.0), panel_width, panel_height)
 	_set_responsive_panel_size(food_panel, Vector2(640.0, 980.0), panel_width, panel_height)
 	_set_responsive_panel_size(museum_panel, Vector2(640.0, 1080.0), panel_width, panel_height)
+	_apply_upgrades_responsive_layout(viewport_size.x)
+	_apply_boosts_responsive_layout(viewport_size.x)
+	_apply_museum_responsive_layout(viewport_size.x)
+	_apply_skins_responsive_layout(viewport_size.x)
+	if mission_logic != null:
+		mission_logic.apply_responsive_layout(viewport_size.x)
 	if bottomless_bowl_logic != null and is_instance_valid(bottomless_bowl_logic.panel):
 		_set_responsive_panel_size(bottomless_bowl_logic.panel, Vector2(640.0, 1080.0), panel_width, panel_height)
+		bottomless_bowl_logic.apply_responsive_layout(viewport_size.x)
 	if crate_logic != null and is_instance_valid(crate_logic.panel):
 		_set_responsive_panel_size(crate_logic.panel, Vector2(640.0, 1080.0), panel_width, panel_height)
 	if mission_logic != null and is_instance_valid(mission_logic.panel):
 		_set_responsive_panel_size(mission_logic.panel, Vector2(640.0, 920.0), panel_width, panel_height)
+	if is_instance_valid(telegram_pager_host):
+		telegram_pager_host.offset_top = telegram_top_height
+		telegram_pager_host.offset_bottom = -telegram_bottom_height
+		for telegram_panel in _get_overlay_panels():
+			if telegram_panel == menu_panel:
+				_layout_pause_popup()
+				continue
+			telegram_panel.custom_minimum_size = Vector2.ZERO
+			telegram_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if is_instance_valid(settings_shell):
+		_layout_settings_shell()
+	if is_instance_valid(pause_detail_shell):
+		_layout_pause_detail_shell()
 
 	var short_phone := viewport_size.y < 1080.0
 	var game_margin := 18 if short_phone else 24
@@ -5282,9 +5531,9 @@ func _apply_mobile_layout() -> void:
 	var game_layer := get_node("GameLayer") as MarginContainer
 	var game_box := get_node("GameLayer/GameBox") as VBoxContainer
 	game_layer.add_theme_constant_override("margin_left", game_margin)
-	game_layer.add_theme_constant_override("margin_top", 54 if short_phone else 64)
+	game_layer.add_theme_constant_override("margin_top", roundi(telegram_top_height + 12.0) if is_instance_valid(telegram_navigation) else (54 if short_phone else 64))
 	game_layer.add_theme_constant_override("margin_right", game_margin)
-	game_layer.add_theme_constant_override("margin_bottom", bottom_reserved)
+	game_layer.add_theme_constant_override("margin_bottom", roundi(telegram_bottom_height + 14.0) if is_instance_valid(telegram_navigation) else bottom_reserved)
 	game_box.add_theme_constant_override("separation", game_separation)
 
 	var phone_layout := content_width < 700.0 or DisplayServer.get_name() in ["Android", "iOS"]
@@ -5296,18 +5545,19 @@ func _apply_mobile_layout() -> void:
 	var hud_row_left := content_left + (content_width - hud_row_width) * 0.5
 	var hud_row_right := hud_row_left + hud_row_width
 	var hud_height := 62.0 if short_phone else 68.0
+	var shell_bottom_offset := telegram_bottom_height if is_instance_valid(telegram_navigation) else 0.0
 	hud_wallet.offset_left = hud_row_left
-	hud_wallet.offset_top = -hud_height - side_margin
+	hud_wallet.offset_top = -shell_bottom_offset - hud_height - side_margin
 	hud_wallet.offset_right = hud_row_left + hud_width
-	hud_wallet.offset_bottom = -side_margin
+	hud_wallet.offset_bottom = -shell_bottom_offset - side_margin
 	if is_instance_valid(compact_inventory_panel):
 		compact_inventory_panel.offset_left = hud_row_left
 		compact_inventory_panel.offset_right = hud_row_left + hud_width
 		compact_inventory_panel.offset_bottom = hud_wallet.offset_top - 10.0
 	upgrade_button.offset_left = -(viewport_size.x - hud_row_right + upgrade_width)
-	upgrade_button.offset_top = -hud_height - side_margin
+	upgrade_button.offset_top = -shell_bottom_offset - hud_height - side_margin
 	upgrade_button.offset_right = -(viewport_size.x - hud_row_right)
-	upgrade_button.offset_bottom = -side_margin
+	upgrade_button.offset_bottom = -shell_bottom_offset - side_margin
 	upgrade_button.custom_minimum_size = Vector2(upgrade_width, hud_height)
 	hud_coin_icon.custom_minimum_size = Vector2(48.0, 48.0)
 	call_deferred("_animate_hud_coin_text")
@@ -5407,6 +5657,389 @@ func _set_responsive_panel_size(panel: Control, preferred_size: Vector2, max_wid
 	panel.custom_minimum_size = Vector2(minf(preferred_size.x, max_width), minf(preferred_size.y, max_height))
 
 
+func _apply_food_grid_responsive_style(viewport_width: float = -1.0) -> void:
+	if viewport_width <= 0.0:
+		viewport_width = get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	food_scroll.custom_minimum_size.y = 0.0 if compact or get_viewport_rect().size.y < 900.0 else 470.0
+	var horizontal_margin := 6 if compact else 10
+	var button_padding := 5.0 if compact else 12.0
+	for card_node in food_cards.values():
+		var card := card_node as PanelContainer
+		if card == null:
+			continue
+		var margin := card.get_child(0) as MarginContainer
+		if margin != null:
+			margin.add_theme_constant_override("margin_left", horizontal_margin)
+			margin.add_theme_constant_override("margin_right", horizontal_margin)
+		var action := card.get_meta("action_button", null) as Button
+		if action == null:
+			continue
+		action.custom_minimum_size.x = 0.0
+		action.add_theme_font_size_override("font_size", 18 if compact else 20)
+		action.add_theme_stylebox_override("normal", _telegram_style(Color("#141b22"), 8, button_padding, 7.0))
+		action.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, button_padding, 7.0))
+		action.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, button_padding, 7.0))
+		action.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _apply_upgrades_responsive_layout(viewport_width: float = -1.0) -> void:
+	if not is_instance_valid(upgrades_panel):
+		return
+	if viewport_width <= 0.0:
+		viewport_width = get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	var root_margin := upgrades_panel.find_child("UpgradesMargin", true, false) as MarginContainer
+	if root_margin != null:
+		_set_telegram_margins(root_margin, 8 if compact else 12, 8 if compact else 10, 8 if compact else 12, 12 if compact else 14)
+	var hero_margin := upgrades_panel.find_child("HeroMargin", true, false) as MarginContainer
+	if hero_margin != null:
+		_set_telegram_margins(hero_margin, 10 if compact else 18, 10 if compact else 14, 10 if compact else 18, 10 if compact else 14)
+	var title := upgrades_panel.find_child("UpgradesTitle", true, false) as Label
+	if title != null:
+		title.custom_minimum_size.x = 0.0
+		title.clip_text = true
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		title.add_theme_font_size_override("font_size", 25 if compact else 30)
+	if is_instance_valid(wallet_chip):
+		wallet_chip.custom_minimum_size.x = 190.0 if compact else 230.0
+	if is_instance_valid(upgrade_coins_label):
+		upgrade_coins_label.custom_minimum_size.x = 0.0
+		upgrade_coins_label.clip_text = true
+		upgrade_coins_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		upgrade_coins_label.add_theme_font_size_override("font_size", 20 if compact else 23)
+	var tabs := upgrades_items.find_child("UpgradeCategoryTabs", false, false) as HBoxContainer
+	if tabs != null:
+		tabs.custom_minimum_size.x = 0.0
+		tabs.add_theme_constant_override("separation", 6 if compact else 10)
+		for tab_node in tabs.get_children():
+			var tab := tab_node as Button
+			if tab == null:
+				continue
+			tab.custom_minimum_size = Vector2(0.0, 48.0 if compact else 52.0)
+			tab.add_theme_font_size_override("font_size", 17 if compact else 20)
+	var cards: Array[Control] = [click_upgrade_card, bonus_chance_card, bonus_value_card, bonus_streak_card, passive_gain_card]
+	cards.append_array(extended_upgrade_cards)
+	for card in cards:
+		_apply_upgrade_card_responsive_layout(card, compact)
+
+
+func _apply_upgrade_card_responsive_layout(card: Control, compact: bool) -> void:
+	if not is_instance_valid(card):
+		return
+	card.custom_minimum_size.x = 0.0
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var margin := card.find_child("CardMargin", true, false) as MarginContainer
+	if margin != null:
+		_set_telegram_margins(margin, 9 if compact else 14, 9 if compact else 11, 9 if compact else 14, 10 if compact else 12)
+	var header := card.find_child("Header", true, false) as HBoxContainer
+	if header != null:
+		header.custom_minimum_size.x = 0.0
+		header.add_theme_constant_override("separation", 5 if compact else 10)
+	var badge := card.find_child("Badge", true, false) as Label
+	if badge != null:
+		badge.custom_minimum_size = Vector2(60.0 if compact else 94.0, 36.0 if compact else 40.0)
+		badge.clip_text = true
+		badge.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		badge.add_theme_font_size_override("font_size", 14 if compact else 17)
+	var name_label := card.find_child("Name", true, false) as Label
+	if name_label != null:
+		name_label.custom_minimum_size.x = 0.0
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_label.clip_text = true
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name_label.add_theme_font_size_override("font_size", 16 if compact else 20)
+	if header != null:
+		for header_child in header.get_children():
+			var header_label := header_child as Label
+			if header_label == null or header_label == badge or header_label == name_label:
+				continue
+			header_label.custom_minimum_size.x = 58.0 if compact else 84.0
+			header_label.size_flags_horizontal = Control.SIZE_SHRINK_END
+			header_label.clip_text = true
+			header_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			header_label.add_theme_font_size_override("font_size", 18 if compact else 24)
+	for label_node in card.find_children("*", "Label", true, false):
+		var label := label_node as Label
+		if label == null or label == badge or label == name_label or label.get_parent() == header:
+			continue
+		label.custom_minimum_size.x = 0.0
+		if label.autowrap_mode == TextServer.AUTOWRAP_OFF:
+			label.clip_text = true
+			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		label.add_theme_font_size_override("font_size", 16 if compact else maxi(18, label.get_theme_font_size("font_size")))
+	for button_node in card.find_children("*", "Button", true, false):
+		var button := button_node as Button
+		if button == null:
+			continue
+		button.custom_minimum_size.x = 0.0
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		button.add_theme_font_size_override("font_size", 17 if compact else 20)
+		button.add_theme_stylebox_override("normal", _telegram_style(Color("#141b22"), 8, 6.0 if compact else 12.0, 7.0))
+		button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 6.0 if compact else 12.0, 7.0))
+		button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 6.0 if compact else 12.0, 7.0))
+		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _apply_boosts_responsive_layout(viewport_width: float = -1.0) -> void:
+	if not is_instance_valid(boosts_panel):
+		return
+	if viewport_width <= 0.0:
+		viewport_width = get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	var root_margin := boosts_panel.find_child("BoostsOuterMargin", true, false) as MarginContainer
+	if root_margin != null:
+		_set_telegram_margins(root_margin, 8 if compact else 12, 8 if compact else 10, 8 if compact else 12, 12 if compact else 14)
+	var hero_margin := boosts_panel.find_child("BoostsHeroMargin", true, false) as MarginContainer
+	if hero_margin != null:
+		_set_telegram_margins(hero_margin, 10 if compact else 18, 9 if compact else 12, 10 if compact else 18, 9 if compact else 12)
+	var title := boosts_panel.find_child("BoostsTitle", true, false) as Label
+	if title != null:
+		title.custom_minimum_size.x = 0.0
+		title.clip_text = true
+		title.add_theme_font_size_override("font_size", 27 if compact else 30)
+	var subtitle := boosts_panel.find_child("BoostsSubtitle", true, false) as Label
+	if subtitle != null:
+		subtitle.custom_minimum_size.x = 0.0
+		subtitle.add_theme_font_size_override("font_size", 15 if compact else 18)
+	var tabs := boosts_panel.find_child("BoostCategoryTabs", true, false) as HBoxContainer
+	if tabs != null:
+		tabs.custom_minimum_size.x = 0.0
+		tabs.add_theme_constant_override("separation", 6 if compact else 10)
+		for tab_node in tabs.get_children():
+			var tab := tab_node as Button
+			if tab == null:
+				continue
+			tab.custom_minimum_size = Vector2(0.0, 48.0 if compact else 52.0)
+			tab.add_theme_font_size_override("font_size", 17 if compact else 20)
+	if is_instance_valid(boosts_scroll):
+		boosts_scroll.custom_minimum_size.y = 0.0 if compact or get_viewport_rect().size.y < 900.0 else 360.0
+	if is_instance_valid(boost_wallet_label):
+		boost_wallet_label.custom_minimum_size.x = 164.0 if compact else 210.0
+		boost_wallet_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		boost_wallet_label.clip_text = true
+		boost_wallet_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		boost_wallet_label.add_theme_font_size_override("font_size", 20 if compact else 22)
+	for card_node in boost_cards.values():
+		var card := card_node as PanelContainer
+		if card == null:
+			continue
+		card.custom_minimum_size.x = 0.0
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var margin := card.get_meta("margin", null) as MarginContainer
+		if margin != null:
+			_set_telegram_margins(margin, 9 if compact else 14, 10 if compact else 12, 9 if compact else 14, 10 if compact else 12)
+		var header := card.get_meta("header", null) as HBoxContainer
+		if header != null:
+			header.custom_minimum_size.x = 0.0
+			header.add_theme_constant_override("separation", 5 if compact else 10)
+		var badge := card.get_meta("badge", null) as Label
+		if badge != null:
+			badge.custom_minimum_size = Vector2(52.0 if compact else 64.0, 28.0 if compact else 30.0)
+			badge.clip_text = true
+			badge.add_theme_font_size_override("font_size", 12 if compact else 15)
+		var name_label := card.get_meta("name_label", null) as Label
+		if name_label != null:
+			name_label.custom_minimum_size.x = 0.0
+			name_label.clip_text = true
+			name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			name_label.add_theme_font_size_override("font_size", 16 if compact else 20)
+		var status := card.get_meta("status_label", null) as Label
+		if status != null:
+			status.visible = not compact
+			status.custom_minimum_size.x = 0.0
+		var description := card.get_meta("description", null) as Label
+		if description != null:
+			description.custom_minimum_size.x = 0.0
+			description.add_theme_font_size_override("font_size", 16 if compact else 20)
+		var tier_info := card.get_meta("tier_info", null) as Label
+		if tier_info != null:
+			tier_info.custom_minimum_size.x = 0.0
+			tier_info.clip_text = true
+			tier_info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			tier_info.add_theme_font_size_override("font_size", 14 if compact else 18)
+		var actions := card.get_meta("actions", null) as HBoxContainer
+		if actions != null:
+			actions.custom_minimum_size.x = 0.0
+			actions.add_theme_constant_override("separation", 5 if compact else 8)
+		for action_node in boost_action_buttons.get(String(card.name).to_snake_case().trim_suffix("_card"), []):
+			var action := action_node as Button
+			if action == null:
+				continue
+			action.custom_minimum_size.x = 0.0
+			action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			action.add_theme_font_size_override("font_size", 14 if compact else 18)
+			action.add_theme_stylebox_override("normal", _telegram_style(Color("#141b22"), 8, 4.0 if compact else 10.0, 6.0))
+			action.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 4.0 if compact else 10.0, 6.0))
+			action.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 4.0 if compact else 10.0, 6.0))
+			action.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _apply_museum_responsive_layout(viewport_width: float = -1.0) -> void:
+	if not is_instance_valid(museum_panel) or not is_instance_valid(museum_content):
+		return
+	if viewport_width <= 0.0:
+		viewport_width = get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	var root_margin := museum_panel.find_child("MuseumRootMargin", true, false) as MarginContainer
+	if root_margin != null:
+		_set_telegram_margins(root_margin, 8 if compact else 12, 8 if compact else 10, 8 if compact else 12, 12 if compact else 14)
+	museum_content.custom_minimum_size.x = 0.0
+	var cat_grid := museum_panel.find_child("MuseumCatGrid", true, false) as GridContainer
+	if cat_grid != null:
+		cat_grid.columns = 2 if compact else (3 if viewport_width < 900.0 else 4)
+	for grid_name in ["MuseumCatGrid", "MuseumTreasureGrid", "MuseumAchievementGrid"]:
+		var grid := museum_panel.find_child(grid_name, true, false) as GridContainer
+		if grid == null:
+			continue
+		grid.custom_minimum_size.x = 0.0
+		grid.add_theme_constant_override("h_separation", 8 if compact else 10)
+		for grid_child in grid.get_children():
+			var control := grid_child as Control
+			if control != null:
+				control.custom_minimum_size.x = 0.0
+	for panel_node in museum_panel.find_children("*", "PanelContainer", true, false):
+		var panel := panel_node as PanelContainer
+		if panel == null:
+			continue
+		var role := String(panel.get_meta("museum_role", ""))
+		if role == "plaque":
+			panel.custom_minimum_size = Vector2(0.0, 88.0 if compact else 82.0)
+		elif role == "portrait":
+			panel.custom_minimum_size = Vector2(0.0, 154.0 if compact else 172.0)
+	for label_node in museum_panel.find_children("*", "Label", true, false):
+		var label := label_node as Label
+		if label == null:
+			continue
+		label.custom_minimum_size.x = 0.0
+		var role := String(label.get_meta("museum_role", ""))
+		match role:
+			"hero":
+				label.custom_minimum_size.y = 142.0 if compact else 126.0
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				label.add_theme_font_size_override("font_size", 22 if compact else 25)
+			"section_title":
+				label.clip_text = true
+				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+				label.add_theme_font_size_override("font_size", 20 if compact else 24)
+			"section_detail":
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				label.add_theme_font_size_override("font_size", 17 if compact else 18)
+			"plaque_label":
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				label.add_theme_font_size_override("font_size", 15 if compact else 18)
+			"portrait_name":
+				label.clip_text = true
+				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+				label.add_theme_font_size_override("font_size", 16 if compact else 18)
+			_:
+				if label.autowrap_mode == TextServer.AUTOWRAP_OFF:
+					label.clip_text = true
+					label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	for button_node in museum_panel.find_children("*", "Button", true, false):
+		var button := button_node as Button
+		if button == null:
+			continue
+		button.custom_minimum_size.x = 0.0
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		button.add_theme_font_size_override("font_size", 16 if compact else 20)
+
+
+func _apply_skins_responsive_layout(viewport_width: float = -1.0) -> void:
+	if not is_instance_valid(skins_panel):
+		return
+	if viewport_width <= 0.0:
+		viewport_width = get_viewport_rect().size.x
+	var compact := viewport_width < 520.0
+	var root_margin := skins_panel.find_child("SkinsOuterMargin", true, false) as MarginContainer
+	if root_margin != null:
+		_set_telegram_margins(root_margin, 8 if compact else 12, 8 if compact else 10, 8 if compact else 12, 12 if compact else 14)
+	var hero_margin := skins_panel.find_child("SkinsHeroMargin", true, false) as MarginContainer
+	if hero_margin != null:
+		_set_telegram_margins(hero_margin, 10 if compact else 18, 9 if compact else 13, 10 if compact else 18, 9 if compact else 13)
+	var title := skins_panel.find_child("SkinsTitle", true, false) as Label
+	if title != null:
+		title.custom_minimum_size.x = 0.0
+		title.clip_text = true
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		title.add_theme_font_size_override("font_size", 27 if compact else 30)
+	if is_instance_valid(skins_status_label):
+		skins_status_label.custom_minimum_size = Vector2(0.0, 42.0 if compact else 0.0)
+		skins_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		skins_status_label.add_theme_font_size_override("font_size", 16 if compact else 18)
+	if is_instance_valid(skins_wallet_label):
+		skins_wallet_label.custom_minimum_size.x = 230.0 if compact else 310.0
+		skins_wallet_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		skins_wallet_label.clip_text = true
+		skins_wallet_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		skins_wallet_label.add_theme_font_size_override("font_size", 16 if compact else 22)
+	skins_tabs_row.custom_minimum_size.x = 0.0
+	skins_tabs_row.add_theme_constant_override("separation", 6 if compact else 8)
+	for tab_node in skins_tabs_row.get_children():
+		var tab := tab_node as Button
+		if tab == null:
+			continue
+		tab.custom_minimum_size = Vector2(0.0, 48.0)
+		tab.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	for scroll in [skins_scroll, crates_scroll, room_skins_scroll]:
+		if scroll == null:
+			continue
+		scroll.custom_minimum_size.y = 0.0 if compact or get_viewport_rect().size.y < 900.0 else 720.0
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	for panel_node in skins_panel.find_children("*", "PanelContainer", true, false):
+		var card := panel_node as PanelContainer
+		if card == null:
+			continue
+		var role := String(card.get_meta("skins_role", ""))
+		if role.is_empty():
+			continue
+		card.custom_minimum_size.x = 0.0
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if role == "skin_card":
+			card.custom_minimum_size.y = 176.0 if compact else 214.0
+			var card_margin := card.find_child("SkinCardMargin", true, false) as MarginContainer
+			if card_margin != null:
+				_set_telegram_margins(card_margin, 9 if compact else 12, 9 if compact else 12, 9 if compact else 12, 9 if compact else 12)
+			var row := card.find_child("SkinCardRow", true, false) as HBoxContainer
+			if row != null:
+				row.custom_minimum_size.x = 0.0
+				row.add_theme_constant_override("separation", 9 if compact else 14)
+			var preview := card.find_child("SkinPreview", true, false) as TextureRect
+			if preview != null:
+				preview.custom_minimum_size = Vector2(98.0 if compact else 150.0, 142.0 if compact else 150.0)
+		elif role == "set_card":
+			var set_margin := card.find_child("SkinSetMargin", true, false) as MarginContainer
+			if set_margin != null:
+				_set_telegram_margins(set_margin, 9 if compact else 12, 9 if compact else 12, 9 if compact else 12, 9 if compact else 12)
+			var set_row := card.find_child("SkinSetRow", true, false) as HBoxContainer
+			if set_row != null:
+				set_row.custom_minimum_size.x = 0.0
+				set_row.add_theme_constant_override("separation", 8 if compact else 14)
+				if set_row.get_child_count() > 0 and set_row.get_child(0) is Label:
+					(set_row.get_child(0) as Label).custom_minimum_size.x = 42.0 if compact else 54.0
+		elif role == "room_card":
+			card.custom_minimum_size = Vector2(0.0, 184.0)
+			var room_preview := card.find_child("RoomSkinPreview", true, false) as TextureRect
+			if room_preview != null:
+				room_preview.custom_minimum_size = Vector2(0.0, 110.0)
+		for label_node in card.find_children("*", "Label", true, false):
+			var label := label_node as Label
+			if label == null or label.name == "LockOverlay":
+				continue
+			label.custom_minimum_size.x = 0.0
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			label.add_theme_font_size_override("font_size", 16 if compact else maxi(18, label.get_theme_font_size("font_size")))
+		for button_node in card.find_children("*", "Button", true, false):
+			var action := button_node as Button
+			if action == null:
+				continue
+			action.custom_minimum_size.x = 0.0
+			action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			action.add_theme_font_size_override("font_size", 16 if compact else 20)
+	if crate_logic != null:
+		crate_logic.apply_responsive_layout(viewport_width)
+
+
 func _spawn_click_popup(amount: int, bonus_multiplier: int = 1, streak_multiplier: int = 1, current_combo_bonus: float = 0.0) -> void:
 	if optimized_tap_effects and click_popup_layer.get_child_count() > _get_effective_particle_limit():
 		return
@@ -5499,6 +6132,10 @@ func _show_menu() -> void:
 	_update_achievements_ui()
 	_update_stats_ui()
 	_update_daily_reward_ui()
+	if is_instance_valid(telegram_pager_host):
+		_show_pause_popup()
+		_tutorial_notify("menu_opened")
+		return
 	_show_overlay_panel(menu_panel)
 	call_deferred("_animate_pause_menu")
 	_tutorial_notify("menu_opened")
@@ -5506,19 +6143,29 @@ func _show_menu() -> void:
 
 func _show_settings() -> void:
 	_play_ui_sound()
+	settings_back_to_pause = pause_popup_open
+	if pause_popup_open:
+		_hide_pause_popup(false, true)
 	_update_upgrade_ui()
 	_update_stats_ui()
 	_update_daily_reward_ui()
-	_show_overlay_panel(settings_panel)
-	call_deferred("_animate_settings_screen")
+	_show_settings_shell()
 
 
 func _show_upgrades() -> void:
 	_play_ui_sound()
+	if is_instance_valid(settings_shell) and settings_shell.visible:
+		settings_back_to_pause = false
+		_hide_settings_shell_immediate()
 	_update_upgrade_ui()
 	_update_stats_ui()
 	_update_daily_reward_ui()
+	_apply_telegram_page_style(upgrades_panel)
+	_apply_upgrades_responsive_layout()
+	_refresh_telegram_segment_buttons(upgrade_category_buttons, upgrade_active_category)
 	_show_overlay_panel(upgrades_panel)
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_destination("upgrades")
 	call_deferred("_animate_upgrade_screen")
 	_tutorial_notify("upgrades_opened")
 
@@ -5527,8 +6174,9 @@ func _show_achievements() -> void:
 	_play_ui_sound()
 	_update_stats_ui()
 	_update_daily_reward_ui()
-	_show_overlay_panel(achievements_panel)
+	_show_pause_detail(achievements_panel, "Achievements")
 	_update_achievements_ui()
+	_style_telegram_achievements_detail()
 	call_deferred("_animate_achievements_screen")
 
 
@@ -5536,7 +6184,8 @@ func _show_stats() -> void:
 	_play_ui_sound()
 	_update_stats_ui()
 	_update_daily_reward_ui()
-	_show_overlay_panel(stats_panel)
+	_show_pause_detail(stats_panel, "Statistics")
+	_style_telegram_stats_detail()
 	call_deferred("_animate_stats_screen")
 
 
@@ -5546,6 +6195,9 @@ func _show_skins() -> void:
 	skins_status_label.text = "Equipped: %s. %s" % [_get_equipped_skin_name(), _get_skin_bonus_text(skin_data)]
 	_set_skins_section("skins")
 	_update_skins_ui()
+	_apply_telegram_page_style(skins_panel)
+	_refresh_telegram_segment_buttons(skins_tab_buttons, skins_active_section)
+	_apply_skins_responsive_layout()
 	_show_overlay_panel(skins_panel)
 	call_deferred("_animate_skins_screen")
 	_tutorial_notify("skins_opened")
@@ -5554,7 +6206,12 @@ func _show_skins() -> void:
 func _show_boosts() -> void:
 	_play_ui_sound()
 	boost_logic.update_ui()
+	_apply_telegram_page_style(boosts_panel)
+	_apply_boosts_responsive_layout()
+	_refresh_telegram_segment_buttons(boost_category_buttons, boost_active_category)
 	_show_overlay_panel(boosts_panel)
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_destination("boosts")
 	call_deferred("_animate_boost_screen")
 	_tutorial_notify("boosts_opened")
 
@@ -5562,8 +6219,10 @@ func _show_boosts() -> void:
 func _show_inventory() -> void:
 	_play_ui_sound()
 	food_panel_mode = "inventory"
-	_refresh_compact_inventory()
-	compact_inventory_panel.visible = not compact_inventory_panel.visible
+	food_status_label.text = "Your collected food and active consumables."
+	_update_food_ui()
+	_show_overlay_panel(food_panel)
+	call_deferred("_animate_food_screen")
 	_tutorial_notify("inventory_opened")
 
 
@@ -5587,18 +6246,24 @@ func _show_crates() -> void:
 func _show_museum() -> void:
 	_play_ui_sound()
 	_rebuild_museum()
+	_apply_telegram_page_style(museum_panel)
+	_apply_museum_responsive_layout()
 	_show_overlay_panel(museum_panel)
 
 
 func _show_bottomless_bowl() -> void:
 	_play_ui_sound()
 	bottomless_bowl_logic.update_ui()
+	_apply_telegram_page_style(bottomless_bowl_logic.panel)
+	bottomless_bowl_logic.apply_responsive_layout()
 	_show_overlay_panel(bottomless_bowl_logic.panel)
 
 
 func _show_missions() -> void:
 	_play_ui_sound()
 	mission_logic.update_ui()
+	_apply_telegram_page_style(mission_logic.panel)
+	mission_logic.apply_responsive_layout()
 	_show_overlay_panel(mission_logic.panel)
 	_tutorial_notify("missions_opened")
 
@@ -5639,7 +6304,1739 @@ func _animate_food_screen() -> void:
 	_animate_control_sequence(controls, 0.015, 22.0)
 
 
+func _build_telegram_navigation() -> void:
+	telegram_pager_host = Control.new()
+	telegram_pager_host.name = "TelegramPagerHost"
+	telegram_pager_host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	telegram_pager_host.offset_top = telegram_top_height
+	telegram_pager_host.offset_bottom = -telegram_bottom_height
+	telegram_pager_host.clip_contents = true
+	telegram_pager_host.mouse_filter = Control.MOUSE_FILTER_PASS
+	menu_overlay.add_child(telegram_pager_host)
+	for panel in _get_overlay_panels():
+		if panel == menu_panel:
+			panel.reparent(menu_overlay)
+			panel.set_anchors_preset(Control.PRESET_CENTER)
+			panel.offset_left = -260.0
+			panel.offset_top = -370.0
+			panel.offset_right = 260.0
+			panel.offset_bottom = 370.0
+			panel.custom_minimum_size = Vector2.ZERO
+			panel.z_index = 51
+			panel.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 16))
+			_apply_telegram_style_tree(panel, true)
+			panel.hide()
+			continue
+		panel.reparent(telegram_pager_host)
+		panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		panel.custom_minimum_size = Vector2.ZERO
+		panel.position = Vector2.ZERO
+		panel.pivot_offset = Vector2.ZERO
+		_apply_telegram_page_style(panel)
+	pause_dim = ColorRect.new()
+	pause_dim.name = "PauseDim"
+	pause_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_dim.color = Color(0.0, 0.0, 0.0, 0.62)
+	pause_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	pause_dim.z_index = 50
+	pause_dim.gui_input.connect(_on_pause_dim_gui_input)
+	pause_dim.hide()
+	menu_overlay.add_child(pause_dim)
+	# GUI picking follows Control tree order, not only visual z_index. Keep the
+	# dimmer before the popup so it receives only clicks outside MenuPanel.
+	menu_overlay.move_child(pause_dim, menu_panel.get_index())
+	menu_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal_close_button.hide()
+	for decoration in modal_decorations:
+		decoration.hide()
+	menu_overlay.color = Color("#17212b")
+	menu_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	telegram_navigation = TelegramNavigation.new()
+	telegram_navigation.name = "TelegramNavigation"
+	add_child(telegram_navigation)
+	telegram_navigation.destination_requested.connect(_on_telegram_destination_requested)
+	telegram_navigation.pause_requested.connect(_show_menu)
+	telegram_navigation.layout_metrics_changed.connect(_on_telegram_layout_metrics_changed)
+	telegram_navigation.pager_drag_started.connect(_on_telegram_pager_drag_started)
+	telegram_navigation.pager_dragged.connect(_on_telegram_pager_dragged)
+	telegram_navigation.pager_drag_released.connect(_on_telegram_pager_drag_released)
+	_on_telegram_layout_metrics_changed(
+		float(telegram_navigation.call("get_top_height")),
+		float(telegram_navigation.call("get_bottom_height"))
+	)
+	_build_settings_shell()
+	_build_pause_detail_shell()
+	# The shell owns primary navigation. Legacy HUD shortcuts stay alive for
+	# tutorial callbacks, but are no longer visible or interactive.
+	menu_button.hide()
+	upgrade_button.hide()
+	upgrade_alert_badge.hide()
+	skins_button.hide()
+	boosts_button.hide()
+	inventory_shop_bar.hide()
+	museum_button.hide()
+	if mission_logic != null and is_instance_valid(mission_logic.button):
+		mission_logic.button.hide()
+	if crate_logic != null and is_instance_valid(crate_logic.button):
+		crate_logic.button.hide()
+	for node_path in [
+		"Background",
+		"RoomBackground",
+		"RoomVignette",
+		"GameLayer",
+		"HudWallet",
+		"UpgradeAlertBadge",
+		"ClickPopupLayer",
+	]:
+		var main_control := get_node_or_null(node_path) as Control
+		if main_control != null:
+			telegram_main_transition_nodes.append(main_control)
+	if random_event_logic != null and is_instance_valid(random_event_logic.layer):
+		telegram_main_transition_nodes.append(random_event_logic.layer)
+
+
+func _on_telegram_layout_metrics_changed(top_height: float, bottom_height: float) -> void:
+	telegram_top_height = top_height
+	telegram_bottom_height = bottom_height
+	if is_instance_valid(telegram_pager_host):
+		telegram_pager_host.offset_top = telegram_top_height
+		telegram_pager_host.offset_bottom = -telegram_bottom_height
+	var game_layer := get_node_or_null("GameLayer") as MarginContainer
+	if game_layer != null:
+		game_layer.add_theme_constant_override("margin_top", roundi(telegram_top_height + 12.0))
+		game_layer.add_theme_constant_override("margin_bottom", roundi(telegram_bottom_height + 14.0))
+	if is_instance_valid(menu_panel):
+		_layout_pause_popup()
+	if is_instance_valid(settings_shell):
+		_layout_settings_shell()
+	if is_instance_valid(pause_detail_shell):
+		_layout_pause_detail_shell()
+
+
+func _build_settings_shell() -> void:
+	settings_shell = ColorRect.new()
+	settings_shell.name = "SettingsShell"
+	settings_shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	settings_shell.color = Color("#17212b")
+	settings_shell.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_shell.z_index = 80
+	settings_shell.hide()
+	add_child(settings_shell)
+
+	settings_action_bar = PanelContainer.new()
+	settings_action_bar.name = "SettingsActionBar"
+	settings_action_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	settings_action_bar.add_theme_stylebox_override("panel", _telegram_style(Color("#17212b"), 0))
+	settings_shell.add_child(settings_action_bar)
+	settings_action_safe_margin = MarginContainer.new()
+	settings_action_bar.add_child(settings_action_safe_margin)
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 4)
+	settings_action_safe_margin.add_child(action_row)
+	var back := Button.new()
+	back.name = "SettingsShellBackButton"
+	back.text = "←"
+	back.custom_minimum_size = Vector2(64.0, 64.0)
+	back.flat = false
+	back.focus_mode = Control.FOCUS_NONE
+	back.add_theme_font_size_override("font_size", 30)
+	back.add_theme_color_override("font_color", Color("#d9e3ec"))
+	back.add_theme_color_override("font_hover_color", Color.WHITE)
+	back.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 28))
+	back.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.07), 28))
+	back.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 28))
+	back.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	back.pressed.connect(_close_settings_shell)
+	action_row.add_child(back)
+	var action_title := Label.new()
+	action_title.name = "SettingsShellTitle"
+	action_title.text = "Settings"
+	action_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	action_title.add_theme_font_size_override("font_size", 26)
+	action_title.add_theme_color_override("font_color", Color("#f2f5f7"))
+	action_row.add_child(action_title)
+	var action_spacer := Control.new()
+	action_spacer.custom_minimum_size.x = 16.0
+	action_row.add_child(action_spacer)
+
+	settings_tabs_bar = PanelContainer.new()
+	settings_tabs_bar.name = "SettingsTabsBar"
+	settings_tabs_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	settings_tabs_bar.add_theme_stylebox_override("panel", _telegram_style(Color("#202f3d"), 0))
+	settings_shell.add_child(settings_tabs_bar)
+	var tabs_layer := Control.new()
+	tabs_layer.name = "SettingsTabsLayer"
+	tabs_layer.mouse_filter = Control.MOUSE_FILTER_PASS
+	settings_tabs_bar.add_child(tabs_layer)
+	settings_tab_indicator = PanelContainer.new()
+	settings_tab_indicator.name = "SettingsTabIndicator"
+	settings_tab_indicator.position.y = 13.0
+	settings_tab_indicator.size = Vector2(96.0, 34.0)
+	settings_tab_indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	settings_tab_indicator.add_theme_stylebox_override(
+		"panel",
+		_telegram_style(Color(0.35, 0.66, 0.88, 0.15), 17)
+	)
+	tabs_layer.add_child(settings_tab_indicator)
+	settings_tabs_scroll = ScrollContainer.new()
+	settings_tabs_scroll.name = "SettingsTabsScroll"
+	settings_tabs_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	settings_tabs_scroll.offset_left = 8.0
+	settings_tabs_scroll.offset_right = -8.0
+	settings_tabs_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	settings_tabs_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	settings_tabs_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	tabs_layer.add_child(settings_tabs_scroll)
+	settings_tabs_row = HBoxContainer.new()
+	settings_tabs_row.name = "SettingsTabRow"
+	settings_tabs_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_tabs_row.add_theme_constant_override("separation", 2)
+	settings_tabs_scroll.add_child(settings_tabs_row)
+	settings_tabs_scroll.get_h_scroll_bar().value_changed.connect(_on_settings_tabs_scrolled)
+	for index in SETTINGS_PAGE_LABELS.size():
+		var tab := Button.new()
+		tab.text = SETTINGS_PAGE_LABELS[index]
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab.custom_minimum_size.y = 60.0
+		tab.flat = false
+		tab.focus_mode = Control.FOCUS_NONE
+		tab.add_theme_font_size_override("font_size", 20)
+		tab.add_theme_color_override("font_color", Color("#9eabb7"))
+		tab.add_theme_color_override("font_hover_color", Color.WHITE)
+		tab.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 10))
+		tab.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.055), 10))
+		tab.add_theme_stylebox_override("pressed", _telegram_style(Color(1, 1, 1, 0.075), 10))
+		tab.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		tab.pressed.connect(_show_settings_page.bind(index, true))
+		settings_tabs_row.add_child(tab)
+		settings_tab_buttons.append(tab)
+
+	settings_pager_host = Control.new()
+	settings_pager_host.name = "SettingsPagerHost"
+	settings_pager_host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	settings_pager_host.clip_contents = true
+	settings_pager_host.mouse_filter = Control.MOUSE_FILTER_PASS
+	settings_shell.add_child(settings_pager_host)
+	for index in SETTINGS_PAGE_LABELS.size():
+		var page := Control.new()
+		page.name = "%sSettingsPage" % SETTINGS_PAGE_LABELS[index]
+		page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		page.mouse_filter = Control.MOUSE_FILTER_PASS
+		page.visible = index == 0
+		settings_pager_host.add_child(page)
+		settings_pages.append(page)
+		var scroll := ScrollContainer.new()
+		scroll.name = "SettingsPageScroll"
+		scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		scroll.scroll_deadzone = 8
+		scroll.follow_focus = true
+		page.add_child(scroll)
+		var page_margin := MarginContainer.new()
+		page_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_set_telegram_margins(page_margin, 20, 16, 20, 28)
+		scroll.add_child(page_margin)
+		settings_page_margins.append(page_margin)
+		var content := VBoxContainer.new()
+		content.name = "SettingsPageContent"
+		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.add_theme_constant_override("separation", 12)
+		page_margin.add_child(content)
+		settings_page_contents.append(content)
+
+	_add_settings_page_intro(settings_page_contents[0], "GENERAL", "Game account, tutorial and progression shortcuts")
+	_add_settings_page_intro(settings_page_contents[1], "PERFORMANCE", "Rendering and effects tuned for this device")
+	_add_settings_page_intro(settings_page_contents[2], "AUDIO", "Sound levels and interface feedback")
+	_add_settings_page_intro(settings_page_contents[3], "CONTROLS", "Touch feedback and game events")
+	settings_header.hide()
+	_build_settings_general_group()
+	if is_instance_valid(performance_settings_card):
+		performance_settings_card.reparent(settings_page_contents[1])
+		performance_settings_card.show()
+	if is_instance_valid(audio_settings_card):
+		audio_settings_card.reparent(settings_page_contents[2])
+		audio_settings_card.show()
+	if is_instance_valid(touch_settings_card):
+		touch_settings_card.reparent(settings_page_contents[3])
+		touch_settings_card.show()
+	settings_panel.hide()
+	_layout_settings_shell()
+	call_deferred("_show_settings_page", 0, false)
+
+
+func _add_settings_page_intro(parent: VBoxContainer, title_text: String, description: String) -> void:
+	var header := Label.new()
+	header.text = title_text
+	header.custom_minimum_size.y = 40.0
+	header.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_theme_font_size_override("font_size", 20)
+	header.add_theme_color_override("font_color", Color("#64b5ef"))
+	parent.add_child(header)
+	var caption := Label.new()
+	caption.text = description
+	caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	caption.add_theme_font_size_override("font_size", 18)
+	caption.add_theme_color_override("font_color", Color("#9eabb7"))
+	parent.add_child(caption)
+
+
+func _build_settings_general_group() -> void:
+	settings_general_group = PanelContainer.new()
+	settings_general_group.name = "SettingsGeneralGroup"
+	settings_general_group.clip_contents = true
+	settings_general_group.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_page_contents[0].add_child(settings_general_group)
+	var rows := VBoxContainer.new()
+	rows.name = "SettingsGeneralRows"
+	rows.add_theme_constant_override("separation", 0)
+	settings_general_group.add_child(rows)
+
+	settings_wallet.reparent(rows)
+	settings_wallet.show()
+	var wallet_row := settings_wallet.find_child("WalletRow", true, false) as HBoxContainer
+	if wallet_row != null:
+		wallet_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+		wallet_row.custom_minimum_size.y = 64.0
+		var wallet_title := Label.new()
+		wallet_title.name = "SettingsWalletTitle"
+		wallet_title.text = "Kibbles"
+		wallet_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		wallet_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		wallet_title.add_theme_font_size_override("font_size", 20)
+		wallet_row.add_child(wallet_title)
+		wallet_row.move_child(wallet_title, 1)
+		menu_coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		menu_coins_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rows.add_child(_create_settings_row_separator())
+
+	tutorial_replay_button.reparent(rows)
+	tutorial_replay_button.show()
+	tutorial_replay_button.text = "Replay tutorial"
+	tutorial_replay_button.icon = load("res://assets/ui/navigation/settings_tutorial.svg") as Texture2D
+	rows.add_child(_create_settings_row_separator())
+
+	open_upgrades_button.reparent(rows)
+	open_upgrades_button.show()
+	open_upgrades_button.text = "Upgrades"
+	open_upgrades_button.icon = load("res://assets/ui/navigation/settings_upgrades.svg") as Texture2D
+	_style_settings_general_group()
+
+
+func _create_settings_row_separator() -> MarginContainer:
+	var separator_margin := MarginContainer.new()
+	separator_margin.name = "SettingsRowSeparator"
+	separator_margin.custom_minimum_size.y = 1.0
+	separator_margin.add_theme_constant_override("margin_left", 58)
+	var separator := ColorRect.new()
+	separator.color = Color("#314252")
+	separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	separator_margin.add_child(separator)
+	return separator_margin
+
+
+func _style_settings_general_group() -> void:
+	if not is_instance_valid(settings_general_group):
+		return
+	settings_general_group.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
+	settings_wallet.custom_minimum_size.y = 64.0
+	settings_wallet.add_theme_stylebox_override("panel", _telegram_style(Color(0, 0, 0, 0), 0))
+	var wallet_margin := settings_wallet.find_child("WalletMargin", true, false) as MarginContainer
+	if wallet_margin != null:
+		_set_telegram_margins(wallet_margin, 16, 0, 16, 0)
+	var wallet_title := settings_wallet.find_child("SettingsWalletTitle", true, false) as Label
+	if wallet_title != null:
+		wallet_title.add_theme_color_override("font_color", Color("#d9e3ec"))
+	var settings_coin_icon := settings_wallet.find_child("SettingsCoinIcon", true, false) as TextureRect
+	if settings_coin_icon != null:
+		settings_coin_icon.custom_minimum_size = Vector2(28.0, 28.0)
+	menu_coins_label.add_theme_font_size_override("font_size", 20)
+	menu_coins_label.add_theme_color_override("font_color", Color("#64b5ef"))
+	for row_button in [tutorial_replay_button, open_upgrades_button]:
+		if not is_instance_valid(row_button):
+			continue
+		row_button.custom_minimum_size.y = 64.0
+		row_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		row_button.expand_icon = true
+		row_button.add_theme_constant_override("icon_max_width", 28)
+		row_button.add_theme_constant_override("h_separation", 16)
+		row_button.add_theme_font_size_override("font_size", 20)
+		row_button.add_theme_color_override("font_color", Color("#d9e3ec"))
+		row_button.add_theme_color_override("font_hover_color", Color.WHITE)
+		row_button.add_theme_color_override("font_pressed_color", Color.WHITE)
+		row_button.add_theme_color_override("icon_normal_color", Color("#64b5ef"))
+		row_button.add_theme_color_override("icon_hover_color", Color("#8dccf4"))
+		row_button.add_theme_color_override("icon_pressed_color", Color.WHITE)
+		row_button.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 0, 16.0, 0.0))
+		row_button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 16.0, 0.0))
+		row_button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 16.0, 0.0))
+		row_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _layout_settings_shell() -> void:
+	if not is_instance_valid(settings_shell):
+		return
+	var tabs_height := 60.0
+	var base_action_height := 72.0
+	var base_bottom_height := 78.0
+	if is_instance_valid(telegram_navigation):
+		tabs_height = telegram_navigation.FILTER_TABS_HEIGHT
+		base_action_height = telegram_navigation.ACTION_BAR_PORTRAIT
+		base_bottom_height = telegram_navigation.BOTTOM_BAR_HEIGHT
+	var action_height := maxf(base_action_height, telegram_top_height - tabs_height)
+	var safe_top := maxf(0.0, action_height - base_action_height)
+	var safe_bottom := maxf(0.0, telegram_bottom_height - base_bottom_height)
+	settings_action_bar.offset_bottom = action_height
+	settings_action_safe_margin.add_theme_constant_override("margin_top", roundi(safe_top))
+	settings_tabs_bar.offset_top = action_height
+	settings_tabs_bar.offset_bottom = action_height + tabs_height
+	settings_pager_host.offset_top = action_height + tabs_height
+	var viewport_width := get_viewport_rect().size.x
+	var horizontal_margin := 14 if viewport_width < 440.0 else (20 if viewport_width < 720.0 else 24)
+	for page_margin in settings_page_margins:
+		_set_telegram_margins(page_margin, horizontal_margin, 16, horizontal_margin, 28)
+	for tab in settings_tab_buttons:
+		tab.custom_minimum_size.y = tabs_height
+	_layout_settings_tabs(viewport_width)
+	settings_tab_indicator.position.y = (tabs_height - 34.0) * 0.5
+	settings_tab_indicator.size.y = 34.0
+	settings_pager_host.offset_bottom = -safe_bottom
+	call_deferred("_move_settings_tab_indicator", settings_current_page, false)
+
+
+func _layout_settings_tabs(viewport_width: float) -> void:
+	if not is_instance_valid(settings_tabs_row) or settings_tab_buttons.is_empty():
+		return
+	var compact := viewport_width < 520.0
+	var natural_widths: Array[float] = []
+	var natural_total := 0.0
+	for tab in settings_tab_buttons:
+		tab.add_theme_font_size_override("font_size", 16 if compact else 20)
+		var font := tab.get_theme_font("font")
+		var text_width := font.get_string_size(
+			tab.text,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1.0,
+			tab.get_theme_font_size("font_size")
+		).x
+		var natural_width := maxf(64.0 if compact else 72.0, text_width + (24.0 if compact else 30.0))
+		natural_widths.append(natural_width)
+		natural_total += natural_width
+	var separation_total := float(settings_tab_buttons.size() - 1) * 2.0
+	var available_width := maxf(0.0, viewport_width - 16.0 - separation_total)
+	var extra_per_tab := maxf(0.0, available_width - natural_total) / float(settings_tab_buttons.size())
+	for index in settings_tab_buttons.size():
+		settings_tab_buttons[index].custom_minimum_size.x = natural_widths[index] + extra_per_tab
+	settings_tabs_row.custom_minimum_size.x = maxf(available_width, natural_total + separation_total)
+
+
+func _on_settings_tabs_scrolled(_value: float) -> void:
+	if is_instance_valid(settings_shell) and settings_shell.visible:
+		call_deferred("_move_settings_tab_indicator", settings_current_page, false)
+
+
+func _show_settings_shell() -> void:
+	if not is_instance_valid(settings_shell):
+		return
+	_apply_telegram_settings_style()
+	_show_settings_page(0, false)
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_interaction_enabled(false)
+	if settings_shell_tween != null and settings_shell_tween.is_valid():
+		settings_shell_tween.kill()
+	var width := get_viewport_rect().size.x
+	settings_shell.position = Vector2(width, 0.0)
+	settings_shell.modulate = Color.WHITE
+	settings_shell.show()
+	settings_shell_tween = create_tween()
+	settings_shell_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	settings_shell_tween.tween_property(settings_shell, "position:x", 0.0, 0.26)
+
+
+func _close_settings_shell() -> void:
+	if not is_instance_valid(settings_shell) or not settings_shell.visible:
+		return
+	if settings_back_to_pause and not pause_popup_open:
+		_show_pause_popup()
+	if settings_shell_tween != null and settings_shell_tween.is_valid():
+		settings_shell_tween.kill()
+	settings_shell_tween = create_tween()
+	settings_shell_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
+	settings_shell_tween.tween_property(settings_shell, "position:x", get_viewport_rect().size.x, 0.22)
+	settings_shell_tween.tween_callback(_finish_close_settings_shell)
+
+
+func _finish_close_settings_shell() -> void:
+	settings_shell.hide()
+	settings_shell.position = Vector2.ZERO
+	if is_instance_valid(telegram_navigation) and not pause_popup_open:
+		telegram_navigation.set_interaction_enabled(true)
+
+
+func _hide_settings_shell_immediate() -> void:
+	if not is_instance_valid(settings_shell):
+		return
+	if settings_shell_tween != null and settings_shell_tween.is_valid():
+		settings_shell_tween.kill()
+	settings_shell.hide()
+	settings_shell.position = Vector2.ZERO
+	if is_instance_valid(telegram_navigation) and not pause_popup_open:
+		telegram_navigation.set_interaction_enabled(true)
+
+
+func _build_pause_detail_shell() -> void:
+	_unwrap_pause_detail_panel(achievements_panel)
+	pause_detail_shell = ColorRect.new()
+	pause_detail_shell.name = "PauseDetailShell"
+	pause_detail_shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_detail_shell.color = Color("#17212b")
+	pause_detail_shell.mouse_filter = Control.MOUSE_FILTER_STOP
+	pause_detail_shell.z_index = 80
+	pause_detail_shell.hide()
+	add_child(pause_detail_shell)
+
+	pause_detail_action_bar = PanelContainer.new()
+	pause_detail_action_bar.name = "PauseDetailActionBar"
+	pause_detail_action_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	var action_style := _telegram_style(Color("#17212b"), 0)
+	action_style.border_width_bottom = 1
+	action_style.border_color = Color("#263746")
+	pause_detail_action_bar.add_theme_stylebox_override("panel", action_style)
+	pause_detail_shell.add_child(pause_detail_action_bar)
+	pause_detail_action_safe_margin = MarginContainer.new()
+	pause_detail_action_bar.add_child(pause_detail_action_safe_margin)
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 4)
+	pause_detail_action_safe_margin.add_child(action_row)
+	var back := Button.new()
+	back.name = "PauseDetailBackButton"
+	back.text = "\u2190"
+	back.custom_minimum_size = Vector2(64.0, 64.0)
+	back.focus_mode = Control.FOCUS_NONE
+	back.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	back.add_theme_font_size_override("font_size", 30)
+	back.add_theme_color_override("font_color", Color("#d9e3ec"))
+	back.add_theme_color_override("font_hover_color", Color.WHITE)
+	back.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 30))
+	back.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.08), 30))
+	back.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 30))
+	back.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	back.pressed.connect(_close_pause_detail_shell)
+	action_row.add_child(back)
+	pause_detail_title = Label.new()
+	pause_detail_title.name = "PauseDetailTitle"
+	pause_detail_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pause_detail_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pause_detail_title.add_theme_font_size_override("font_size", 26)
+	pause_detail_title.add_theme_color_override("font_color", Color("#f2f5f7"))
+	action_row.add_child(pause_detail_title)
+	var spacer := Control.new()
+	spacer.custom_minimum_size.x = 16.0
+	action_row.add_child(spacer)
+
+	pause_detail_host = Control.new()
+	pause_detail_host.name = "PauseDetailHost"
+	pause_detail_host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_detail_host.clip_contents = true
+	pause_detail_host.mouse_filter = Control.MOUSE_FILTER_PASS
+	pause_detail_shell.add_child(pause_detail_host)
+	_layout_pause_detail_shell()
+
+
+func _unwrap_pause_detail_panel(panel: PanelContainer) -> void:
+	# Achievements was historically wrapped in an extra page-level scroller.
+	# A Telegram fragment uses one full-height list instead, so remove that
+	# wrapper and let ItemList own vertical scrolling.
+	if panel.get_child_count() != 1 or not (panel.get_child(0) is ScrollContainer):
+		return
+	var wrapper := panel.get_child(0) as ScrollContainer
+	if wrapper.get_child_count() != 1:
+		return
+	var content := wrapper.get_child(0)
+	content.reparent(panel)
+	if content is Control:
+		var control := content as Control
+		control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		control.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wrapper.queue_free()
+
+
+func _layout_pause_detail_shell() -> void:
+	if not is_instance_valid(pause_detail_shell):
+		return
+	var tabs_height := 60.0
+	var base_action_height := 72.0
+	var base_bottom_height := 78.0
+	if is_instance_valid(telegram_navigation):
+		tabs_height = telegram_navigation.FILTER_TABS_HEIGHT
+		base_action_height = telegram_navigation.ACTION_BAR_PORTRAIT
+		base_bottom_height = telegram_navigation.BOTTOM_BAR_HEIGHT
+	var action_height := maxf(base_action_height, telegram_top_height - tabs_height)
+	var safe_top := maxf(0.0, action_height - base_action_height)
+	var safe_bottom := maxf(0.0, telegram_bottom_height - base_bottom_height)
+	pause_detail_action_bar.offset_bottom = action_height
+	pause_detail_action_safe_margin.add_theme_constant_override("margin_top", roundi(safe_top))
+	pause_detail_host.offset_top = action_height
+	pause_detail_host.offset_bottom = -safe_bottom
+
+
+func _show_pause_detail(panel: Control, title_text: String) -> void:
+	if not is_instance_valid(pause_detail_shell) or not is_instance_valid(panel):
+		return
+	pause_detail_back_to_pause = pause_popup_open
+	if pause_popup_open:
+		_hide_pause_popup(false, true)
+	if pause_detail_tween != null and pause_detail_tween.is_valid():
+		pause_detail_tween.kill()
+	if is_instance_valid(pause_detail_current) and pause_detail_current != panel:
+		pause_detail_current.hide()
+	if panel.get_parent() != pause_detail_host:
+		panel.reparent(pause_detail_host)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.custom_minimum_size = Vector2.ZERO
+	panel.position = Vector2.ZERO
+	panel.modulate = Color.WHITE
+	panel.show()
+	pause_detail_current = panel
+	pause_detail_title.text = title_text
+	_apply_telegram_page_style(panel)
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_interaction_enabled(false)
+	var width := get_viewport_rect().size.x
+	pause_detail_shell.position = Vector2(width, 0.0)
+	pause_detail_shell.show()
+	pause_detail_tween = create_tween()
+	pause_detail_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	pause_detail_tween.tween_property(pause_detail_shell, "position:x", 0.0, 0.26)
+
+
+func _close_pause_detail_shell() -> void:
+	if not is_instance_valid(pause_detail_shell) or not pause_detail_shell.visible:
+		return
+	if pause_detail_back_to_pause and not pause_popup_open:
+		_show_pause_popup()
+	if pause_detail_tween != null and pause_detail_tween.is_valid():
+		pause_detail_tween.kill()
+	pause_detail_tween = create_tween()
+	pause_detail_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
+	pause_detail_tween.tween_property(pause_detail_shell, "position:x", get_viewport_rect().size.x, 0.22)
+	pause_detail_tween.tween_callback(_finish_close_pause_detail_shell)
+
+
+func _finish_close_pause_detail_shell() -> void:
+	pause_detail_shell.hide()
+	pause_detail_shell.position = Vector2.ZERO
+	if is_instance_valid(pause_detail_current):
+		pause_detail_current.hide()
+	if is_instance_valid(telegram_navigation) and not pause_popup_open and (not is_instance_valid(settings_shell) or not settings_shell.visible):
+		telegram_navigation.set_interaction_enabled(true)
+
+
+func _hide_pause_detail_shell_immediate() -> void:
+	if not is_instance_valid(pause_detail_shell):
+		return
+	if pause_detail_tween != null and pause_detail_tween.is_valid():
+		pause_detail_tween.kill()
+	pause_detail_shell.hide()
+	pause_detail_shell.position = Vector2.ZERO
+	if is_instance_valid(pause_detail_current):
+		pause_detail_current.hide()
+	if is_instance_valid(telegram_navigation) and not pause_popup_open and (not is_instance_valid(settings_shell) or not settings_shell.visible):
+		telegram_navigation.set_interaction_enabled(true)
+
+
+func _show_settings_page(index: int, animated := true) -> void:
+	if settings_pages.is_empty():
+		return
+	index = clampi(index, 0, settings_pages.size() - 1)
+	if settings_swipe_dragging:
+		_reset_settings_drag()
+	if settings_page_tween != null and settings_page_tween.is_valid():
+		settings_page_tween.kill()
+	for page_index in settings_pages.size():
+		settings_pages[page_index].position = Vector2.ZERO
+		settings_pages[page_index].visible = page_index == settings_current_page
+	var outgoing := settings_pages[settings_current_page]
+	var incoming := settings_pages[index]
+	var direction := signi(index - settings_current_page)
+	settings_current_page = index
+	_update_settings_tab_states()
+	if is_instance_valid(settings_tabs_scroll):
+		settings_tabs_scroll.ensure_control_visible(settings_tab_buttons[index])
+	call_deferred("_move_settings_tab_indicator", index, animated)
+	var scroll := incoming.find_child("SettingsPageScroll", true, false) as ScrollContainer
+	if scroll != null:
+		scroll.scroll_vertical = 0
+	if outgoing == incoming or not animated or direction == 0:
+		for page_index in settings_pages.size():
+			settings_pages[page_index].visible = page_index == index
+		incoming.position = Vector2.ZERO
+		return
+	var width := maxf(settings_pager_host.size.x, get_viewport_rect().size.x)
+	outgoing.show()
+	incoming.position.x = float(direction) * width
+	incoming.show()
+	settings_page_tween = create_tween().set_parallel(true)
+	settings_page_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	settings_page_tween.tween_property(outgoing, "position:x", -float(direction) * width, 0.28)
+	settings_page_tween.tween_property(incoming, "position:x", 0.0, 0.28)
+	settings_page_tween.chain().tween_callback(_finish_settings_page_transition.bind(index))
+
+
+func _finish_settings_page_transition(index: int) -> void:
+	for page_index in settings_pages.size():
+		settings_pages[page_index].visible = page_index == index
+		settings_pages[page_index].position = Vector2.ZERO
+
+
+func _update_settings_tab_states() -> void:
+	for index in settings_tab_buttons.size():
+		var active := index == settings_current_page
+		settings_tab_buttons[index].add_theme_color_override("font_color", Color("#64b5ef") if active else Color("#9eabb7"))
+		settings_tab_buttons[index].add_theme_color_override("font_hover_color", Color("#8dccf4") if active else Color.WHITE)
+
+
+func _move_settings_tab_indicator(index: int, animated := true) -> void:
+	if index < 0 or index >= settings_tab_buttons.size() or not is_instance_valid(settings_tab_indicator):
+		return
+	var geometry := _get_settings_tab_indicator_geometry(index)
+	var target_x := geometry.x
+	var target_width := geometry.y
+	if animated:
+		var indicator_tween := create_tween().set_parallel(true)
+		indicator_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+		indicator_tween.tween_property(settings_tab_indicator, "position:x", target_x, 0.24)
+		indicator_tween.tween_property(settings_tab_indicator, "size:x", target_width, 0.24)
+	else:
+		settings_tab_indicator.position.x = target_x
+		settings_tab_indicator.size.x = target_width
+
+
+func _get_settings_tab_indicator_geometry(index: int) -> Vector2:
+	var button := settings_tab_buttons[index]
+	var font := button.get_theme_font("font")
+	var text_width := font.get_string_size(
+		button.text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		button.get_theme_font_size("font_size")
+	).x
+	var target_width := maxf(44.0, text_width + 28.0)
+	var target_x: float = button.global_position.x - (settings_tab_indicator.get_parent() as Control).global_position.x + (button.size.x - target_width) * 0.5
+	return Vector2(target_x, target_width)
+
+
+func _move_settings_tab_indicator_progress(from_index: int, to_index: int, progress: float) -> void:
+	if not is_instance_valid(settings_tab_indicator):
+		return
+	var from_geometry := _get_settings_tab_indicator_geometry(from_index)
+	var to_geometry := _get_settings_tab_indicator_geometry(to_index)
+	progress = clampf(progress, 0.0, 1.0)
+	settings_tab_indicator.position.x = lerpf(from_geometry.x, to_geometry.x, progress)
+	settings_tab_indicator.size.x = lerpf(from_geometry.y, to_geometry.y, progress)
+
+
+func _handle_settings_shell_swipe(event: InputEvent) -> bool:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			settings_swipe_start = event.position
+			settings_swipe_tracking = event.position.y >= telegram_top_height
+			settings_swipe_dragging = false
+			settings_swipe_velocity_x = 0.0
+			return false
+		if settings_swipe_tracking:
+			settings_swipe_tracking = false
+			if settings_swipe_dragging:
+				_settle_settings_drag()
+				return true
+			return false
+	elif event is InputEventScreenDrag and settings_swipe_tracking:
+		var delta: Vector2 = event.position - settings_swipe_start
+		settings_swipe_velocity_x = event.velocity.x
+		return _update_settings_drag(delta)
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			settings_swipe_start = event.position
+			settings_swipe_tracking = event.position.y >= telegram_top_height
+			settings_swipe_dragging = false
+			settings_swipe_velocity_x = 0.0
+			return false
+		if settings_swipe_tracking:
+			settings_swipe_tracking = false
+			if settings_swipe_dragging:
+				_settle_settings_drag()
+				return true
+			return false
+	elif event is InputEventMouseMotion and settings_swipe_tracking and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		var delta: Vector2 = event.position - settings_swipe_start
+		settings_swipe_velocity_x = event.velocity.x
+		return _update_settings_drag(delta)
+	return false
+
+
+func _update_settings_drag(delta: Vector2) -> bool:
+	if not settings_swipe_dragging:
+		if absf(delta.x) < 16.0 or absf(delta.x) <= absf(delta.y):
+			return false
+		_begin_settings_drag(1 if delta.x < 0.0 else -1)
+	var width := maxf(settings_pager_host.size.x, get_viewport_rect().size.x)
+	var drag_x := clampf(delta.x, -width, width)
+	if settings_swipe_direction > 0:
+		drag_x = minf(0.0, drag_x)
+	else:
+		drag_x = maxf(0.0, drag_x)
+	if settings_swipe_neighbor < 0:
+		drag_x *= 0.22
+	settings_swipe_drag_x = drag_x
+	var outgoing := settings_pages[settings_current_page]
+	outgoing.position.x = drag_x
+	if settings_swipe_neighbor >= 0:
+		var incoming := settings_pages[settings_swipe_neighbor]
+		incoming.position.x = drag_x + float(settings_swipe_direction) * width
+		_move_settings_tab_indicator_progress(
+			settings_current_page,
+			settings_swipe_neighbor,
+			absf(drag_x) / width
+		)
+	return true
+
+
+func _begin_settings_drag(direction: int) -> void:
+	if settings_page_tween != null and settings_page_tween.is_valid():
+		settings_page_tween.kill()
+	settings_swipe_dragging = true
+	settings_swipe_direction = direction
+	settings_swipe_neighbor = settings_current_page + direction
+	if settings_swipe_neighbor < 0 or settings_swipe_neighbor >= settings_pages.size():
+		settings_swipe_neighbor = -1
+	var outgoing := settings_pages[settings_current_page]
+	outgoing.position = Vector2.ZERO
+	outgoing.show()
+	if settings_swipe_neighbor >= 0:
+		var width := maxf(settings_pager_host.size.x, get_viewport_rect().size.x)
+		var incoming := settings_pages[settings_swipe_neighbor]
+		incoming.position = Vector2(float(direction) * width, 0.0)
+		incoming.show()
+
+
+func _settle_settings_drag() -> void:
+	if not settings_swipe_dragging:
+		return
+	var width := maxf(settings_pager_host.size.x, get_viewport_rect().size.x)
+	var velocity_commits := (
+		absf(settings_swipe_velocity_x) >= 900.0
+		and signf(settings_swipe_velocity_x) == -float(settings_swipe_direction)
+	)
+	var commit := (
+		settings_swipe_neighbor >= 0
+		and (absf(settings_swipe_drag_x) >= width / 3.0 or velocity_commits)
+	)
+	var outgoing := settings_pages[settings_current_page]
+	if settings_page_tween != null and settings_page_tween.is_valid():
+		settings_page_tween.kill()
+	settings_page_tween = create_tween().set_parallel(true)
+	settings_page_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	if commit:
+		var next_index := settings_swipe_neighbor
+		var incoming := settings_pages[next_index]
+		var remaining_ratio := 1.0 - absf(settings_swipe_drag_x) / width
+		var duration := clampf(0.14 + remaining_ratio * 0.16, 0.14, 0.30)
+		settings_current_page = next_index
+		_update_settings_tab_states()
+		if is_instance_valid(settings_tabs_scroll):
+			settings_tabs_scroll.ensure_control_visible(settings_tab_buttons[next_index])
+		settings_page_tween.tween_property(outgoing, "position:x", -float(settings_swipe_direction) * width, duration)
+		settings_page_tween.tween_property(incoming, "position:x", 0.0, duration)
+		settings_page_tween.tween_property(settings_tab_indicator, "position:x", _get_settings_tab_indicator_geometry(next_index).x, duration)
+		settings_page_tween.tween_property(settings_tab_indicator, "size:x", _get_settings_tab_indicator_geometry(next_index).y, duration)
+		settings_page_tween.chain().tween_callback(_finish_settings_drag.bind(next_index))
+	else:
+		var cancel_duration := clampf(0.14 + absf(settings_swipe_drag_x) / width * 0.12, 0.14, 0.26)
+		settings_page_tween.tween_property(outgoing, "position:x", 0.0, cancel_duration)
+		if settings_swipe_neighbor >= 0:
+			var incoming := settings_pages[settings_swipe_neighbor]
+			settings_page_tween.tween_property(incoming, "position:x", float(settings_swipe_direction) * width, cancel_duration)
+		var current_geometry := _get_settings_tab_indicator_geometry(settings_current_page)
+		settings_page_tween.tween_property(settings_tab_indicator, "position:x", current_geometry.x, cancel_duration)
+		settings_page_tween.tween_property(settings_tab_indicator, "size:x", current_geometry.y, cancel_duration)
+		settings_page_tween.chain().tween_callback(_cancel_settings_drag)
+
+
+func _finish_settings_drag(index: int) -> void:
+	_finish_settings_page_transition(index)
+	_reset_settings_drag(false)
+	call_deferred("_move_settings_tab_indicator", index, false)
+
+
+func _cancel_settings_drag() -> void:
+	_reset_settings_drag()
+	_move_settings_tab_indicator(settings_current_page, false)
+
+
+func _reset_settings_drag(hide_other_pages := true) -> void:
+	settings_swipe_tracking = false
+	settings_swipe_dragging = false
+	settings_swipe_direction = 0
+	settings_swipe_neighbor = -1
+	settings_swipe_drag_x = 0.0
+	settings_swipe_velocity_x = 0.0
+	for page_index in settings_pages.size():
+		settings_pages[page_index].position = Vector2.ZERO
+		if hide_other_pages:
+			settings_pages[page_index].visible = page_index == settings_current_page
+
+
+func _show_pause_popup() -> void:
+	if pause_popup_open:
+		return
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_interaction_enabled(false)
+		telegram_navigation.set_pause_active(true)
+	_apply_telegram_pause_style()
+	resume_button.show()
+	_layout_pause_popup()
+	pause_popup_open = true
+	pause_opened_over_page = (
+		menu_overlay.visible
+		and telegram_current_panel != null
+		and telegram_current_panel.visible
+	)
+	if not pause_opened_over_page:
+		menu_overlay.color = Color(0, 0, 0, 0)
+		menu_overlay.show()
+	pause_dim.modulate.a = 0.0
+	pause_dim.show()
+	menu_panel.modulate.a = 0.0
+	menu_panel.scale = Vector2(0.96, 0.96)
+	menu_panel.pivot_offset = menu_panel.size * 0.5
+	menu_panel.show()
+	if modal_transition_tween != null and modal_transition_tween.is_valid():
+		modal_transition_tween.kill()
+	modal_transition_tween = create_tween().set_parallel(true)
+	modal_transition_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	modal_transition_tween.tween_property(pause_dim, "modulate:a", 1.0, 0.16)
+	modal_transition_tween.tween_property(menu_panel, "modulate:a", 1.0, 0.18)
+	modal_transition_tween.tween_property(menu_panel, "scale", Vector2.ONE, 0.22)
+
+
+func _on_pause_dim_gui_input(event: InputEvent) -> void:
+	var pressed_outside: bool = false
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		pressed_outside = mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed
+	elif event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		pressed_outside = touch_event.pressed
+	if not pressed_outside:
+		return
+	get_viewport().set_input_as_handled()
+	_hide_pause_popup()
+
+
+func _hide_pause_popup(play_sound := true, immediate := false) -> void:
+	if not pause_popup_open:
+		return
+	pause_popup_open = false
+	if play_sound:
+		_play_ui_sound()
+	if modal_transition_tween != null and modal_transition_tween.is_valid():
+		modal_transition_tween.kill()
+	if immediate:
+		_finish_hide_pause_popup()
+		return
+	modal_transition_tween = create_tween().set_parallel(true)
+	modal_transition_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	modal_transition_tween.tween_property(pause_dim, "modulate:a", 0.0, 0.14)
+	modal_transition_tween.tween_property(menu_panel, "modulate:a", 0.0, 0.14)
+	modal_transition_tween.tween_property(menu_panel, "scale", Vector2(0.97, 0.97), 0.16)
+	modal_transition_tween.chain().tween_callback(_finish_hide_pause_popup)
+
+
+func _finish_hide_pause_popup() -> void:
+	pause_dim.hide()
+	pause_dim.modulate.a = 1.0
+	menu_panel.hide()
+	menu_panel.modulate.a = 1.0
+	menu_panel.scale = Vector2.ONE
+	if not pause_opened_over_page:
+		menu_overlay.hide()
+	menu_overlay.color = Color("#17212b")
+	pause_opened_over_page = false
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_pause_active(false)
+	if is_instance_valid(telegram_navigation) and (not is_instance_valid(settings_shell) or not settings_shell.visible):
+		telegram_navigation.set_interaction_enabled(true)
+
+
+func _layout_pause_popup() -> void:
+	if not is_instance_valid(menu_panel):
+		return
+	var viewport_size := get_viewport_rect().size
+	var horizontal_margin := clampf(viewport_size.x * 0.065, 20.0, 48.0)
+	if viewport_size.x < 360.0:
+		horizontal_margin = 1.0
+	var content_top := telegram_top_height + 12.0
+	var content_bottom := viewport_size.y - telegram_bottom_height - 12.0
+	var available_height := maxf(280.0, content_bottom - content_top)
+	var popup_width := minf(520.0, viewport_size.x - horizontal_margin * 2.0)
+	var desired_height := 740.0
+	var menu_items := menu_panel.find_child("MenuItems", true, false) as VBoxContainer
+	if menu_items != null:
+		desired_height = clampf(menu_items.get_combined_minimum_size().y + 28.0, 600.0, 740.0)
+	var popup_height := minf(desired_height, available_height)
+	var popup_left := (viewport_size.x - popup_width) * 0.5
+	var popup_top := content_top + (available_height - popup_height) * 0.5
+	# Explicit top-left geometry is stable even if a pager tween finishes while
+	# the modal is opening; it also keeps the dialog inside navigation insets.
+	menu_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	menu_panel.offset_left = popup_left
+	menu_panel.offset_top = popup_top
+	menu_panel.offset_right = popup_left + popup_width
+	menu_panel.offset_bottom = popup_top + popup_height
+	menu_panel.custom_minimum_size = Vector2.ZERO
+
+
+func _on_telegram_destination_requested(destination: String, direction: int) -> void:
+	if destination == "main":
+		_hide_menu_from_navigation()
+		telegram_navigation.set_destination(destination)
+		return
+	var panel := _prepare_telegram_destination(destination)
+	if panel == null:
+		return
+	telegram_pending_direction = direction
+	_show_overlay_panel(panel)
+	telegram_navigation.set_destination(destination)
+	_notify_telegram_destination(destination)
+
+
+func _notify_telegram_destination(destination: String) -> void:
+	match destination:
+		"skins":
+			_tutorial_notify("skins_opened")
+		"missions":
+			_tutorial_notify("missions_opened")
+		"inventory":
+			_tutorial_notify("inventory_opened")
+		"shop":
+			_tutorial_notify("shop_opened")
+		"upgrades":
+			_tutorial_notify("upgrades_opened")
+		"boosts":
+			_tutorial_notify("boosts_opened")
+
+
+func _on_telegram_pager_drag_started(direction: int) -> void:
+	if telegram_swipe_dragging:
+		return
+	_cancel_cat_press_for_navigation()
+	if telegram_page_transition != null and telegram_page_transition.is_valid():
+		telegram_page_transition.kill()
+	_reset_telegram_main_positions()
+	telegram_transition_serial += 1
+	telegram_swipe_dragging = true
+	telegram_swipe_direction = direction
+	telegram_swipe_drag_x = 0.0
+	telegram_swipe_velocity_x = 0.0
+	var current_destination: String = telegram_navigation.current_destination
+	var current_index: int = telegram_navigation.TOP_DESTINATIONS.find(current_destination)
+	var neighbor_index: int = current_index + direction
+	telegram_swipe_neighbor_destination = ""
+	if current_index >= 0 and neighbor_index >= 0 and neighbor_index < telegram_navigation.TOP_DESTINATIONS.size():
+		telegram_swipe_neighbor_destination = telegram_navigation.TOP_DESTINATIONS[neighbor_index]
+	telegram_swipe_outgoing_panel = null if current_destination == "main" else telegram_current_panel
+	telegram_swipe_incoming_panel = null
+	if not telegram_swipe_neighbor_destination.is_empty() and telegram_swipe_neighbor_destination != "main":
+		telegram_swipe_incoming_panel = _prepare_telegram_destination(telegram_swipe_neighbor_destination, false)
+
+	for candidate in _get_overlay_panels():
+		if candidate == menu_panel:
+			continue
+		if candidate != telegram_swipe_outgoing_panel and candidate != telegram_swipe_incoming_panel:
+			candidate.hide()
+	if is_instance_valid(telegram_swipe_outgoing_panel):
+		telegram_swipe_outgoing_panel.position = Vector2.ZERO
+		telegram_swipe_outgoing_panel.modulate = Color.WHITE
+		telegram_swipe_outgoing_panel.show()
+	if is_instance_valid(telegram_swipe_incoming_panel):
+		var width := maxf(telegram_pager_host.size.x, get_viewport_rect().size.x)
+		telegram_swipe_incoming_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		telegram_swipe_incoming_panel.position = Vector2(float(direction) * width, 0.0)
+		telegram_swipe_incoming_panel.modulate = Color.WHITE
+		telegram_swipe_incoming_panel.show()
+
+	var main_is_involved := current_destination == "main" or telegram_swipe_neighbor_destination == "main"
+	if main_is_involved:
+		_capture_telegram_main_positions()
+	if not telegram_swipe_neighbor_destination.is_empty() and (current_destination != "main" or telegram_swipe_neighbor_destination != "main"):
+		if not menu_overlay.visible and combo_timer != null:
+			combo_was_running_before_overlay = not combo_timer.is_stopped()
+			combo_time_left_before_overlay = combo_timer.time_left
+			if combo_was_running_before_overlay:
+				combo_timer.stop()
+			menu_time_pause_started = Time.get_unix_time_from_system()
+		menu_overlay.color = Color(0, 0, 0, 0)
+		menu_overlay.modulate = Color.WHITE
+		menu_overlay.show()
+
+
+func _on_telegram_pager_dragged(delta_x: float, velocity_x: float, direction: int) -> void:
+	if not telegram_swipe_dragging or direction != telegram_swipe_direction:
+		return
+	var width := maxf(telegram_pager_host.size.x, get_viewport_rect().size.x)
+	var drag_x := clampf(delta_x, -width, width)
+	if direction > 0:
+		drag_x = minf(0.0, drag_x)
+	else:
+		drag_x = maxf(0.0, drag_x)
+	if telegram_swipe_neighbor_destination.is_empty():
+		drag_x *= 0.22
+	telegram_swipe_drag_x = drag_x
+	telegram_swipe_velocity_x = velocity_x
+	var current_destination: String = telegram_navigation.current_destination
+	if current_destination == "main":
+		_set_telegram_main_offset(drag_x)
+	elif is_instance_valid(telegram_swipe_outgoing_panel):
+		telegram_swipe_outgoing_panel.position.x = drag_x
+	if not telegram_swipe_neighbor_destination.is_empty():
+		var neighbor_offset := float(direction) * width + drag_x
+		if telegram_swipe_neighbor_destination == "main":
+			_set_telegram_main_offset(neighbor_offset)
+		elif is_instance_valid(telegram_swipe_incoming_panel):
+			telegram_swipe_incoming_panel.position.x = neighbor_offset
+		telegram_navigation.preview_pager_drag(direction, absf(drag_x) / width)
+
+
+func _on_telegram_pager_drag_released(delta_x: float, velocity_x: float, direction: int) -> void:
+	if not telegram_swipe_dragging or direction != telegram_swipe_direction:
+		return
+	_on_telegram_pager_dragged(delta_x, velocity_x, direction)
+	var width := maxf(telegram_pager_host.size.x, get_viewport_rect().size.x)
+	var velocity_commits := (
+		absf(telegram_swipe_velocity_x) >= 900.0
+		and signf(telegram_swipe_velocity_x) == -float(direction)
+	)
+	var commit := (
+		not telegram_swipe_neighbor_destination.is_empty()
+		and (absf(telegram_swipe_drag_x) >= width / 3.0 or velocity_commits)
+	)
+	if telegram_page_transition != null and telegram_page_transition.is_valid():
+		telegram_page_transition.kill()
+	telegram_page_transition = create_tween().set_parallel(true)
+	telegram_page_transition.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	telegram_navigation.set_interaction_enabled(false)
+	if commit:
+		var remaining_ratio := 1.0 - absf(telegram_swipe_drag_x) / width
+		var duration := clampf(0.14 + remaining_ratio * 0.16, 0.14, 0.30)
+		var destination := telegram_swipe_neighbor_destination
+		telegram_navigation.set_destination(destination, true)
+		_play_ui_sound()
+		_notify_telegram_destination(destination)
+		var started_from_main := telegram_swipe_outgoing_panel == null and destination != "main"
+		if started_from_main:
+			_tween_telegram_main_to_offset(telegram_page_transition, -float(direction) * width, duration)
+		elif is_instance_valid(telegram_swipe_outgoing_panel):
+			telegram_page_transition.tween_property(
+				telegram_swipe_outgoing_panel,
+				"position:x",
+				-float(direction) * width,
+				duration
+			)
+		if destination == "main":
+			_tween_telegram_main_to_offset(telegram_page_transition, 0.0, duration)
+		elif is_instance_valid(telegram_swipe_incoming_panel):
+			telegram_page_transition.tween_property(telegram_swipe_incoming_panel, "position:x", 0.0, duration)
+		var serial := telegram_transition_serial
+		telegram_page_transition.chain().tween_callback(
+			_finish_telegram_swipe_commit.bind(destination, serial)
+		)
+	else:
+		var cancel_duration := clampf(0.14 + absf(telegram_swipe_drag_x) / width * 0.12, 0.14, 0.26)
+		var current_destination: String = telegram_navigation.current_destination
+		telegram_navigation.cancel_pager_preview()
+		if current_destination == "main":
+			_tween_telegram_main_to_offset(telegram_page_transition, 0.0, cancel_duration)
+		elif is_instance_valid(telegram_swipe_outgoing_panel):
+			telegram_page_transition.tween_property(telegram_swipe_outgoing_panel, "position:x", 0.0, cancel_duration)
+		if telegram_swipe_neighbor_destination == "main":
+			_tween_telegram_main_to_offset(telegram_page_transition, float(direction) * width, cancel_duration)
+		elif is_instance_valid(telegram_swipe_incoming_panel):
+			telegram_page_transition.tween_property(
+				telegram_swipe_incoming_panel,
+				"position:x",
+				float(direction) * width,
+				cancel_duration
+			)
+		telegram_page_transition.chain().tween_callback(_finish_telegram_swipe_cancel)
+
+
+func _finish_telegram_swipe_commit(destination: String, serial: int) -> void:
+	if serial != telegram_transition_serial:
+		return
+	_reset_telegram_main_positions()
+	for panel in _get_overlay_panels():
+		if panel == menu_panel:
+			continue
+		if panel != telegram_swipe_incoming_panel:
+			panel.hide()
+		panel.position = Vector2.ZERO
+		panel.modulate = Color.WHITE
+	if destination == "main":
+		telegram_current_panel = null
+		menu_overlay.hide()
+		menu_overlay.color = Color("#17212b")
+		_resume_combo_after_menu()
+	else:
+		telegram_current_panel = telegram_swipe_incoming_panel
+		if is_instance_valid(telegram_current_panel):
+			telegram_current_panel.position = Vector2.ZERO
+			telegram_current_panel.show()
+			call_deferred("_reset_panel_scroll", telegram_current_panel)
+		menu_overlay.color = Color("#17212b")
+		menu_overlay.show()
+	_reset_telegram_swipe_state()
+	telegram_navigation.set_interaction_enabled(true)
+
+
+func _finish_telegram_swipe_cancel() -> void:
+	var current_destination: String = telegram_navigation.current_destination
+	_reset_telegram_main_positions()
+	if is_instance_valid(telegram_swipe_incoming_panel):
+		telegram_swipe_incoming_panel.hide()
+		telegram_swipe_incoming_panel.position = Vector2.ZERO
+	if is_instance_valid(telegram_swipe_outgoing_panel):
+		telegram_swipe_outgoing_panel.position = Vector2.ZERO
+		telegram_swipe_outgoing_panel.show()
+	if current_destination == "main":
+		menu_overlay.hide()
+		menu_overlay.color = Color("#17212b")
+		_resume_combo_after_menu()
+	else:
+		menu_overlay.color = Color("#17212b")
+		menu_overlay.show()
+	telegram_navigation.cancel_pager_preview()
+	_reset_telegram_swipe_state()
+	telegram_navigation.set_interaction_enabled(true)
+
+
+func _reset_telegram_swipe_state() -> void:
+	telegram_swipe_dragging = false
+	telegram_swipe_direction = 0
+	telegram_swipe_neighbor_destination = ""
+	telegram_swipe_outgoing_panel = null
+	telegram_swipe_incoming_panel = null
+	telegram_swipe_drag_x = 0.0
+	telegram_swipe_velocity_x = 0.0
+
+
+func _prepare_telegram_destination(destination: String, play_sound := true) -> Control:
+	if play_sound:
+		_play_ui_sound()
+	match destination:
+		"shop":
+			food_panel_mode = "shop"
+			food_status_label.text = "Every food costs %s kibbles." % _format_number(FOOD_COST)
+			_update_food_ui()
+			_apply_telegram_page_style(food_panel)
+			_apply_food_grid_responsive_style()
+			return food_panel
+		"inventory":
+			food_panel_mode = "inventory"
+			food_status_label.text = "Your collected food and active consumables."
+			_update_food_ui()
+			_apply_telegram_page_style(food_panel)
+			_apply_food_grid_responsive_style()
+			return food_panel
+		"upgrades":
+			_update_upgrade_ui()
+			_update_stats_ui()
+			_update_daily_reward_ui()
+			_apply_telegram_page_style(upgrades_panel)
+			_apply_upgrades_responsive_layout()
+			_refresh_telegram_segment_buttons(upgrade_category_buttons, upgrade_active_category)
+			return upgrades_panel
+		"boosts":
+			boost_logic.update_ui()
+			_apply_telegram_page_style(boosts_panel)
+			_apply_boosts_responsive_layout()
+			_refresh_telegram_segment_buttons(boost_category_buttons, boost_active_category)
+			return boosts_panel
+		"skins":
+			var skin_data := _get_skin_data(equipped_skin_id)
+			skins_status_label.text = "Equipped: %s. %s" % [_get_equipped_skin_name(), _get_skin_bonus_text(skin_data)]
+			_set_skins_section("skins")
+			_update_skins_ui()
+			_apply_telegram_page_style(skins_panel)
+			_refresh_telegram_segment_buttons(skins_tab_buttons, skins_active_section)
+			_apply_skins_responsive_layout()
+			return skins_panel
+		"missions":
+			mission_logic.update_ui()
+			_apply_telegram_page_style(mission_logic.panel)
+			mission_logic.apply_responsive_layout()
+			return mission_logic.panel
+		"museum":
+			_rebuild_museum()
+			_apply_telegram_page_style(museum_panel)
+			_apply_museum_responsive_layout()
+			return museum_panel
+	return null
+
+
+func _hide_menu_from_navigation() -> void:
+	if pause_popup_open:
+		_hide_pause_popup(false, true)
+	telegram_transition_serial += 1
+	if telegram_page_transition != null and telegram_page_transition.is_valid():
+		telegram_page_transition.kill()
+	_reset_telegram_main_positions()
+	if menu_overlay.visible:
+		var outgoing := telegram_current_panel
+		if outgoing != null and outgoing.visible:
+			var width := maxf(telegram_pager_host.size.x, get_viewport_rect().size.x)
+			menu_overlay.color = Color(0, 0, 0, 0)
+			_capture_telegram_main_positions()
+			_set_telegram_main_offset(-width)
+			outgoing.position = Vector2.ZERO
+			outgoing.modulate = Color.WHITE
+			telegram_page_transition = create_tween().set_parallel(true)
+			telegram_page_transition.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+			telegram_page_transition.tween_property(outgoing, "position:x", width, 0.30)
+			_tween_telegram_main_to_base(telegram_page_transition, 0.30)
+			telegram_page_transition.chain().tween_callback(_finish_telegram_return_to_main)
+		else:
+			_finish_telegram_return_to_main()
+	if is_instance_valid(compact_inventory_panel):
+		compact_inventory_panel.hide()
+
+
+func _finish_telegram_return_to_main() -> void:
+	_reset_telegram_main_positions()
+	for panel in _get_overlay_panels():
+		# The pause popup is a centered modal, not a pager page. Resetting its
+		# position here races with opening Pause during the final pager frames.
+		if panel == menu_panel:
+			continue
+		panel.hide()
+		panel.position = Vector2.ZERO
+		panel.modulate = Color.WHITE
+	telegram_current_panel = null
+	if pause_popup_open:
+		# Pause may be opened while the last pager frame is still settling.
+		# Keep its dimmer and modal in the active GUI tree.
+		menu_overlay.color = Color(0, 0, 0, 0)
+		menu_overlay.show()
+		pause_opened_over_page = false
+	else:
+		menu_overlay.hide()
+		menu_overlay.color = Color("#17212b")
+	modal_closing = false
+	if not pause_popup_open:
+		_resume_combo_after_menu()
+
+
+func _capture_telegram_main_positions() -> void:
+	telegram_main_base_positions.clear()
+	for node in telegram_main_transition_nodes:
+		if is_instance_valid(node):
+			telegram_main_base_positions[node] = node.position
+
+
+func _set_telegram_main_offset(offset_x: float) -> void:
+	for node in telegram_main_base_positions.keys():
+		if is_instance_valid(node):
+			var base_position: Vector2 = telegram_main_base_positions[node]
+			(node as Control).position = base_position + Vector2(offset_x, 0.0)
+
+
+func _tween_telegram_main_to_base(tween: Tween, duration: float) -> void:
+	_tween_telegram_main_to_offset(tween, 0.0, duration)
+
+
+func _tween_telegram_main_to_offset(tween: Tween, offset_x: float, duration: float) -> void:
+	for node in telegram_main_base_positions.keys():
+		if is_instance_valid(node):
+			var base_position: Vector2 = telegram_main_base_positions[node]
+			tween.tween_property(node, "position", base_position + Vector2(offset_x, 0.0), duration)
+
+
+func _reset_telegram_main_positions() -> void:
+	for node in telegram_main_base_positions.keys():
+		if is_instance_valid(node):
+			var base_position: Vector2 = telegram_main_base_positions[node]
+			(node as Control).position = base_position
+	telegram_main_base_positions.clear()
+
+
+func _apply_telegram_page_style(panel: Control) -> void:
+	if panel is PanelContainer:
+		(panel as PanelContainer).add_theme_stylebox_override("panel", _telegram_style(Color("#17212b"), 0))
+	_apply_telegram_style_tree(panel, true)
+	_apply_telegram_root_spacing(panel)
+
+
+func _apply_telegram_style_tree(node: Node, is_root := false) -> void:
+	for child in node.get_children():
+		if child is PanelContainer:
+			var card := child as PanelContainer
+			card.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
+		elif child is Button:
+			var button := child as Button
+			var normalized_text := button.text.strip_edges().to_upper()
+			if normalized_text in ["BACK", "BACK TO GAME", "CLOSE", "RESUME"]:
+				button.hide()
+				continue
+			button.add_theme_color_override("font_color", Color("#d9e3ec"))
+			button.add_theme_color_override("font_hover_color", Color.WHITE)
+			button.add_theme_color_override("font_pressed_color", Color("#64b5ef"))
+			button.add_theme_color_override("font_disabled_color", Color("#81909e"))
+			button.add_theme_font_size_override("font_size", 20)
+			button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			button.add_theme_stylebox_override("normal", _telegram_style(Color("#1f2c38"), 9, 12.0, 8.0))
+			button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 9, 12.0, 8.0))
+			button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 9, 12.0, 8.0))
+			button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		elif child is Label:
+			var label := child as Label
+			label.add_theme_font_size_override("font_size", _get_telegram_readable_font_size(label))
+			if label.name == "SectionTitle":
+				label.add_theme_font_size_override("font_size", 20)
+				label.add_theme_color_override("font_color", Color("#64b5ef"))
+			elif label.name.to_lower().contains("subtitle") or label.name.to_lower().contains("caption"):
+				label.add_theme_font_size_override("font_size", 18)
+				label.add_theme_color_override("font_color", Color("#8d9baa"))
+			if label.get_theme_color("font_color").get_luminance() < 0.52:
+				label.add_theme_color_override("font_color", Color("#a8b5c1"))
+		elif child is ProgressBar:
+			var progress := child as ProgressBar
+			progress.add_theme_stylebox_override("background", _telegram_style(Color("#101820"), 4))
+			progress.add_theme_stylebox_override("fill", _telegram_style(Color("#4b9bd3"), 4))
+		_apply_telegram_style_tree(child)
+
+
+func _get_telegram_readable_font_size(label: Label) -> int:
+	if not label.has_meta("telegram_base_font_size"):
+		label.set_meta("telegram_base_font_size", label.get_theme_font_size("font_size"))
+	var base_size := int(label.get_meta("telegram_base_font_size"))
+	if base_size >= 30:
+		return 30
+	if base_size >= 22:
+		return 28
+	if base_size >= 19:
+		return 24
+	if base_size >= 17:
+		return 22
+	if base_size >= 15:
+		return 20
+	return 18
+
+
+func _refresh_telegram_segment_buttons(buttons: Dictionary, active_key: String) -> void:
+	var compact := get_viewport_rect().size.x < 520.0
+	var horizontal_padding := 4.0 if compact else 10.0
+	for key in buttons.keys():
+		var button := buttons[key] as Button
+		if button == null:
+			continue
+		var accent: Color = button.get_meta("telegram_segment_accent", Color("#64b5ef"))
+		var active := String(key) == active_key
+		var compact_font_size := 13 if button.text.length() > 8 else 16
+		button.add_theme_font_size_override("font_size", compact_font_size if compact else 20)
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		button.add_theme_color_override("font_color", accent.lightened(0.18) if active else Color("#a8b5c1"))
+		button.add_theme_color_override("font_hover_color", Color.WHITE)
+		button.add_theme_stylebox_override(
+			"normal",
+			_telegram_style(Color(accent.r, accent.g, accent.b, 0.18) if active else Color("#1f2c38"), 10, horizontal_padding, 6.0)
+		)
+		button.add_theme_stylebox_override(
+			"hover",
+			_telegram_style(Color(accent.r, accent.g, accent.b, 0.25) if active else Color("#293b4a"), 10, horizontal_padding, 6.0)
+		)
+		button.add_theme_stylebox_override(
+			"pressed",
+			_telegram_style(Color(accent.r, accent.g, accent.b, 0.32), 10, horizontal_padding, 6.0)
+		)
+		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _apply_telegram_root_spacing(panel: Control) -> void:
+	for child in panel.find_children("*", "MarginContainer", true, false):
+		var margin := child as MarginContainer
+		if margin.get_parent() == panel or margin.get_parent() is ScrollContainer:
+			margin.add_theme_constant_override("margin_left", 12)
+			margin.add_theme_constant_override("margin_top", 10)
+			margin.add_theme_constant_override("margin_right", 12)
+			margin.add_theme_constant_override("margin_bottom", 14)
+			for margin_child in margin.get_children():
+				if margin_child is VBoxContainer:
+					(margin_child as VBoxContainer).add_theme_constant_override("separation", 10)
+
+
+func _apply_telegram_settings_style() -> void:
+	_apply_telegram_page_style(settings_panel)
+	settings_header.add_theme_stylebox_override("panel", _telegram_style(Color("#17212b"), 0))
+	settings_header.custom_minimum_size.y = 68.0
+	var header_margin := settings_header.find_child("HeaderMargin", true, false) as MarginContainer
+	if header_margin != null:
+		_set_telegram_margins(header_margin, 8, 8, 8, 8)
+	var settings_title := settings_header.find_child("SettingsTitle", true, false) as Label
+	if settings_title != null:
+		settings_title.add_theme_font_size_override("font_size", 22)
+		settings_title.add_theme_color_override("font_color", Color("#f2f5f7"))
+		settings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	var settings_subtitle := settings_header.find_child("SettingsSubtitle", true, false) as Label
+	if settings_subtitle != null:
+		settings_subtitle.add_theme_font_size_override("font_size", 14)
+		settings_subtitle.add_theme_color_override("font_color", Color("#8d9baa"))
+		settings_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+	settings_wallet.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
+	settings_wallet.custom_minimum_size.y = 64.0
+	var settings_coin_icon := settings_wallet.find_child("SettingsCoinIcon", true, false) as TextureRect
+	if settings_coin_icon != null:
+		settings_coin_icon.custom_minimum_size = Vector2(28.0, 28.0)
+	menu_coins_label.add_theme_font_size_override("font_size", 20)
+	menu_coins_label.add_theme_color_override("font_color", Color("#d9e3ec"))
+
+	var cards: Array[PanelContainer] = [click_settings_card, audio_settings_card, offline_settings_card]
+	if is_instance_valid(performance_settings_card):
+		cards.append(performance_settings_card)
+	if is_instance_valid(touch_settings_card):
+		cards.append(touch_settings_card)
+	for card in cards:
+		_style_telegram_settings_card(card)
+
+	for slider in [click_power_slider, click_volume_slider, ui_volume_slider, particle_limit_slider]:
+		if is_instance_valid(slider):
+			_style_telegram_settings_slider(slider)
+	var settings_actions := settings_panel.find_child("SettingsActions", true, false) as HBoxContainer
+	if settings_actions != null:
+		settings_actions.add_theme_constant_override("separation", 0)
+	var settings_buttons: Array[Node] = []
+	var settings_options: Array[Node] = []
+	if not settings_page_contents.is_empty():
+		for page_content in settings_page_contents:
+			settings_buttons.append_array(page_content.find_children("*", "Button", true, false))
+			settings_options.append_array(page_content.find_children("*", "OptionButton", true, false))
+	else:
+		settings_buttons = settings_panel.find_children("*", "Button", true, false)
+		settings_options = settings_panel.find_children("*", "OptionButton", true, false)
+	for button in settings_buttons:
+		var settings_control := button as Button
+		if settings_control is CheckButton:
+			continue
+		settings_control.custom_minimum_size.y = maxf(64.0, settings_control.custom_minimum_size.y)
+		settings_control.add_theme_font_size_override("font_size", 20)
+		settings_control.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		settings_control.add_theme_color_override("font_color", Color("#d9e3ec"))
+		settings_control.add_theme_color_override("font_hover_color", Color.WHITE)
+		settings_control.add_theme_stylebox_override("normal", _telegram_style(Color("#1f2c38"), 8, 12.0, 7.0))
+		settings_control.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 12.0, 7.0))
+		settings_control.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 12.0, 7.0))
+		settings_control.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for option in settings_options:
+		var option_button := option as OptionButton
+		option_button.custom_minimum_size.y = 56.0
+		option_button.add_theme_font_size_override("font_size", 20)
+		option_button.add_theme_color_override("font_color", Color("#d9e3ec"))
+		option_button.add_theme_color_override("font_hover_color", Color.WHITE)
+		option_button.add_theme_color_override("font_pressed_color", Color.WHITE)
+		option_button.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 8, 10.0, 0.0))
+		option_button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 10.0, 0.0))
+		option_button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 10.0, 0.0))
+		option_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		option_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_style_settings_general_group()
+
+
+func _style_telegram_settings_card(card: PanelContainer) -> void:
+	card.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
+	var card_margin: MarginContainer
+	for direct_child in card.get_children():
+		if direct_child is MarginContainer:
+			card_margin = direct_child as MarginContainer
+			break
+	if card_margin != null:
+		_set_telegram_margins(card_margin, 16, 6, 16, 8)
+	var card_boxes := card.find_children("*", "VBoxContainer", true, false)
+	if not card_boxes.is_empty():
+		(card_boxes[0] as VBoxContainer).add_theme_constant_override("separation", 6)
+	var labels := card.find_children("*", "Label", true, false)
+	for index in labels.size():
+		var label := labels[index] as Label
+		if index == 0:
+			label.custom_minimum_size.y = 40.0
+			label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			label.add_theme_font_size_override("font_size", 20)
+			label.add_theme_color_override("font_color", Color("#64b5ef"))
+		elif label.get_theme_font_size("font_size") <= 14:
+			label.add_theme_font_size_override("font_size", 18)
+			label.add_theme_color_override("font_color", Color("#8d9baa"))
+		else:
+			label.add_theme_font_size_override("font_size", 20)
+			label.add_theme_color_override("font_color", Color("#d9e3ec"))
+	for icon_node in card.find_children("*", "TextureRect", true, false):
+		var icon := icon_node as TextureRect
+		if icon.custom_minimum_size.x <= 48.0 and icon.custom_minimum_size.y <= 48.0:
+			icon.custom_minimum_size = Vector2(28.0, 28.0)
+	for row_node in card.find_children("*", "HBoxContainer", true, false):
+		var row := row_node as HBoxContainer
+		row.custom_minimum_size.y = maxf(row.custom_minimum_size.y, 54.0)
+		row.add_theme_constant_override("separation", 10)
+	for check_node in card.find_children("*", "CheckButton", true, false):
+		var check := check_node as CheckButton
+		check.custom_minimum_size.y = 64.0
+		check.add_theme_font_size_override("font_size", 20)
+		check.add_theme_color_override("font_color", Color("#d9e3ec"))
+		check.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
+		check.add_theme_stylebox_override("pressed", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
+		check.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.04), 8, 6.0, 0.0))
+		check.add_theme_stylebox_override("hover_pressed", _telegram_style(Color(1, 1, 1, 0.04), 8, 6.0, 0.0))
+		check.add_theme_stylebox_override("disabled", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
+		check.add_theme_stylebox_override("disabled_pressed", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
+		check.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _style_telegram_settings_slider(slider: HSlider) -> void:
+	slider.custom_minimum_size.y = 42.0
+	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	slider.add_theme_stylebox_override("slider", _telegram_style(Color("#41515f"), 5, 0.0, 5.0))
+	slider.add_theme_stylebox_override("grabber_area", _telegram_style(Color("#4b9bd3"), 5, 0.0, 5.0))
+	slider.add_theme_stylebox_override("grabber_area_highlight", _telegram_style(Color("#64b5ef"), 5, 0.0, 5.0))
+	slider.add_theme_icon_override("grabber", load("res://assets/ui/navigation/slider_thumb.svg") as Texture2D)
+	slider.add_theme_icon_override("grabber_highlight", load("res://assets/ui/navigation/slider_thumb_hover.svg") as Texture2D)
+
+
+func _style_telegram_achievements_detail() -> void:
+	var title := achievements_panel.find_child("AchievementsTitle", true, false) as Label
+	if title != null:
+		title.hide()
+	var margin := achievements_panel.find_child("AchievementsMargin", true, false) as MarginContainer
+	if margin != null:
+		_set_telegram_margins(margin, 16, 14, 16, 20)
+	var items := achievements_panel.find_child("AchievementsItems", true, false) as VBoxContainer
+	if items != null:
+		items.alignment = BoxContainer.ALIGNMENT_BEGIN
+		items.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		items.add_theme_constant_override("separation", 10)
+	achievements_summary.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
+	achievements_progress_label.add_theme_font_size_override("font_size", 22)
+	achievements_progress_label.add_theme_color_override("font_color", Color("#d9e3ec"))
+	achievements_filter.custom_minimum_size = Vector2(0.0, 60.0)
+	achievements_filter.add_theme_font_size_override("font_size", 20)
+	achievements_filter.add_theme_color_override("font_color", Color("#d9e3ec"))
+	achievements_filter.add_theme_color_override("font_hover_color", Color.WHITE)
+	achievements_filter.add_theme_stylebox_override("normal", _telegram_style(Color("#1f2c38"), 9, 14.0, 8.0))
+	achievements_filter.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 9, 14.0, 8.0))
+	achievements_filter.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 9, 14.0, 8.0))
+	achievements_filter.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	achievements_filter.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	achievements_list.custom_minimum_size = Vector2(0.0, 180.0)
+	achievements_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	achievements_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	achievements_list.add_theme_font_size_override("font_size", 20)
+	achievements_list.add_theme_constant_override("line_separation", 14)
+	achievements_list.add_theme_color_override("font_color", Color("#a8b5c1"))
+	achievements_list.add_theme_color_override("font_selected_color", Color.WHITE)
+	achievements_list.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10, 10.0, 8.0))
+	achievements_list.add_theme_stylebox_override("focus", _telegram_style(Color("#1f2c38"), 10, 10.0, 8.0))
+	achievements_list.add_theme_stylebox_override("selected", _telegram_style(Color("#2b5278"), 8, 8.0, 5.0))
+	achievements_list.add_theme_stylebox_override("selected_focus", _telegram_style(Color("#2b5278"), 8, 8.0, 5.0))
+	achievements_list.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+
+func _style_telegram_stats_detail() -> void:
+	stats_header.hide()
+	var margin := stats_panel.find_child("StatsMargin", true, false) as MarginContainer
+	if margin != null:
+		_set_telegram_margins(margin, 12, 12, 12, 20)
+	var items := stats_panel.find_child("StatsItems", true, false) as VBoxContainer
+	if items != null:
+		items.add_theme_constant_override("separation", 8)
+	var scroll := stats_panel.find_child("StatsScroll", true, false) as ScrollContainer
+	if scroll != null:
+		scroll.custom_minimum_size = Vector2.ZERO
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	stats_cards.add_theme_constant_override("separation", 18)
+	var compact_grid := get_viewport_rect().size.x < 520.0
+	for grid_node in stats_cards.find_children("*", "GridContainer", true, false):
+		var grid := grid_node as GridContainer
+		grid.columns = 1 if compact_grid else 2
+		grid.add_theme_constant_override("h_separation", 10)
+		grid.add_theme_constant_override("v_separation", 10)
+	for card in stats_card_controls:
+		card.custom_minimum_size = Vector2(0.0, 86.0)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+
+func _apply_telegram_pause_style() -> void:
+	var compact := get_viewport_rect().size.x < 520.0
+	menu_panel.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 12))
+	var menu_margin := menu_panel.find_child("MenuMargin", true, false) as MarginContainer
+	if menu_margin != null:
+		_set_telegram_margins(menu_margin, 12 if compact else 16, 10 if compact else 14, 12 if compact else 16, 10 if compact else 14)
+	var menu_items := menu_panel.find_child("MenuItems", true, false) as VBoxContainer
+	if menu_items != null:
+		menu_items.add_theme_constant_override("separation", 2)
+	menu_header.add_theme_stylebox_override("panel", _telegram_style(Color(0, 0, 0, 0), 0))
+	var header_labels := menu_header.find_children("*", "Label", true, false)
+	for index in header_labels.size():
+		var header_label := header_labels[index] as Label
+		if index == 0:
+			header_label.add_theme_font_size_override("font_size", 24 if compact else 28)
+			header_label.add_theme_color_override("font_color", Color("#d9e3ec"))
+		else:
+			header_label.add_theme_font_size_override("font_size", 16 if compact else 18)
+			header_label.add_theme_color_override("font_color", Color("#8d9baa"))
+	menu_wallet.add_theme_stylebox_override("panel", _telegram_style(Color("#253443"), 10))
+	daily_reward_card.add_theme_stylebox_override("panel", _telegram_style(Color("#253443"), 10))
+	for button in [settings_button, achievements_button, stats_button, resume_button, exit_button]:
+		button.custom_minimum_size.x = 0.0
+		button.custom_minimum_size.y = 52.0 if compact else 60.0
+		button.add_theme_font_size_override("font_size", 18 if compact else 20)
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		button.add_theme_color_override("font_color", Color("#d9e3ec"))
+		button.add_theme_color_override("font_hover_color", Color.WHITE)
+		button.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 8, 12.0, 7.0))
+		button.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.055), 8, 12.0, 7.0))
+		button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 12.0, 7.0))
+		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	exit_button.add_theme_color_override("font_color", Color("#ef6b73"))
+	exit_button.add_theme_color_override("font_hover_color", Color("#ff858c"))
+
+
+func _set_telegram_margins(margin: MarginContainer, left: int, top: int, right: int, bottom: int) -> void:
+	margin.add_theme_constant_override("margin_left", left)
+	margin.add_theme_constant_override("margin_top", top)
+	margin.add_theme_constant_override("margin_right", right)
+	margin.add_theme_constant_override("margin_bottom", bottom)
+
+
+func _telegram_style(color: Color, radius: int, horizontal_padding := 0.0, vertical_padding := 0.0) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.corner_radius_top_left = radius
+	style.corner_radius_top_right = radius
+	style.corner_radius_bottom_left = radius
+	style.corner_radius_bottom_right = radius
+	style.content_margin_left = horizontal_padding
+	style.content_margin_right = horizontal_padding
+	style.content_margin_top = vertical_padding
+	style.content_margin_bottom = vertical_padding
+	return style
+
+
 func _show_overlay_panel(panel: Control) -> void:
+	if is_instance_valid(telegram_pager_host):
+		if pause_popup_open and panel != menu_panel:
+			_hide_pause_popup(false, true)
+		_show_telegram_pager_panel(panel, telegram_pending_direction)
+		telegram_pending_direction = 0
+		return
 	upgrade_alert_elapsed = 0.0
 	var overlay_was_visible := menu_overlay.visible
 	_stop_entrance_animations()
@@ -5707,8 +8104,117 @@ func _show_overlay_panel(panel: Control) -> void:
 	call_deferred("_reset_panel_scroll", panel)
 
 
+func _show_telegram_pager_panel(panel: Control, direction: int) -> void:
+	upgrade_alert_elapsed = 0.0
+	var overlay_was_visible := menu_overlay.visible
+	if not overlay_was_visible and combo_timer != null:
+		combo_was_running_before_overlay = not combo_timer.is_stopped()
+		combo_time_left_before_overlay = combo_timer.time_left
+		if combo_was_running_before_overlay:
+			combo_timer.stop()
+			menu_time_pause_started = Time.get_unix_time_from_system()
+	if telegram_page_transition != null and telegram_page_transition.is_valid():
+		telegram_page_transition.kill()
+	_reset_telegram_main_positions()
+	telegram_transition_serial += 1
+	var serial := telegram_transition_serial
+	var outgoing := telegram_current_panel
+	if outgoing == panel:
+		panel.show()
+		panel.position = Vector2.ZERO
+		panel.modulate = Color.WHITE
+		menu_overlay.show()
+		call_deferred("_reset_panel_scroll", panel)
+		return
+	for candidate in _get_overlay_panels():
+		if candidate != outgoing and candidate != panel:
+			candidate.hide()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.position = Vector2.ZERO
+	panel.scale = Vector2.ONE
+	panel.rotation = 0.0
+	panel.modulate = Color.WHITE
+	panel.show()
+	menu_overlay.modulate = Color.WHITE
+	menu_overlay.show()
+	if (outgoing == null or not overlay_was_visible) and direction != 0:
+		var width := maxf(telegram_pager_host.size.x, get_viewport_rect().size.x)
+		menu_overlay.color = Color(0, 0, 0, 0)
+		panel.position.x = float(direction) * width
+		_capture_telegram_main_positions()
+		telegram_page_transition = create_tween().set_parallel(true)
+		telegram_page_transition.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+		telegram_page_transition.tween_property(panel, "position:x", 0.0, 0.30)
+		for main_node in telegram_main_base_positions.keys():
+			if is_instance_valid(main_node):
+				var base_position: Vector2 = telegram_main_base_positions[main_node]
+				telegram_page_transition.tween_property(
+					main_node,
+					"position",
+					base_position + Vector2(-float(direction) * width, 0.0),
+					0.30
+				)
+		telegram_page_transition.chain().tween_callback(_finish_telegram_page_transition.bind(panel, outgoing, serial))
+	elif outgoing == null or not overlay_was_visible:
+		panel.modulate.a = 0.0
+		panel.position.y = 8.0
+		telegram_page_transition = create_tween().set_parallel(true)
+		telegram_page_transition.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+		telegram_page_transition.tween_property(panel, "modulate:a", 1.0, 0.16)
+		telegram_page_transition.tween_property(panel, "position:y", 0.0, 0.22)
+		telegram_page_transition.chain().tween_callback(_finish_telegram_page_transition.bind(panel, outgoing, serial))
+	elif direction == 0:
+		panel.modulate.a = 0.0
+		telegram_page_transition = create_tween().set_parallel(true)
+		telegram_page_transition.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		telegram_page_transition.tween_property(outgoing, "modulate:a", 0.0, 0.12)
+		telegram_page_transition.tween_property(panel, "modulate:a", 1.0, 0.16)
+		telegram_page_transition.chain().tween_callback(_finish_telegram_page_transition.bind(panel, outgoing, serial))
+	else:
+		var width := maxf(telegram_pager_host.size.x, get_viewport_rect().size.x)
+		panel.position.x = float(direction) * width
+		outgoing.position = Vector2.ZERO
+		outgoing.modulate = Color.WHITE
+		telegram_page_transition = create_tween().set_parallel(true)
+		# Telegram's ViewPagerFixed uses an ease-out-quint curve and moves both
+		# real page views across the complete viewport.
+		telegram_page_transition.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+		telegram_page_transition.tween_property(outgoing, "position:x", -float(direction) * width, 0.30)
+		telegram_page_transition.tween_property(panel, "position:x", 0.0, 0.30)
+		telegram_page_transition.chain().tween_callback(_finish_telegram_page_transition.bind(panel, outgoing, serial))
+	telegram_current_panel = panel
+	call_deferred("_reset_panel_scroll", panel)
+
+
+func _finish_telegram_page_transition(panel: Control, outgoing: Control, serial: int) -> void:
+	if serial != telegram_transition_serial:
+		return
+	if outgoing != null and outgoing != panel:
+		outgoing.hide()
+		outgoing.position = Vector2.ZERO
+		outgoing.modulate = Color.WHITE
+	panel.position = Vector2.ZERO
+	panel.modulate = Color.WHITE
+	_reset_telegram_main_positions()
+	menu_overlay.color = Color("#17212b")
+	telegram_current_panel = panel
+
+
 func _hide_menu() -> void:
+	if is_instance_valid(settings_shell) and settings_shell.visible:
+		_close_settings_shell()
+		return
+	if is_instance_valid(pause_detail_shell) and pause_detail_shell.visible:
+		_close_pause_detail_shell()
+		return
 	if not menu_overlay.visible or modal_closing:
+		return
+	if pause_popup_open:
+		_hide_pause_popup()
+		return
+	if is_instance_valid(telegram_pager_host):
+		telegram_navigation.set_destination("main")
+		_hide_menu_from_navigation()
 		return
 	modal_closing = true
 	_play_ui_sound()
