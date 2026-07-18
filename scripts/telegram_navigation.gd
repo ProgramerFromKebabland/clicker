@@ -8,20 +8,32 @@ signal pager_dragged(delta_x: float, velocity_x: float, direction: int)
 signal pager_drag_released(delta_x: float, velocity_x: float, direction: int)
 
 const TOP_DESTINATIONS: Array[String] = ["main", "skins", "missions", "museum", "inventory"]
-const BOTTOM_DESTINATIONS: Array[String] = ["shop", "pause", "main", "upgrades", "boosts"]
+const BOTTOM_DESTINATIONS: Array[String] = ["shop", "main", "upgrades", "boosts"]
 const TOP_LABELS: Array[String] = ["Main", "Skin", "Mission", "Museum", "Inventory"]
-const BOTTOM_LABELS: Array[String] = ["Shop", "Pause", "Main", "Upgrades", "Boosts"]
+const BOTTOM_LABELS: Array[String] = ["Shop", "Main", "Upgrades", "Boosts"]
 const BOTTOM_ICON_PATHS: Array[String] = [
 	"res://assets/ui/navigation/shop.svg",
-	"res://assets/ui/navigation/pause.svg",
 	"res://assets/ui/navigation/main.svg",
 	"res://assets/ui/navigation/upgrades.svg",
 	"res://assets/ui/navigation/boosts.svg",
 ]
-const TELEGRAM_BLUE := Color("#5aa9e6")
-const SURFACE := Color("#17212b")
-const SURFACE_RAISED := Color("#202f3d")
-const TEXT_MUTED := Color("#8d9baa")
+const GOLD_ACCENT := Color("#f2b84b")
+const SURFACE := Color(0.035, 0.038, 0.045, 0.98)
+const SURFACE_RAISED := Color(0.06, 0.066, 0.078, 0.98)
+const TEXT_MUTED := Color("#a5adbb")
+const TOP_ACCENTS: Array[Color] = [
+	GOLD_ACCENT,
+	Color(0.36, 0.82, 1.0),
+	Color(0.3, 0.9, 0.5),
+	Color(0.92, 0.58, 0.22),
+	Color(0.96, 0.68, 0.26),
+]
+const BOTTOM_ACCENTS: Array[Color] = [
+	Color(0.96, 0.68, 0.26),
+	GOLD_ACCENT,
+	Color(0.25, 0.78, 1.0),
+	Color(0.68, 0.42, 1.0),
+]
 # Telegram measures these surfaces in density-independent pixels. The project
 # renders a 720-wide canvas into a 540-wide debug/mobile window, so slightly
 # larger design-space values preserve Telegram's physical touch targets.
@@ -50,8 +62,9 @@ var tabs_background: PanelContainer
 var tabs_container: HBoxContainer
 var bottom_safe_margin: MarginContainer
 var bottom_row: Control
-var top_height := ACTION_BAR_PORTRAIT + FILTER_TABS_HEIGHT
+var top_height := FILTER_TABS_HEIGHT
 var bottom_height := BOTTOM_BAR_HEIGHT
+var safe_top_inset := 0.0
 var touch_start := Vector2.ZERO
 var touch_last := Vector2.ZERO
 var tracking_swipe := false
@@ -82,7 +95,10 @@ func _build_top_bar() -> void:
 	top_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top_bar.offset_bottom = top_height
 	top_bar.mouse_filter = Control.MOUSE_FILTER_PASS
-	top_bar.add_theme_stylebox_override("panel", _flat_style(SURFACE, 0.0))
+	top_bar.add_theme_stylebox_override(
+		"panel",
+		_game_style(SURFACE, 0.0, Color(1.0, 1.0, 1.0, 0.1), 1, 5)
+	)
 	add_child(top_bar)
 
 	var stack := VBoxContainer.new()
@@ -92,51 +108,30 @@ func _build_top_bar() -> void:
 	title_safe_margin = MarginContainer.new()
 	stack.add_child(title_safe_margin)
 	title_row = HBoxContainer.new()
-	title_row.custom_minimum_size.y = ACTION_BAR_PORTRAIT
-	title_row.add_theme_constant_override("separation", 8)
+	title_row.custom_minimum_size.y = 0.0
 	title_safe_margin.add_child(title_row)
-
-	var title_margin := MarginContainer.new()
-	title_margin.add_theme_constant_override("margin_left", 20)
-	title_margin.add_theme_constant_override("margin_right", 12)
-	title_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(title_margin)
-	var title := Label.new()
-	title.text = "Kebab Clicker"
-	title.add_theme_font_size_override("font_size", 25)
-	title.add_theme_color_override("font_color", Color.WHITE)
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title_margin.add_child(title)
-
-	var search := Button.new()
-	search.text = "⌕"
-	search.flat = true
-	search.custom_minimum_size = Vector2(50, 48)
-	search.add_theme_font_size_override("font_size", 29)
-	search.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	search.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	title_row.add_child(search)
-	var more := Button.new()
-	more.text = "⋮"
-	more.flat = true
-	more.custom_minimum_size = Vector2(48, 48)
-	more.add_theme_font_size_override("font_size", 25)
-	more.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	title_row.add_child(more)
 
 	tabs_background = PanelContainer.new()
 	tabs_background.custom_minimum_size.y = FILTER_TABS_HEIGHT
-	tabs_background.add_theme_stylebox_override("panel", _flat_style(SURFACE_RAISED, 0.0))
+	tabs_background.add_theme_stylebox_override(
+		"panel",
+		_game_style(SURFACE_RAISED, 0.0, Color(1.0, 1.0, 1.0, 0.08), 1, 2)
+	)
 	stack.add_child(tabs_background)
 	var tabs_layer := Control.new()
 	tabs_layer.mouse_filter = Control.MOUSE_FILTER_PASS
 	tabs_background.add_child(tabs_layer)
 
 	indicator = PanelContainer.new()
-	# Telegram FilterTabsView uses a centered 28dp pill at alpha 31/255.
 	indicator.add_theme_stylebox_override(
 		"panel",
-		_flat_style(Color(0.35, 0.66, 0.88, 31.0 / 255.0), 14.0)
+		_game_style(
+			Color(GOLD_ACCENT.r, GOLD_ACCENT.g, GOLD_ACCENT.b, 0.2),
+			16.0,
+			Color(GOLD_ACCENT.r, GOLD_ACCENT.g, GOLD_ACCENT.b, 0.55),
+			1,
+			3
+		)
 	)
 	indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	indicator.position.y = (FILTER_TABS_HEIGHT - 34.0) * 0.5
@@ -158,16 +153,17 @@ func _build_top_bar() -> void:
 	tabs_container.add_theme_constant_override("separation", 2)
 	top_scroll.add_child(tabs_container)
 	for index in TOP_LABELS.size():
+		var accent := TOP_ACCENTS[index]
 		var button := Button.new()
 		button.text = TOP_LABELS[index]
-		button.flat = true
+		button.flat = false
 		button.custom_minimum_size = Vector2(96, FILTER_TABS_HEIGHT)
 		button.add_theme_font_size_override("font_size", 20)
 		button.add_theme_color_override("font_color", TEXT_MUTED)
 		button.add_theme_color_override("font_hover_color", Color.WHITE)
-		button.add_theme_stylebox_override("normal", _flat_style(Color(0, 0, 0, 0), 10.0))
-		button.add_theme_stylebox_override("hover", _flat_style(Color(1, 1, 1, 0.055), 10.0))
-		button.add_theme_stylebox_override("pressed", _flat_style(Color(1, 1, 1, 0.075), 10.0))
+		button.add_theme_stylebox_override("normal", _old_button_style(accent, "normal"))
+		button.add_theme_stylebox_override("hover", _old_button_style(accent, "hover"))
+		button.add_theme_stylebox_override("pressed", _old_button_style(accent, "pressed"))
 		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		button.pressed.connect(_request_destination.bind(TOP_DESTINATIONS[index]))
@@ -181,9 +177,11 @@ func _build_bottom_bar() -> void:
 	bottom_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom_bar.offset_top = -bottom_height
 	bottom_bar.mouse_filter = Control.MOUSE_FILTER_PASS
-	var bottom_style := _flat_style(SURFACE, 0.0)
+	var bottom_style := _game_style(SURFACE, 0.0, Color(1.0, 1.0, 1.0, 0.1), 1, 5)
 	bottom_style.border_width_top = 1
-	bottom_style.border_color = Color("#263746")
+	bottom_style.border_width_left = 0
+	bottom_style.border_width_right = 0
+	bottom_style.border_width_bottom = 0
 	bottom_bar.add_theme_stylebox_override("panel", bottom_style)
 	add_child(bottom_bar)
 
@@ -206,13 +204,18 @@ func _build_bottom_bar() -> void:
 		button.anchor_bottom = 1.0
 		button.anchor_left = float(index) / float(BOTTOM_LABELS.size())
 		button.anchor_right = float(index + 1) / float(BOTTOM_LABELS.size())
+		button.offset_left = 3.0
+		button.offset_top = 4.0
+		button.offset_right = -3.0
+		button.offset_bottom = -4.0
 		if is_main:
-			button.offset_left = -4.0
-			button.offset_top = -5.0
-			button.offset_right = 4.0
+			button.offset_top = -3.0
 			button.z_index = 2
-		for state in ["normal", "hover", "pressed", "focus"]:
-			button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		var accent := BOTTOM_ACCENTS[index]
+		button.add_theme_stylebox_override("normal", _old_button_style(accent, "normal"))
+		button.add_theme_stylebox_override("hover", _old_button_style(accent, "hover"))
+		button.add_theme_stylebox_override("pressed", _old_button_style(accent, "pressed"))
+		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		button.pressed.connect(_request_destination.bind(destination))
 		button.mouse_entered.connect(_set_bottom_hovered.bind(index, true))
@@ -267,14 +270,14 @@ func _apply_responsive_metrics() -> void:
 	var viewport_size := get_viewport_rect().size
 	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
 		return
-	var landscape := viewport_size.x > viewport_size.y
 	var safe_insets := _get_mobile_safe_insets(viewport_size)
-	var action_height := ACTION_BAR_LANDSCAPE if landscape else ACTION_BAR_PORTRAIT
+	var action_height := 0.0
 	var next_top_height := safe_insets.y + action_height + FILTER_TABS_HEIGHT
 	var next_bottom_height := BOTTOM_BAR_HEIGHT + safe_insets.w
 	var metrics_changed := not is_equal_approx(top_height, next_top_height) or not is_equal_approx(bottom_height, next_bottom_height)
 	top_height = next_top_height
 	bottom_height = next_bottom_height
+	safe_top_inset = safe_insets.y
 	top_bar.offset_bottom = top_height
 	title_safe_margin.add_theme_constant_override("margin_top", roundi(safe_insets.y))
 	title_row.custom_minimum_size.y = action_height
@@ -359,6 +362,10 @@ func get_top_height() -> float:
 
 func get_bottom_height() -> float:
 	return bottom_height
+
+
+func get_safe_top() -> float:
+	return safe_top_inset
 
 
 func _input(event: InputEvent) -> void:
@@ -460,17 +467,21 @@ func set_interaction_enabled(enabled: bool) -> void:
 func _select_destination(destination: String, animated: bool) -> void:
 	for index in top_buttons.size():
 		var active: bool = TOP_DESTINATIONS[index] == destination
-		top_buttons[index].add_theme_color_override("font_color", TELEGRAM_BLUE if active else TEXT_MUTED)
-		top_buttons[index].add_theme_color_override("font_hover_color", Color("#8dccf4") if active else Color.WHITE)
+		var top_accent := TOP_ACCENTS[index]
+		top_buttons[index].add_theme_color_override("font_color", top_accent.lightened(0.2) if active else Color(0.88, 0.91, 0.96, 1.0))
+		top_buttons[index].add_theme_color_override("font_hover_color", Color.WHITE)
+		top_buttons[index].add_theme_stylebox_override("normal", _old_button_style(top_accent, "normal", active))
 	var active_bottom_destination := "pause" if pause_active else ("main" if destination in TOP_DESTINATIONS else destination)
 	for index in bottom_buttons.size():
 		var active: bool = BOTTOM_DESTINATIONS[index] == active_bottom_destination
+		var bottom_accent := BOTTOM_ACCENTS[index]
 		bottom_active[index] = active
-		bottom_icon_views[index].modulate = TELEGRAM_BLUE if active else TEXT_MUTED
-		bottom_labels[index].add_theme_color_override("font_color", TELEGRAM_BLUE if active else TEXT_MUTED)
+		bottom_icon_views[index].modulate = bottom_accent.lightened(0.16) if active else Color(0.82, 0.85, 0.91, 1.0)
+		bottom_labels[index].add_theme_color_override("font_color", bottom_accent.lightened(0.16) if active else Color(0.82, 0.85, 0.91, 1.0))
 		_refresh_bottom_selector(index)
 	var top_index := TOP_DESTINATIONS.find(destination)
 	if top_index >= 0:
+		_set_indicator_accent(TOP_ACCENTS[top_index])
 		_move_indicator(top_index, animated)
 	else:
 		indicator.hide()
@@ -494,12 +505,23 @@ func _refresh_bottom_selector(index: int) -> void:
 		alpha = 0.18
 	elif bottom_hovered[index]:
 		alpha = 0.11
-	var foreground := TELEGRAM_BLUE if bottom_active[index] else (Color("#c2d4e2") if bottom_hovered[index] else TEXT_MUTED)
+	var accent := BOTTOM_ACCENTS[index]
+	var foreground := accent.lightened(0.12) if bottom_active[index] else (Color("#d4dae4") if bottom_hovered[index] else TEXT_MUTED)
 	bottom_icon_views[index].modulate = foreground
 	bottom_labels[index].add_theme_color_override("font_color", foreground)
 	bottom_selectors[index].add_theme_stylebox_override(
 		"panel",
-		_flat_style(Color(0.35, 0.66, 0.88, alpha), 19.0 if BOTTOM_DESTINATIONS[index] == "main" else 18.0)
+		_game_style(
+			Color(accent.r, accent.g, accent.b, alpha),
+			19.0 if BOTTOM_DESTINATIONS[index] == "main" else 18.0,
+			Color(accent.r, accent.g, accent.b, 0.5 if bottom_active[index] else (0.24 if bottom_hovered[index] else 0.0)),
+			1 if alpha > 0.0 else 0,
+			4 if bottom_active[index] else 0
+		)
+	)
+	bottom_buttons[index].add_theme_stylebox_override(
+		"normal",
+		_old_button_style(accent, "hover" if bottom_hovered[index] else "normal", bottom_active[index])
 	)
 
 
@@ -551,14 +573,16 @@ func preview_pager_drag(direction: int, progress: float) -> void:
 	progress = clampf(progress, 0.0, 1.0)
 	var from_geometry := _get_indicator_geometry(from_index)
 	var to_geometry := _get_indicator_geometry(to_index)
+	var preview_accent := TOP_ACCENTS[from_index].lerp(TOP_ACCENTS[to_index], progress)
+	_set_indicator_accent(preview_accent)
 	indicator.position.x = lerpf(from_geometry.x, to_geometry.x, progress)
 	indicator.size.x = lerpf(from_geometry.y, to_geometry.y, progress)
 	for index in top_buttons.size():
 		var color := TEXT_MUTED
 		if index == from_index:
-			color = TELEGRAM_BLUE.lerp(TEXT_MUTED, progress)
+			color = TOP_ACCENTS[from_index].lightened(0.16).lerp(TEXT_MUTED, progress)
 		elif index == to_index:
-			color = TEXT_MUTED.lerp(TELEGRAM_BLUE, progress)
+			color = TEXT_MUTED.lerp(TOP_ACCENTS[to_index].lightened(0.16), progress)
 		top_buttons[index].add_theme_color_override("font_color", color)
 
 
@@ -570,11 +594,54 @@ func _refresh_indicator() -> void:
 	_select_destination(current_destination, false)
 
 
-func _flat_style(color: Color, radius: float) -> StyleBoxFlat:
+func _set_indicator_accent(accent: Color) -> void:
+	indicator.add_theme_stylebox_override(
+		"panel",
+		_game_style(
+			Color(accent.r, accent.g, accent.b, 0.2),
+			16.0,
+			Color(accent.r, accent.g, accent.b, 0.55),
+			1,
+			3
+		)
+	)
+
+
+func _old_button_style(accent: Color, state: String, active := false) -> StyleBoxFlat:
+	var background := Color(accent.r, accent.g, accent.b, 0.18)
+	var border := Color(accent.r, accent.g, accent.b, 0.24)
+	var shadow_size := 0
+	if state == "hover":
+		background = Color(accent.r, accent.g, accent.b, 0.3)
+		border = Color(accent.r, accent.g, accent.b, 0.48)
+		shadow_size = 3
+	elif state == "pressed":
+		background = Color(accent.r, accent.g, accent.b, 0.42)
+		border = Color(1.0, 1.0, 1.0, 0.42)
+	elif active:
+		background = Color(accent.r, accent.g, accent.b, 0.34)
+		border = Color(accent.r, accent.g, accent.b, 0.68)
+		shadow_size = 4
+	return _game_style(background, 16.0, border, 1, shadow_size)
+
+
+func _game_style(
+	color: Color,
+	radius: float,
+	border := Color(0.0, 0.0, 0.0, 0.0),
+	border_width := 0,
+	shadow_size := 0
+) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
+	style.border_color = border
+	style.set_border_width_all(border_width)
 	style.corner_radius_top_left = int(radius)
 	style.corner_radius_top_right = int(radius)
 	style.corner_radius_bottom_left = int(radius)
 	style.corner_radius_bottom_right = int(radius)
+	if shadow_size > 0:
+		style.shadow_color = Color(0.0, 0.0, 0.0, 0.42)
+		style.shadow_size = shadow_size
+		style.shadow_offset = Vector2(0.0, 3.0)
 	return style

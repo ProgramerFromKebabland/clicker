@@ -22,6 +22,12 @@ const MUSEUM_UI_ICON = preload("res://assets/ui/museum.png")
 const SKINS_UI_ICON = preload("res://assets/ui/skins.png")
 const SETTINGS_ICON_SHEET_PATH := "res://assets/ui/settings_icons.png"
 const SETTINGS_PAGE_LABELS: Array[String] = ["General", "Performance", "Audio", "Controls"]
+const NORMAL_SHELL_BACKGROUND := Color(0.018, 0.021, 0.028, 1.0)
+const NORMAL_SHELL_SURFACE := Color(0.035, 0.038, 0.045, 0.98)
+const NORMAL_SHELL_RAISED := Color(0.06, 0.066, 0.078, 0.98)
+const NORMAL_SHELL_TEXT := Color(0.94, 0.97, 1.0, 1.0)
+const NORMAL_SHELL_MUTED := Color(0.64, 0.68, 0.75, 1.0)
+const NORMAL_SHELL_GOLD := Color(0.95, 0.72, 0.3, 1.0)
 
 var telegram_navigation: Control
 var telegram_page_transition: Tween
@@ -798,6 +804,7 @@ func _ready() -> void:
 	_build_admin_panel()
 	_prepare_mobile_panels()
 	_setup_modal_navigation()
+	_apply_normal_button_style_tree(self)
 	_build_telegram_navigation()
 	_apply_mobile_layout()
 	# Several setup passes above replace styleboxes. Reapply the loaded preference
@@ -810,7 +817,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if not dragged_food_id.is_empty():
+	# Screen-drag events own the preview position on touch devices. Polling the
+	# emulated mouse at the same time makes the food snap back under the finger.
+	if not dragged_food_id.is_empty() and dragged_food_touch_index < 0:
 		_update_food_drag_preview(get_viewport().get_mouse_position())
 	if boost_logic != null:
 		boost_logic.process(delta)
@@ -1654,7 +1663,7 @@ func _rebuild_museum() -> void:
 		cat_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		cat_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		cat_name.add_theme_font_size_override("font_size", 18)
-		cat_name.add_theme_color_override("font_color", Color("#d9e3ec") if owned else Color("#81909e"))
+		cat_name.add_theme_color_override("font_color", Color(0.92, 0.95, 1.0, 1.0) if owned else Color(0.48, 0.52, 0.61, 1.0))
 		stack.add_child(cat_name)
 		cat_grid.add_child(portrait)
 
@@ -1925,7 +1934,10 @@ func _build_food_ui() -> void:
 	food_empty_state = PanelContainer.new()
 	food_empty_state.name = "FoodEmptyState"
 	food_empty_state.custom_minimum_size.y = 260.0
-	food_empty_state.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 12))
+	food_empty_state.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(Color(0.075, 0.06, 0.035, 0.92), Color(0.96, 0.68, 0.26, 0.42), 18, 1, -1, 3)
+	)
 	food_scroll_content.add_child(food_empty_state)
 	var empty_margin := MarginContainer.new()
 	_set_telegram_margins(empty_margin, 24, 28, 24, 28)
@@ -1938,26 +1950,26 @@ func _build_food_ui() -> void:
 	empty_icon.text = "◇"
 	empty_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	empty_icon.add_theme_font_size_override("font_size", 38)
-	empty_icon.add_theme_color_override("font_color", Color("#64b5ef"))
+	empty_icon.add_theme_color_override("font_color", Color(1.0, 0.76, 0.32, 1.0))
 	empty_content.add_child(empty_icon)
 	var empty_title := Label.new()
 	empty_title.text = "NO BOOSTS YET"
 	empty_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	empty_title.add_theme_font_size_override("font_size", 24)
-	empty_title.add_theme_color_override("font_color", Color("#d9e3ec"))
+	empty_title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.62, 1.0))
 	empty_content.add_child(empty_title)
 	var empty_caption := Label.new()
 	empty_caption.text = "Buy a snack in Shop. It will appear here when it is ready to use."
 	empty_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	empty_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	empty_caption.add_theme_font_size_override("font_size", 18)
-	empty_caption.add_theme_color_override("font_color", Color("#9eabb7"))
+	empty_caption.add_theme_color_override("font_color", Color(0.68, 0.72, 0.8, 1.0))
 	empty_content.add_child(empty_caption)
 	var empty_shop_button := Button.new()
 	empty_shop_button.name = "EmptyInventoryShopButton"
 	empty_shop_button.text = "OPEN SHOP"
 	empty_shop_button.custom_minimum_size.y = 60.0
-	_style_upgrade_button(empty_shop_button, Color("#4b9bd3"))
+	_style_upgrade_button(empty_shop_button, Color(0.96, 0.68, 0.26, 1.0))
 	empty_shop_button.pressed.connect(_open_shop_from_inventory)
 	empty_content.add_child(empty_shop_button)
 
@@ -2116,15 +2128,19 @@ func _create_food_card(index: int) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(0.0, 154.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.gui_input.connect(_on_food_icon_gui_input.bind(food_id))
 	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(data["accent"] as Color, false))
 	food_cards[food_id] = card
 	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_theme_constant_override("margin_left", 10)
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_bottom", 10)
 	card.add_child(margin)
 	var content := VBoxContainer.new()
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_theme_constant_override("separation", 5)
 	margin.add_child(content)
 	var icon := TextureRect.new()
@@ -2132,8 +2148,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	icon.custom_minimum_size = Vector2(48.0, 48.0)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_STOP
-	icon.gui_input.connect(_on_food_icon_gui_input.bind(food_id))
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(icon)
 	var name_label := Label.new()
 	name_label.text = String(data["name"]).to_upper()
@@ -2143,6 +2158,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	name_label.custom_minimum_size.x = 0.0
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.add_theme_font_size_override("font_size", 13)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(name_label)
 	var boost: Dictionary = _get_food_boost(index)
 	var boost_label := Label.new()
@@ -2153,6 +2169,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	boost_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	boost_label.add_theme_font_size_override("font_size", 12)
 	boost_label.add_theme_color_override("font_color", Color(0.72, 0.9, 1.0, 1.0))
+	boost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(boost_label)
 	var count_label := Label.new()
 	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2161,6 +2178,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	count_label.custom_minimum_size.x = 0.0
 	count_label.add_theme_font_size_override("font_size", 14)
 	count_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
+	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(count_label)
 	food_card_counts[food_id] = count_label
 	var action := Button.new()
@@ -2317,20 +2335,25 @@ func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_start_food_drag(food_id)
+			_start_food_drag(food_id, event.global_position)
+			get_viewport().set_input_as_handled()
 		elif dragged_food_id == food_id:
 			_finish_food_drag(event.global_position)
+			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion and dragged_food_id == food_id:
 		_update_food_drag_preview(event.global_position)
 	elif event is InputEventScreenTouch:
 		if event.pressed:
 			dragged_food_touch_index = event.index
 			_start_food_drag(food_id, event.position)
+			get_viewport().set_input_as_handled()
 		elif dragged_food_id == food_id and event.index == dragged_food_touch_index:
 			_finish_food_drag(event.position)
 			dragged_food_touch_index = -1
+			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenDrag and dragged_food_id == food_id and event.index == dragged_food_touch_index:
 		_update_food_drag_preview(event.position)
+		get_viewport().set_input_as_handled()
 
 
 func _buy_food(food_id: String) -> void:
@@ -2364,7 +2387,15 @@ func _start_food_drag(food_id: String, start_position := Vector2.INF) -> void:
 	dragged_food_preview.show()
 	_update_food_drag_preview(get_viewport().get_mouse_position() if start_position == Vector2.INF else start_position)
 	food_status_label.text = "Drop it on the cat."
+	# The drag leaves the inventory page immediately so the cat becomes the drop
+	# target. Lock the pager until release so the same phone gesture cannot also
+	# navigate to another page.
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_destination("main", false)
+		telegram_navigation.set_interaction_enabled(false)
+	telegram_current_panel = null
 	menu_overlay.hide()
+	_sync_main_pause_button("main")
 	_resume_combo_after_menu()
 	_resume_gameplay_time_after_menu()
 
@@ -2379,8 +2410,11 @@ func _finish_food_drag(global_position: Vector2) -> void:
 		return
 	var food_id := dragged_food_id
 	dragged_food_id = ""
+	dragged_food_touch_index = -1
 	if is_instance_valid(dragged_food_preview):
 		dragged_food_preview.hide()
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_interaction_enabled(true)
 	if cat_button.get_global_rect().has_point(global_position):
 		_feed_cat(food_id)
 	else:
@@ -2457,6 +2491,8 @@ func _update_food_ui() -> void:
 			continue
 		# The shop remains a catalogue; inventory is only what the player owns.
 		card.visible = food_panel_mode == "shop" or count > 0
+		card.mouse_filter = Control.MOUSE_FILTER_STOP if food_panel_mode == "inventory" else Control.MOUSE_FILTER_PASS
+		card.mouse_default_cursor_shape = Control.CURSOR_DRAG if food_panel_mode == "inventory" else Control.CURSOR_ARROW
 		var button := card.get_meta("action_button") as Button
 		if button == null:
 			continue
@@ -3724,6 +3760,8 @@ func _set_upgrade_card_hover(card: PanelContainer, accent: Color, hovered: bool)
 
 
 func _style_upgrade_button(button: Button, accent: Color) -> void:
+	button.set_meta("normal_style_accent", accent)
+	button.flat = false
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
@@ -3746,6 +3784,41 @@ func _style_upgrade_button(button: Button, accent: Color) -> void:
 		"disabled",
 		_make_upgrade_style(Color(0.07, 0.075, 0.085, 0.56), Color(1.0, 1.0, 1.0, 0.07), 16, 1)
 	)
+
+
+func _apply_normal_button_style_tree(node: Node) -> void:
+	for child in node.get_children():
+		_apply_normal_button_style_tree(child)
+	if not (node is Button):
+		return
+	var button := node as Button
+	if button is CheckButton:
+		return
+	if button.has_meta("normal_style_accent"):
+		button.flat = false
+		return
+	if button.has_theme_stylebox_override("normal"):
+		return
+	_style_upgrade_button(button, _get_normal_button_accent(button))
+
+
+func _get_normal_button_accent(button: Button) -> Color:
+	var identity := (button.name + " " + button.text).to_lower()
+	if "exit" in identity or "delete" in identity or "reset" in identity:
+		return VALUE_UPGRADE_COLOR
+	if "boost" in identity or "stats" in identity:
+		return Color(0.68, 0.42, 1.0, 1.0)
+	if "skin" in identity:
+		return SKIN_ACCENT
+	if "achievement" in identity or "daily" in identity or "reward" in identity or "luck" in identity:
+		return Color(0.82, 0.66, 0.22, 1.0)
+	if "shop" in identity or "food" in identity or "inventory" in identity or "museum" in identity:
+		return Color(0.96, 0.68, 0.26, 1.0)
+	if "mission" in identity or "passive" in identity or "resume" in identity:
+		return PASSIVE_UPGRADE_COLOR
+	if "upgrade" in identity or "click" in identity or "settings" in identity or "tutorial" in identity:
+		return CLICK_UPGRADE_COLOR
+	return Color(0.42, 0.5, 0.66, 1.0)
 
 
 func _apply_minimal_ui_system(node: Node) -> void:
@@ -4551,23 +4624,19 @@ func _animate_hud_coin_text() -> void:
 	if hud_coin_text_tween != null and hud_coin_text_tween.is_valid():
 		hud_coin_text_tween.kill()
 
-	coins_label.add_theme_font_size_override("font_size", 28)
-	coins_label.position.x = 0.0
 	var clip := coins_label.get_parent() as Control
-	var font := coins_label.get_theme_font("font")
-	var font_size := coins_label.get_theme_font_size("font_size")
-	var text_width := font.get_string_size(coins_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
-	coins_label.size = Vector2(text_width + 4.0, clip.size.y)
-	var overflow := maxf(0.0, text_width - clip.size.x + 4.0)
-	if overflow <= 0.0:
+	if not is_instance_valid(clip) or clip.size.x <= 1.0:
 		return
-
-	var travel_time := clampf(overflow / 45.0, 1.2, 4.5)
-	hud_coin_text_tween = create_tween().set_loops()
-	hud_coin_text_tween.tween_interval(1.2)
-	hud_coin_text_tween.tween_property(coins_label, "position:x", -overflow, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	hud_coin_text_tween.tween_interval(1.4)
-	hud_coin_text_tween.tween_property(coins_label, "position:x", 0.0, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var font := coins_label.get_theme_font("font")
+	var font_size := 28
+	var available_width := maxf(1.0, clip.size.x - 4.0)
+	var text_width := font.get_string_size(coins_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+	while text_width > available_width and font_size > 14:
+		font_size -= 1
+		text_width = font.get_string_size(coins_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+	coins_label.add_theme_font_size_override("font_size", font_size)
+	coins_label.position.x = 0.0
+	coins_label.size = Vector2(text_width + 4.0, clip.size.y)
 
 
 func _update_volume_ui() -> void:
@@ -5537,10 +5606,19 @@ func _apply_mobile_layout() -> void:
 	game_box.add_theme_constant_override("separation", game_separation)
 
 	var phone_layout := content_width < 700.0 or DisplayServer.get_name() in ["Android", "iOS"]
-	var hud_gap := 28.0 if phone_layout else 22.0
+	var legacy_hud_actions_visible := upgrade_button.visible
+	var hud_gap := (28.0 if phone_layout else 22.0) if legacy_hud_actions_visible else 0.0
 	var available_hud_width := content_width - side_margin * 2.0 - hud_gap
-	var hud_width := minf(300.0, available_hud_width * 0.52) if phone_layout else available_hud_width * 0.43
-	var upgrade_width := minf(250.0, available_hud_width - hud_width) if phone_layout else available_hud_width - hud_width
+	var hud_width := (
+		(minf(300.0, available_hud_width * 0.52) if phone_layout else available_hud_width * 0.43)
+		if legacy_hud_actions_visible
+		else available_hud_width
+	)
+	var upgrade_width := (
+		(minf(250.0, available_hud_width - hud_width) if phone_layout else available_hud_width - hud_width)
+		if legacy_hud_actions_visible
+		else 0.0
+	)
 	var hud_row_width := hud_width + hud_gap + upgrade_width
 	var hud_row_left := content_left + (content_width - hud_row_width) * 0.5
 	var hud_row_right := hud_row_left + hud_row_width
@@ -5583,12 +5661,13 @@ func _apply_mobile_layout() -> void:
 		inventory_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
 		shop_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
 
-	var menu_size := 78.0 if short_phone else 92.0
+	var menu_size := 70.0 if short_phone else 78.0
+	var menu_top := telegram_top_height + 12.0 if is_instance_valid(telegram_navigation) else side_margin
 	menu_button.custom_minimum_size = Vector2(menu_size, menu_size)
 	menu_button.offset_left = -(viewport_size.x - content_right + side_margin + menu_size)
-	menu_button.offset_top = side_margin
+	menu_button.offset_top = menu_top
 	menu_button.offset_right = -(viewport_size.x - content_right + side_margin)
-	menu_button.offset_bottom = side_margin + menu_size
+	menu_button.offset_bottom = menu_top + menu_size
 
 	var skins_width := 142.0 if short_phone else 154.0
 	var skins_height := 64.0
@@ -5677,10 +5756,15 @@ func _apply_food_grid_responsive_style(viewport_width: float = -1.0) -> void:
 			continue
 		action.custom_minimum_size.x = 0.0
 		action.add_theme_font_size_override("font_size", 18 if compact else 20)
-		action.add_theme_stylebox_override("normal", _telegram_style(Color("#141b22"), 8, button_padding, 7.0))
-		action.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, button_padding, 7.0))
-		action.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, button_padding, 7.0))
-		action.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		var accent: Color = action.get_meta("normal_style_accent", Color(0.96, 0.68, 0.26, 1.0))
+		_style_upgrade_button(action, accent)
+		for style_name in ["normal", "hover", "pressed", "disabled"]:
+			var style := action.get_theme_stylebox(style_name) as StyleBoxFlat
+			if style != null:
+				style.content_margin_left = button_padding
+				style.content_margin_right = button_padding
+				style.content_margin_top = 7.0
+				style.content_margin_bottom = 7.0
 
 
 func _apply_upgrades_responsive_layout(viewport_width: float = -1.0) -> void:
@@ -5775,10 +5859,8 @@ func _apply_upgrade_card_responsive_layout(card: Control, compact: bool) -> void
 		button.custom_minimum_size.x = 0.0
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		button.add_theme_font_size_override("font_size", 17 if compact else 20)
-		button.add_theme_stylebox_override("normal", _telegram_style(Color("#141b22"), 8, 6.0 if compact else 12.0, 7.0))
-		button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 6.0 if compact else 12.0, 7.0))
-		button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 6.0 if compact else 12.0, 7.0))
-		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		var accent: Color = button.get_meta("normal_style_accent", CLICK_UPGRADE_COLOR)
+		_style_upgrade_button(button, accent)
 
 
 func _apply_boosts_responsive_layout(viewport_width: float = -1.0) -> void:
@@ -5869,10 +5951,8 @@ func _apply_boosts_responsive_layout(viewport_width: float = -1.0) -> void:
 			action.custom_minimum_size.x = 0.0
 			action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			action.add_theme_font_size_override("font_size", 14 if compact else 18)
-			action.add_theme_stylebox_override("normal", _telegram_style(Color("#141b22"), 8, 4.0 if compact else 10.0, 6.0))
-			action.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 4.0 if compact else 10.0, 6.0))
-			action.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 4.0 if compact else 10.0, 6.0))
-			action.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+			var accent: Color = action.get_meta("normal_style_accent", Color(0.68, 0.42, 1.0, 1.0))
+			_style_upgrade_button(action, accent)
 
 
 func _apply_museum_responsive_layout(viewport_width: float = -1.0) -> void:
@@ -6323,7 +6403,6 @@ func _build_telegram_navigation() -> void:
 			panel.offset_bottom = 370.0
 			panel.custom_minimum_size = Vector2.ZERO
 			panel.z_index = 51
-			panel.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 16))
 			_apply_telegram_style_tree(panel, true)
 			panel.hide()
 			continue
@@ -6349,7 +6428,7 @@ func _build_telegram_navigation() -> void:
 	modal_close_button.hide()
 	for decoration in modal_decorations:
 		decoration.hide()
-	menu_overlay.color = Color("#17212b")
+	menu_overlay.color = NORMAL_SHELL_BACKGROUND
 	menu_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	telegram_navigation = TelegramNavigation.new()
@@ -6369,7 +6448,7 @@ func _build_telegram_navigation() -> void:
 	_build_pause_detail_shell()
 	# The shell owns primary navigation. Legacy HUD shortcuts stay alive for
 	# tutorial callbacks, but are no longer visible or interactive.
-	menu_button.hide()
+	menu_button.show()
 	upgrade_button.hide()
 	upgrade_alert_badge.hide()
 	skins_button.hide()
@@ -6386,6 +6465,7 @@ func _build_telegram_navigation() -> void:
 		"RoomVignette",
 		"GameLayer",
 		"HudWallet",
+		"MenuButton",
 		"UpgradeAlertBadge",
 		"ClickPopupLayer",
 	]:
@@ -6418,7 +6498,7 @@ func _build_settings_shell() -> void:
 	settings_shell = ColorRect.new()
 	settings_shell.name = "SettingsShell"
 	settings_shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	settings_shell.color = Color("#17212b")
+	settings_shell.color = NORMAL_SHELL_BACKGROUND
 	settings_shell.mouse_filter = Control.MOUSE_FILTER_STOP
 	settings_shell.z_index = 80
 	settings_shell.hide()
@@ -6427,7 +6507,10 @@ func _build_settings_shell() -> void:
 	settings_action_bar = PanelContainer.new()
 	settings_action_bar.name = "SettingsActionBar"
 	settings_action_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	settings_action_bar.add_theme_stylebox_override("panel", _telegram_style(Color("#17212b"), 0))
+	settings_action_bar.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(NORMAL_SHELL_SURFACE, Color(1.0, 1.0, 1.0, 0.1), 0, 1, -1, 4)
+	)
 	settings_shell.add_child(settings_action_bar)
 	settings_action_safe_margin = MarginContainer.new()
 	settings_action_bar.add_child(settings_action_safe_margin)
@@ -6436,16 +6519,12 @@ func _build_settings_shell() -> void:
 	settings_action_safe_margin.add_child(action_row)
 	var back := Button.new()
 	back.name = "SettingsShellBackButton"
-	back.text = "←"
+	back.text = "\u2190"
 	back.custom_minimum_size = Vector2(64.0, 64.0)
 	back.flat = false
 	back.focus_mode = Control.FOCUS_NONE
 	back.add_theme_font_size_override("font_size", 30)
-	back.add_theme_color_override("font_color", Color("#d9e3ec"))
-	back.add_theme_color_override("font_hover_color", Color.WHITE)
-	back.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 28))
-	back.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.07), 28))
-	back.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 28))
+	_style_upgrade_button(back, CLICK_UPGRADE_COLOR)
 	back.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	back.pressed.connect(_close_settings_shell)
 	action_row.add_child(back)
@@ -6455,7 +6534,7 @@ func _build_settings_shell() -> void:
 	action_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	action_title.add_theme_font_size_override("font_size", 26)
-	action_title.add_theme_color_override("font_color", Color("#f2f5f7"))
+	action_title.add_theme_color_override("font_color", NORMAL_SHELL_TEXT)
 	action_row.add_child(action_title)
 	var action_spacer := Control.new()
 	action_spacer.custom_minimum_size.x = 16.0
@@ -6464,7 +6543,10 @@ func _build_settings_shell() -> void:
 	settings_tabs_bar = PanelContainer.new()
 	settings_tabs_bar.name = "SettingsTabsBar"
 	settings_tabs_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	settings_tabs_bar.add_theme_stylebox_override("panel", _telegram_style(Color("#202f3d"), 0))
+	settings_tabs_bar.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(NORMAL_SHELL_RAISED, Color(1.0, 1.0, 1.0, 0.08), 0, 1, -1, 2)
+	)
 	settings_shell.add_child(settings_tabs_bar)
 	var tabs_layer := Control.new()
 	tabs_layer.name = "SettingsTabsLayer"
@@ -6477,7 +6559,14 @@ func _build_settings_shell() -> void:
 	settings_tab_indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	settings_tab_indicator.add_theme_stylebox_override(
 		"panel",
-		_telegram_style(Color(0.35, 0.66, 0.88, 0.15), 17)
+		_make_upgrade_style(
+			Color(CLICK_UPGRADE_COLOR.r, CLICK_UPGRADE_COLOR.g, CLICK_UPGRADE_COLOR.b, 0.2),
+			Color(CLICK_UPGRADE_COLOR.r, CLICK_UPGRADE_COLOR.g, CLICK_UPGRADE_COLOR.b, 0.58),
+			17,
+			1,
+			-1,
+			3
+		)
 	)
 	tabs_layer.add_child(settings_tab_indicator)
 	settings_tabs_scroll = ScrollContainer.new()
@@ -6503,11 +6592,17 @@ func _build_settings_shell() -> void:
 		tab.flat = false
 		tab.focus_mode = Control.FOCUS_NONE
 		tab.add_theme_font_size_override("font_size", 20)
-		tab.add_theme_color_override("font_color", Color("#9eabb7"))
+		tab.add_theme_color_override("font_color", NORMAL_SHELL_MUTED)
 		tab.add_theme_color_override("font_hover_color", Color.WHITE)
-		tab.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 10))
-		tab.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.055), 10))
-		tab.add_theme_stylebox_override("pressed", _telegram_style(Color(1, 1, 1, 0.075), 10))
+		tab.add_theme_stylebox_override("normal", _make_upgrade_style(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 12, 0))
+		tab.add_theme_stylebox_override(
+			"hover",
+			_make_upgrade_style(Color(CLICK_UPGRADE_COLOR.r, CLICK_UPGRADE_COLOR.g, CLICK_UPGRADE_COLOR.b, 0.12), Color(CLICK_UPGRADE_COLOR.r, CLICK_UPGRADE_COLOR.g, CLICK_UPGRADE_COLOR.b, 0.26), 12, 1)
+		)
+		tab.add_theme_stylebox_override(
+			"pressed",
+			_make_upgrade_style(Color(CLICK_UPGRADE_COLOR.r, CLICK_UPGRADE_COLOR.g, CLICK_UPGRADE_COLOR.b, 0.22), Color(CLICK_UPGRADE_COLOR.r, CLICK_UPGRADE_COLOR.g, CLICK_UPGRADE_COLOR.b, 0.42), 12, 1)
+		)
 		tab.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		tab.pressed.connect(_show_settings_page.bind(index, true))
 		settings_tabs_row.add_child(tab)
@@ -6573,13 +6668,13 @@ func _add_settings_page_intro(parent: VBoxContainer, title_text: String, descrip
 	header.custom_minimum_size.y = 40.0
 	header.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_theme_font_size_override("font_size", 20)
-	header.add_theme_color_override("font_color", Color("#64b5ef"))
+	header.add_theme_color_override("font_color", CLICK_UPGRADE_COLOR.lightened(0.18))
 	parent.add_child(header)
 	var caption := Label.new()
 	caption.text = description
 	caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	caption.add_theme_font_size_override("font_size", 18)
-	caption.add_theme_color_override("font_color", Color("#9eabb7"))
+	caption.add_theme_color_override("font_color", NORMAL_SHELL_MUTED)
 	parent.add_child(caption)
 
 
@@ -6631,7 +6726,7 @@ func _create_settings_row_separator() -> MarginContainer:
 	separator_margin.custom_minimum_size.y = 1.0
 	separator_margin.add_theme_constant_override("margin_left", 58)
 	var separator := ColorRect.new()
-	separator.color = Color("#314252")
+	separator.color = Color(1.0, 1.0, 1.0, 0.09)
 	separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	separator_margin.add_child(separator)
 	return separator_margin
@@ -6640,38 +6735,40 @@ func _create_settings_row_separator() -> MarginContainer:
 func _style_settings_general_group() -> void:
 	if not is_instance_valid(settings_general_group):
 		return
-	settings_general_group.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
+	settings_general_group.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(NORMAL_SHELL_SURFACE, Color(NORMAL_SHELL_GOLD.r, NORMAL_SHELL_GOLD.g, NORMAL_SHELL_GOLD.b, 0.18), 18, 1, -1, 3)
+	)
 	settings_wallet.custom_minimum_size.y = 64.0
-	settings_wallet.add_theme_stylebox_override("panel", _telegram_style(Color(0, 0, 0, 0), 0))
+	settings_wallet.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(Color(0.11, 0.085, 0.035, 0.72), Color(NORMAL_SHELL_GOLD.r, NORMAL_SHELL_GOLD.g, NORMAL_SHELL_GOLD.b, 0.28), 16, 1, -1, 2)
+	)
 	var wallet_margin := settings_wallet.find_child("WalletMargin", true, false) as MarginContainer
 	if wallet_margin != null:
-		_set_telegram_margins(wallet_margin, 16, 0, 16, 0)
+		_set_telegram_margins(wallet_margin, 16, 4, 16, 4)
 	var wallet_title := settings_wallet.find_child("SettingsWalletTitle", true, false) as Label
 	if wallet_title != null:
-		wallet_title.add_theme_color_override("font_color", Color("#d9e3ec"))
+		wallet_title.add_theme_color_override("font_color", NORMAL_SHELL_TEXT)
 	var settings_coin_icon := settings_wallet.find_child("SettingsCoinIcon", true, false) as TextureRect
 	if settings_coin_icon != null:
 		settings_coin_icon.custom_minimum_size = Vector2(28.0, 28.0)
 	menu_coins_label.add_theme_font_size_override("font_size", 20)
-	menu_coins_label.add_theme_color_override("font_color", Color("#64b5ef"))
+	menu_coins_label.add_theme_color_override("font_color", NORMAL_SHELL_GOLD.lightened(0.16))
 	for row_button in [tutorial_replay_button, open_upgrades_button]:
 		if not is_instance_valid(row_button):
 			continue
+		var accent := CLICK_UPGRADE_COLOR if row_button == tutorial_replay_button else CHANCE_UPGRADE_COLOR
 		row_button.custom_minimum_size.y = 64.0
 		row_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		row_button.expand_icon = true
 		row_button.add_theme_constant_override("icon_max_width", 28)
 		row_button.add_theme_constant_override("h_separation", 16)
 		row_button.add_theme_font_size_override("font_size", 20)
-		row_button.add_theme_color_override("font_color", Color("#d9e3ec"))
-		row_button.add_theme_color_override("font_hover_color", Color.WHITE)
-		row_button.add_theme_color_override("font_pressed_color", Color.WHITE)
-		row_button.add_theme_color_override("icon_normal_color", Color("#64b5ef"))
-		row_button.add_theme_color_override("icon_hover_color", Color("#8dccf4"))
+		_style_upgrade_button(row_button, accent)
+		row_button.add_theme_color_override("icon_normal_color", accent.lightened(0.12))
+		row_button.add_theme_color_override("icon_hover_color", accent.lightened(0.28))
 		row_button.add_theme_color_override("icon_pressed_color", Color.WHITE)
-		row_button.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 0, 16.0, 0.0))
-		row_button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 16.0, 0.0))
-		row_button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 16.0, 0.0))
 		row_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 
@@ -6681,12 +6778,14 @@ func _layout_settings_shell() -> void:
 	var tabs_height := 60.0
 	var base_action_height := 72.0
 	var base_bottom_height := 78.0
+	var safe_top := 0.0
 	if is_instance_valid(telegram_navigation):
 		tabs_height = telegram_navigation.FILTER_TABS_HEIGHT
 		base_action_height = telegram_navigation.ACTION_BAR_PORTRAIT
 		base_bottom_height = telegram_navigation.BOTTOM_BAR_HEIGHT
-	var action_height := maxf(base_action_height, telegram_top_height - tabs_height)
-	var safe_top := maxf(0.0, action_height - base_action_height)
+		if telegram_navigation.has_method("get_safe_top"):
+			safe_top = float(telegram_navigation.call("get_safe_top"))
+	var action_height := base_action_height + safe_top
 	var safe_bottom := maxf(0.0, telegram_bottom_height - base_bottom_height)
 	settings_action_bar.offset_bottom = action_height
 	settings_action_safe_margin.add_theme_constant_override("margin_top", roundi(safe_top))
@@ -6791,7 +6890,7 @@ func _build_pause_detail_shell() -> void:
 	pause_detail_shell = ColorRect.new()
 	pause_detail_shell.name = "PauseDetailShell"
 	pause_detail_shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	pause_detail_shell.color = Color("#17212b")
+	pause_detail_shell.color = NORMAL_SHELL_BACKGROUND
 	pause_detail_shell.mouse_filter = Control.MOUSE_FILTER_STOP
 	pause_detail_shell.z_index = 80
 	pause_detail_shell.hide()
@@ -6800,9 +6899,11 @@ func _build_pause_detail_shell() -> void:
 	pause_detail_action_bar = PanelContainer.new()
 	pause_detail_action_bar.name = "PauseDetailActionBar"
 	pause_detail_action_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	var action_style := _telegram_style(Color("#17212b"), 0)
+	var action_style := _make_upgrade_style(NORMAL_SHELL_SURFACE, Color(1.0, 1.0, 1.0, 0.1), 0, 1, -1, 4)
 	action_style.border_width_bottom = 1
-	action_style.border_color = Color("#263746")
+	action_style.border_width_left = 0
+	action_style.border_width_right = 0
+	action_style.border_width_top = 0
 	pause_detail_action_bar.add_theme_stylebox_override("panel", action_style)
 	pause_detail_shell.add_child(pause_detail_action_bar)
 	pause_detail_action_safe_margin = MarginContainer.new()
@@ -6817,11 +6918,7 @@ func _build_pause_detail_shell() -> void:
 	back.focus_mode = Control.FOCUS_NONE
 	back.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	back.add_theme_font_size_override("font_size", 30)
-	back.add_theme_color_override("font_color", Color("#d9e3ec"))
-	back.add_theme_color_override("font_hover_color", Color.WHITE)
-	back.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 30))
-	back.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.08), 30))
-	back.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 30))
+	_style_upgrade_button(back, Color(0.62, 0.48, 1.0, 1.0))
 	back.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	back.pressed.connect(_close_pause_detail_shell)
 	action_row.add_child(back)
@@ -6830,7 +6927,7 @@ func _build_pause_detail_shell() -> void:
 	pause_detail_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pause_detail_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pause_detail_title.add_theme_font_size_override("font_size", 26)
-	pause_detail_title.add_theme_color_override("font_color", Color("#f2f5f7"))
+	pause_detail_title.add_theme_color_override("font_color", NORMAL_SHELL_TEXT)
 	action_row.add_child(pause_detail_title)
 	var spacer := Control.new()
 	spacer.custom_minimum_size.x = 16.0
@@ -6869,12 +6966,14 @@ func _layout_pause_detail_shell() -> void:
 	var tabs_height := 60.0
 	var base_action_height := 72.0
 	var base_bottom_height := 78.0
+	var safe_top := 0.0
 	if is_instance_valid(telegram_navigation):
 		tabs_height = telegram_navigation.FILTER_TABS_HEIGHT
 		base_action_height = telegram_navigation.ACTION_BAR_PORTRAIT
 		base_bottom_height = telegram_navigation.BOTTOM_BAR_HEIGHT
-	var action_height := maxf(base_action_height, telegram_top_height - tabs_height)
-	var safe_top := maxf(0.0, action_height - base_action_height)
+		if telegram_navigation.has_method("get_safe_top"):
+			safe_top = float(telegram_navigation.call("get_safe_top"))
+	var action_height := base_action_height + safe_top
 	var safe_bottom := maxf(0.0, telegram_bottom_height - base_bottom_height)
 	pause_detail_action_bar.offset_bottom = action_height
 	pause_detail_action_safe_margin.add_theme_constant_override("margin_top", roundi(safe_top))
@@ -6994,8 +7093,8 @@ func _finish_settings_page_transition(index: int) -> void:
 func _update_settings_tab_states() -> void:
 	for index in settings_tab_buttons.size():
 		var active := index == settings_current_page
-		settings_tab_buttons[index].add_theme_color_override("font_color", Color("#64b5ef") if active else Color("#9eabb7"))
-		settings_tab_buttons[index].add_theme_color_override("font_hover_color", Color("#8dccf4") if active else Color.WHITE)
+		settings_tab_buttons[index].add_theme_color_override("font_color", CLICK_UPGRADE_COLOR.lightened(0.18) if active else NORMAL_SHELL_MUTED)
+		settings_tab_buttons[index].add_theme_color_override("font_hover_color", CLICK_UPGRADE_COLOR.lightened(0.3) if active else Color.WHITE)
 
 
 func _move_settings_tab_indicator(index: int, animated := true) -> void:
@@ -7262,7 +7361,7 @@ func _finish_hide_pause_popup() -> void:
 	menu_panel.scale = Vector2.ONE
 	if not pause_opened_over_page:
 		menu_overlay.hide()
-	menu_overlay.color = Color("#17212b")
+	menu_overlay.color = NORMAL_SHELL_BACKGROUND
 	pause_opened_over_page = false
 	if is_instance_valid(telegram_navigation):
 		telegram_navigation.set_pause_active(false)
@@ -7300,16 +7399,23 @@ func _layout_pause_popup() -> void:
 
 func _on_telegram_destination_requested(destination: String, direction: int) -> void:
 	if destination == "main":
+		_sync_main_pause_button(destination)
 		_hide_menu_from_navigation()
 		telegram_navigation.set_destination(destination)
 		return
 	var panel := _prepare_telegram_destination(destination)
 	if panel == null:
 		return
+	_sync_main_pause_button(destination)
 	telegram_pending_direction = direction
 	_show_overlay_panel(panel)
 	telegram_navigation.set_destination(destination)
 	_notify_telegram_destination(destination)
+
+
+func _sync_main_pause_button(destination: String) -> void:
+	if is_instance_valid(menu_button):
+		menu_button.visible = destination == "main"
 
 
 func _notify_telegram_destination(destination: String) -> void:
@@ -7486,7 +7592,7 @@ func _finish_telegram_swipe_commit(destination: String, serial: int) -> void:
 	if destination == "main":
 		telegram_current_panel = null
 		menu_overlay.hide()
-		menu_overlay.color = Color("#17212b")
+		menu_overlay.color = NORMAL_SHELL_BACKGROUND
 		_resume_combo_after_menu()
 	else:
 		telegram_current_panel = telegram_swipe_incoming_panel
@@ -7494,8 +7600,9 @@ func _finish_telegram_swipe_commit(destination: String, serial: int) -> void:
 			telegram_current_panel.position = Vector2.ZERO
 			telegram_current_panel.show()
 			call_deferred("_reset_panel_scroll", telegram_current_panel)
-		menu_overlay.color = Color("#17212b")
+		menu_overlay.color = NORMAL_SHELL_BACKGROUND
 		menu_overlay.show()
+	_sync_main_pause_button(destination)
 	_reset_telegram_swipe_state()
 	telegram_navigation.set_interaction_enabled(true)
 
@@ -7511,11 +7618,12 @@ func _finish_telegram_swipe_cancel() -> void:
 		telegram_swipe_outgoing_panel.show()
 	if current_destination == "main":
 		menu_overlay.hide()
-		menu_overlay.color = Color("#17212b")
+		menu_overlay.color = NORMAL_SHELL_BACKGROUND
 		_resume_combo_after_menu()
 	else:
-		menu_overlay.color = Color("#17212b")
+		menu_overlay.color = NORMAL_SHELL_BACKGROUND
 		menu_overlay.show()
+	_sync_main_pause_button(current_destination)
 	telegram_navigation.cancel_pager_preview()
 	_reset_telegram_swipe_state()
 	telegram_navigation.set_interaction_enabled(true)
@@ -7631,7 +7739,7 @@ func _finish_telegram_return_to_main() -> void:
 		pause_opened_over_page = false
 	else:
 		menu_overlay.hide()
-		menu_overlay.color = Color("#17212b")
+		menu_overlay.color = NORMAL_SHELL_BACKGROUND
 	modal_closing = false
 	if not pause_popup_open:
 		_resume_combo_after_menu()
@@ -7671,66 +7779,18 @@ func _reset_telegram_main_positions() -> void:
 
 
 func _apply_telegram_page_style(panel: Control) -> void:
-	if panel is PanelContainer:
-		(panel as PanelContainer).add_theme_stylebox_override("panel", _telegram_style(Color("#17212b"), 0))
 	_apply_telegram_style_tree(panel, true)
 	_apply_telegram_root_spacing(panel)
 
 
-func _apply_telegram_style_tree(node: Node, is_root := false) -> void:
+func _apply_telegram_style_tree(node: Node, _is_root := false) -> void:
 	for child in node.get_children():
-		if child is PanelContainer:
-			var card := child as PanelContainer
-			card.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
-		elif child is Button:
+		if child is Button:
 			var button := child as Button
 			var normalized_text := button.text.strip_edges().to_upper()
-			if normalized_text in ["BACK", "BACK TO GAME", "CLOSE", "RESUME"]:
+			if normalized_text in ["BACK", "BACK TO GAME", "CLOSE"]:
 				button.hide()
-				continue
-			button.add_theme_color_override("font_color", Color("#d9e3ec"))
-			button.add_theme_color_override("font_hover_color", Color.WHITE)
-			button.add_theme_color_override("font_pressed_color", Color("#64b5ef"))
-			button.add_theme_color_override("font_disabled_color", Color("#81909e"))
-			button.add_theme_font_size_override("font_size", 20)
-			button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-			button.add_theme_stylebox_override("normal", _telegram_style(Color("#1f2c38"), 9, 12.0, 8.0))
-			button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 9, 12.0, 8.0))
-			button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 9, 12.0, 8.0))
-			button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		elif child is Label:
-			var label := child as Label
-			label.add_theme_font_size_override("font_size", _get_telegram_readable_font_size(label))
-			if label.name == "SectionTitle":
-				label.add_theme_font_size_override("font_size", 20)
-				label.add_theme_color_override("font_color", Color("#64b5ef"))
-			elif label.name.to_lower().contains("subtitle") or label.name.to_lower().contains("caption"):
-				label.add_theme_font_size_override("font_size", 18)
-				label.add_theme_color_override("font_color", Color("#8d9baa"))
-			if label.get_theme_color("font_color").get_luminance() < 0.52:
-				label.add_theme_color_override("font_color", Color("#a8b5c1"))
-		elif child is ProgressBar:
-			var progress := child as ProgressBar
-			progress.add_theme_stylebox_override("background", _telegram_style(Color("#101820"), 4))
-			progress.add_theme_stylebox_override("fill", _telegram_style(Color("#4b9bd3"), 4))
 		_apply_telegram_style_tree(child)
-
-
-func _get_telegram_readable_font_size(label: Label) -> int:
-	if not label.has_meta("telegram_base_font_size"):
-		label.set_meta("telegram_base_font_size", label.get_theme_font_size("font_size"))
-	var base_size := int(label.get_meta("telegram_base_font_size"))
-	if base_size >= 30:
-		return 30
-	if base_size >= 22:
-		return 28
-	if base_size >= 19:
-		return 24
-	if base_size >= 17:
-		return 22
-	if base_size >= 15:
-		return 20
-	return 18
 
 
 func _refresh_telegram_segment_buttons(buttons: Dictionary, active_key: String) -> void:
@@ -7740,26 +7800,43 @@ func _refresh_telegram_segment_buttons(buttons: Dictionary, active_key: String) 
 		var button := buttons[key] as Button
 		if button == null:
 			continue
-		var accent: Color = button.get_meta("telegram_segment_accent", Color("#64b5ef"))
+		var accent: Color = button.get_meta("telegram_segment_accent", CLICK_UPGRADE_COLOR)
 		var active := String(key) == active_key
 		var compact_font_size := 13 if button.text.length() > 8 else 16
 		button.add_theme_font_size_override("font_size", compact_font_size if compact else 20)
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		button.add_theme_color_override("font_color", accent.lightened(0.18) if active else Color("#a8b5c1"))
+		button.add_theme_color_override("font_color", accent.lightened(0.2) if active else NORMAL_SHELL_MUTED)
 		button.add_theme_color_override("font_hover_color", Color.WHITE)
 		button.add_theme_stylebox_override(
 			"normal",
-			_telegram_style(Color(accent.r, accent.g, accent.b, 0.18) if active else Color("#1f2c38"), 10, horizontal_padding, 6.0)
+			_normal_segment_style(accent, active, false, horizontal_padding)
 		)
 		button.add_theme_stylebox_override(
 			"hover",
-			_telegram_style(Color(accent.r, accent.g, accent.b, 0.25) if active else Color("#293b4a"), 10, horizontal_padding, 6.0)
+			_normal_segment_style(accent, active, true, horizontal_padding)
 		)
 		button.add_theme_stylebox_override(
 			"pressed",
-			_telegram_style(Color(accent.r, accent.g, accent.b, 0.32), 10, horizontal_padding, 6.0)
+			_normal_segment_style(accent, true, true, horizontal_padding)
 		)
 		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _normal_segment_style(accent: Color, active: bool, hovered: bool, horizontal_padding: float) -> StyleBoxFlat:
+	var background := Color(0.055, 0.06, 0.07, 0.82)
+	var border := Color(1.0, 1.0, 1.0, 0.09)
+	if active:
+		background = Color(accent.r, accent.g, accent.b, 0.3 if hovered else 0.22)
+		border = Color(accent.r, accent.g, accent.b, 0.64 if hovered else 0.48)
+	elif hovered:
+		background = Color(accent.r, accent.g, accent.b, 0.14)
+		border = Color(accent.r, accent.g, accent.b, 0.3)
+	var style := _make_upgrade_style(background, border, 14, 1, -1, 3 if active else 0)
+	style.content_margin_left = horizontal_padding
+	style.content_margin_right = horizontal_padding
+	style.content_margin_top = 6.0
+	style.content_margin_bottom = 6.0
+	return style
 
 
 func _apply_telegram_root_spacing(panel: Control) -> void:
@@ -7776,138 +7853,21 @@ func _apply_telegram_root_spacing(panel: Control) -> void:
 
 
 func _apply_telegram_settings_style() -> void:
-	_apply_telegram_page_style(settings_panel)
-	settings_header.add_theme_stylebox_override("panel", _telegram_style(Color("#17212b"), 0))
-	settings_header.custom_minimum_size.y = 68.0
-	var header_margin := settings_header.find_child("HeaderMargin", true, false) as MarginContainer
-	if header_margin != null:
-		_set_telegram_margins(header_margin, 8, 8, 8, 8)
-	var settings_title := settings_header.find_child("SettingsTitle", true, false) as Label
-	if settings_title != null:
-		settings_title.add_theme_font_size_override("font_size", 22)
-		settings_title.add_theme_color_override("font_color", Color("#f2f5f7"))
-		settings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	var settings_subtitle := settings_header.find_child("SettingsSubtitle", true, false) as Label
-	if settings_subtitle != null:
-		settings_subtitle.add_theme_font_size_override("font_size", 14)
-		settings_subtitle.add_theme_color_override("font_color", Color("#8d9baa"))
-		settings_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-
-	settings_wallet.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
-	settings_wallet.custom_minimum_size.y = 64.0
-	var settings_coin_icon := settings_wallet.find_child("SettingsCoinIcon", true, false) as TextureRect
-	if settings_coin_icon != null:
-		settings_coin_icon.custom_minimum_size = Vector2(28.0, 28.0)
-	menu_coins_label.add_theme_font_size_override("font_size", 20)
-	menu_coins_label.add_theme_color_override("font_color", Color("#d9e3ec"))
-
-	var cards: Array[PanelContainer] = [click_settings_card, audio_settings_card, offline_settings_card]
+	settings_shell.color = NORMAL_SHELL_BACKGROUND
+	audio_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(Color(0.62, 0.48, 1.0, 1.0), false))
 	if is_instance_valid(performance_settings_card):
-		cards.append(performance_settings_card)
+		performance_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(Color(0.26, 0.86, 0.82), false))
 	if is_instance_valid(touch_settings_card):
-		cards.append(touch_settings_card)
-	for card in cards:
-		_style_telegram_settings_card(card)
-
-	for slider in [click_power_slider, click_volume_slider, ui_volume_slider, particle_limit_slider]:
-		if is_instance_valid(slider):
-			_style_telegram_settings_slider(slider)
-	var settings_actions := settings_panel.find_child("SettingsActions", true, false) as HBoxContainer
-	if settings_actions != null:
-		settings_actions.add_theme_constant_override("separation", 0)
-	var settings_buttons: Array[Node] = []
-	var settings_options: Array[Node] = []
-	if not settings_page_contents.is_empty():
-		for page_content in settings_page_contents:
-			settings_buttons.append_array(page_content.find_children("*", "Button", true, false))
-			settings_options.append_array(page_content.find_children("*", "OptionButton", true, false))
-	else:
-		settings_buttons = settings_panel.find_children("*", "Button", true, false)
-		settings_options = settings_panel.find_children("*", "OptionButton", true, false)
-	for button in settings_buttons:
-		var settings_control := button as Button
-		if settings_control is CheckButton:
-			continue
-		settings_control.custom_minimum_size.y = maxf(64.0, settings_control.custom_minimum_size.y)
-		settings_control.add_theme_font_size_override("font_size", 20)
-		settings_control.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		settings_control.add_theme_color_override("font_color", Color("#d9e3ec"))
-		settings_control.add_theme_color_override("font_hover_color", Color.WHITE)
-		settings_control.add_theme_stylebox_override("normal", _telegram_style(Color("#1f2c38"), 8, 12.0, 7.0))
-		settings_control.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 12.0, 7.0))
-		settings_control.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 12.0, 7.0))
-		settings_control.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	for option in settings_options:
-		var option_button := option as OptionButton
-		option_button.custom_minimum_size.y = 56.0
-		option_button.add_theme_font_size_override("font_size", 20)
-		option_button.add_theme_color_override("font_color", Color("#d9e3ec"))
-		option_button.add_theme_color_override("font_hover_color", Color.WHITE)
-		option_button.add_theme_color_override("font_pressed_color", Color.WHITE)
-		option_button.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 8, 10.0, 0.0))
-		option_button.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 8, 10.0, 0.0))
-		option_button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 10.0, 0.0))
-		option_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		option_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		touch_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(Color(1.0, 0.58, 0.34), false))
+	_style_settings_slider(click_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
+	_style_settings_slider(ui_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
+	if is_instance_valid(particle_limit_slider):
+		_style_settings_slider(particle_limit_slider, Color(0.26, 0.86, 0.82))
+	if is_instance_valid(slider_sound_option):
+		slider_sound_option.custom_minimum_size.y = 56.0
+		slider_sound_option.add_theme_font_size_override("font_size", 18)
+		_style_upgrade_button(slider_sound_option, Color(0.62, 0.48, 1.0, 1.0))
 	_style_settings_general_group()
-
-
-func _style_telegram_settings_card(card: PanelContainer) -> void:
-	card.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
-	var card_margin: MarginContainer
-	for direct_child in card.get_children():
-		if direct_child is MarginContainer:
-			card_margin = direct_child as MarginContainer
-			break
-	if card_margin != null:
-		_set_telegram_margins(card_margin, 16, 6, 16, 8)
-	var card_boxes := card.find_children("*", "VBoxContainer", true, false)
-	if not card_boxes.is_empty():
-		(card_boxes[0] as VBoxContainer).add_theme_constant_override("separation", 6)
-	var labels := card.find_children("*", "Label", true, false)
-	for index in labels.size():
-		var label := labels[index] as Label
-		if index == 0:
-			label.custom_minimum_size.y = 40.0
-			label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			label.add_theme_font_size_override("font_size", 20)
-			label.add_theme_color_override("font_color", Color("#64b5ef"))
-		elif label.get_theme_font_size("font_size") <= 14:
-			label.add_theme_font_size_override("font_size", 18)
-			label.add_theme_color_override("font_color", Color("#8d9baa"))
-		else:
-			label.add_theme_font_size_override("font_size", 20)
-			label.add_theme_color_override("font_color", Color("#d9e3ec"))
-	for icon_node in card.find_children("*", "TextureRect", true, false):
-		var icon := icon_node as TextureRect
-		if icon.custom_minimum_size.x <= 48.0 and icon.custom_minimum_size.y <= 48.0:
-			icon.custom_minimum_size = Vector2(28.0, 28.0)
-	for row_node in card.find_children("*", "HBoxContainer", true, false):
-		var row := row_node as HBoxContainer
-		row.custom_minimum_size.y = maxf(row.custom_minimum_size.y, 54.0)
-		row.add_theme_constant_override("separation", 10)
-	for check_node in card.find_children("*", "CheckButton", true, false):
-		var check := check_node as CheckButton
-		check.custom_minimum_size.y = 64.0
-		check.add_theme_font_size_override("font_size", 20)
-		check.add_theme_color_override("font_color", Color("#d9e3ec"))
-		check.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
-		check.add_theme_stylebox_override("pressed", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
-		check.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.04), 8, 6.0, 0.0))
-		check.add_theme_stylebox_override("hover_pressed", _telegram_style(Color(1, 1, 1, 0.04), 8, 6.0, 0.0))
-		check.add_theme_stylebox_override("disabled", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
-		check.add_theme_stylebox_override("disabled_pressed", _telegram_style(Color(0, 0, 0, 0), 8, 6.0, 0.0))
-		check.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-
-
-func _style_telegram_settings_slider(slider: HSlider) -> void:
-	slider.custom_minimum_size.y = 42.0
-	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	slider.add_theme_stylebox_override("slider", _telegram_style(Color("#41515f"), 5, 0.0, 5.0))
-	slider.add_theme_stylebox_override("grabber_area", _telegram_style(Color("#4b9bd3"), 5, 0.0, 5.0))
-	slider.add_theme_stylebox_override("grabber_area_highlight", _telegram_style(Color("#64b5ef"), 5, 0.0, 5.0))
-	slider.add_theme_icon_override("grabber", load("res://assets/ui/navigation/slider_thumb.svg") as Texture2D)
-	slider.add_theme_icon_override("grabber_highlight", load("res://assets/ui/navigation/slider_thumb_hover.svg") as Texture2D)
 
 
 func _style_telegram_achievements_detail() -> void:
@@ -7922,16 +7882,16 @@ func _style_telegram_achievements_detail() -> void:
 		items.alignment = BoxContainer.ALIGNMENT_BEGIN
 		items.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		items.add_theme_constant_override("separation", 10)
-	achievements_summary.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10))
+	achievements_summary.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(Color(0.12, 0.09, 0.025, 0.95), Color(1.0, 0.74, 0.2, 0.75), 16, 2, -1, 7)
+	)
 	achievements_progress_label.add_theme_font_size_override("font_size", 22)
-	achievements_progress_label.add_theme_color_override("font_color", Color("#d9e3ec"))
+	achievements_progress_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.42, 1.0))
+	_style_upgrade_progress(achievements_progress_bar, Color(1.0, 0.72, 0.2, 1.0))
 	achievements_filter.custom_minimum_size = Vector2(0.0, 60.0)
 	achievements_filter.add_theme_font_size_override("font_size", 20)
-	achievements_filter.add_theme_color_override("font_color", Color("#d9e3ec"))
-	achievements_filter.add_theme_color_override("font_hover_color", Color.WHITE)
-	achievements_filter.add_theme_stylebox_override("normal", _telegram_style(Color("#1f2c38"), 9, 14.0, 8.0))
-	achievements_filter.add_theme_stylebox_override("hover", _telegram_style(Color("#293b4a"), 9, 14.0, 8.0))
-	achievements_filter.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 9, 14.0, 8.0))
+	_style_upgrade_button(achievements_filter, Color(0.76, 0.6, 0.18, 1.0))
 	achievements_filter.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	achievements_filter.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	achievements_list.custom_minimum_size = Vector2(0.0, 180.0)
@@ -7939,12 +7899,18 @@ func _style_telegram_achievements_detail() -> void:
 	achievements_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	achievements_list.add_theme_font_size_override("font_size", 20)
 	achievements_list.add_theme_constant_override("line_separation", 14)
-	achievements_list.add_theme_color_override("font_color", Color("#a8b5c1"))
+	achievements_list.add_theme_color_override("font_color", Color(0.76, 0.8, 0.88, 1.0))
 	achievements_list.add_theme_color_override("font_selected_color", Color.WHITE)
-	achievements_list.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 10, 10.0, 8.0))
-	achievements_list.add_theme_stylebox_override("focus", _telegram_style(Color("#1f2c38"), 10, 10.0, 8.0))
-	achievements_list.add_theme_stylebox_override("selected", _telegram_style(Color("#2b5278"), 8, 8.0, 5.0))
-	achievements_list.add_theme_stylebox_override("selected_focus", _telegram_style(Color("#2b5278"), 8, 8.0, 5.0))
+	var list_style := _make_upgrade_style(Color(0.025, 0.03, 0.045, 0.98), Color(0.28, 0.3, 0.38, 1.0), 14, 1)
+	list_style.content_margin_left = 10.0
+	list_style.content_margin_right = 10.0
+	list_style.content_margin_top = 8.0
+	list_style.content_margin_bottom = 8.0
+	var selected_style := _make_upgrade_style(Color(0.76, 0.6, 0.18, 0.28), Color(1.0, 0.74, 0.2, 0.62), 10, 1)
+	achievements_list.add_theme_stylebox_override("panel", list_style)
+	achievements_list.add_theme_stylebox_override("focus", list_style)
+	achievements_list.add_theme_stylebox_override("selected", selected_style)
+	achievements_list.add_theme_stylebox_override("selected_focus", selected_style)
 	achievements_list.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
@@ -7975,38 +7941,27 @@ func _style_telegram_stats_detail() -> void:
 
 func _apply_telegram_pause_style() -> void:
 	var compact := get_viewport_rect().size.x < 520.0
-	menu_panel.add_theme_stylebox_override("panel", _telegram_style(Color("#1f2c38"), 12))
+	_setup_pause_menu_visuals()
 	var menu_margin := menu_panel.find_child("MenuMargin", true, false) as MarginContainer
 	if menu_margin != null:
 		_set_telegram_margins(menu_margin, 12 if compact else 16, 10 if compact else 14, 12 if compact else 16, 10 if compact else 14)
 	var menu_items := menu_panel.find_child("MenuItems", true, false) as VBoxContainer
 	if menu_items != null:
-		menu_items.add_theme_constant_override("separation", 2)
-	menu_header.add_theme_stylebox_override("panel", _telegram_style(Color(0, 0, 0, 0), 0))
+		menu_items.add_theme_constant_override("separation", 6 if compact else 8)
 	var header_labels := menu_header.find_children("*", "Label", true, false)
 	for index in header_labels.size():
 		var header_label := header_labels[index] as Label
 		if index == 0:
 			header_label.add_theme_font_size_override("font_size", 24 if compact else 28)
-			header_label.add_theme_color_override("font_color", Color("#d9e3ec"))
+			header_label.add_theme_color_override("font_color", NORMAL_SHELL_GOLD.lightened(0.16))
 		else:
 			header_label.add_theme_font_size_override("font_size", 16 if compact else 18)
-			header_label.add_theme_color_override("font_color", Color("#8d9baa"))
-	menu_wallet.add_theme_stylebox_override("panel", _telegram_style(Color("#253443"), 10))
-	daily_reward_card.add_theme_stylebox_override("panel", _telegram_style(Color("#253443"), 10))
+			header_label.add_theme_color_override("font_color", NORMAL_SHELL_MUTED)
 	for button in [settings_button, achievements_button, stats_button, resume_button, exit_button]:
 		button.custom_minimum_size.x = 0.0
 		button.custom_minimum_size.y = 52.0 if compact else 60.0
 		button.add_theme_font_size_override("font_size", 18 if compact else 20)
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		button.add_theme_color_override("font_color", Color("#d9e3ec"))
-		button.add_theme_color_override("font_hover_color", Color.WHITE)
-		button.add_theme_stylebox_override("normal", _telegram_style(Color(0, 0, 0, 0), 8, 12.0, 7.0))
-		button.add_theme_stylebox_override("hover", _telegram_style(Color(1, 1, 1, 0.055), 8, 12.0, 7.0))
-		button.add_theme_stylebox_override("pressed", _telegram_style(Color("#2b5278"), 8, 12.0, 7.0))
-		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	exit_button.add_theme_color_override("font_color", Color("#ef6b73"))
-	exit_button.add_theme_color_override("font_hover_color", Color("#ff858c"))
 
 
 func _set_telegram_margins(margin: MarginContainer, left: int, top: int, right: int, bottom: int) -> void:
@@ -8014,20 +7969,6 @@ func _set_telegram_margins(margin: MarginContainer, left: int, top: int, right: 
 	margin.add_theme_constant_override("margin_top", top)
 	margin.add_theme_constant_override("margin_right", right)
 	margin.add_theme_constant_override("margin_bottom", bottom)
-
-
-func _telegram_style(color: Color, radius: int, horizontal_padding := 0.0, vertical_padding := 0.0) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.corner_radius_top_left = radius
-	style.corner_radius_top_right = radius
-	style.corner_radius_bottom_left = radius
-	style.corner_radius_bottom_right = radius
-	style.content_margin_left = horizontal_padding
-	style.content_margin_right = horizontal_padding
-	style.content_margin_top = vertical_padding
-	style.content_margin_bottom = vertical_padding
-	return style
 
 
 func _show_overlay_panel(panel: Control) -> void:
@@ -8196,7 +8137,7 @@ func _finish_telegram_page_transition(panel: Control, outgoing: Control, serial:
 	panel.position = Vector2.ZERO
 	panel.modulate = Color.WHITE
 	_reset_telegram_main_positions()
-	menu_overlay.color = Color("#17212b")
+	menu_overlay.color = NORMAL_SHELL_BACKGROUND
 	telegram_current_panel = panel
 
 

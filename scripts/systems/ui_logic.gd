@@ -42,8 +42,7 @@ func set_coin_display(value: float) -> void:
 	var formatted = game._format_number(game.displayed_coins)
 	game.coins_label.text = formatted
 	game.coins_label.tooltip_text = formatted
-	if not game.low_quality_mode:
-		game.call_deferred("_animate_hud_coin_text")
+	game.call_deferred("_animate_hud_coin_text")
 	game.menu_wallet_coins_label.text = "%s KIBBLES" % formatted
 	game.menu_coins_label.text = formatted
 	game.upgrade_coins_label.text = formatted
