@@ -366,7 +366,8 @@ func _on_action_pressed() -> void:
 		"merchant":
 			if not game._spend_coins(merchant_cost):
 				return
-			var merchant_reward := maxi(merchant_cost + 1, roundi(float(merchant_cost) * float(data.get("reward_mult", 2.0))))
+			var minimum_reward: int = game._add_resource_value(merchant_cost, 1)
+			var merchant_reward: int = maxi(minimum_reward, game._safe_resource_round(float(merchant_cost) * float(data.get("reward_mult", 2.0))))
 			game._gain_coins(merchant_reward, action_button.get_global_rect().get_center())
 			game._update_coins()
 			game._queue_save()
@@ -386,7 +387,7 @@ func _level_scaled_reward(multiplier: float) -> int:
 	var mastery := 1.0 + minf(2.0, sqrt(float(maxi(0, game.total_taps))) / 100.0)
 	var active_bonus := 1.0 + minf(1.5, float(interaction_count) * 0.08)
 	var income_power := float(game.click_value + game._get_effective_passive_gain())
-	return maxi(1, roundi(income_power * multiplier * level_bonus * mastery * active_bonus))
+	return game._safe_resource_round(income_power * multiplier * level_bonus * mastery * active_bonus, 1)
 
 func _get_player_level() -> int:
 	var upgrade_total := maxi(1, game.click_value)

@@ -4,6 +4,7 @@ const ClickLogic = preload("res://scripts/systems/click_logic.gd")
 const UpgradeLogic = preload("res://scripts/systems/upgrade_logic.gd")
 const AchievementLogic = preload("res://scripts/systems/achievement_logic.gd")
 const SaveLogic = preload("res://scripts/systems/save_logic.gd")
+const BigCounter = preload("res://scripts/systems/big_counter.gd")
 const RewardLogic = preload("res://scripts/systems/reward_logic.gd")
 const UI_SOUND_VARIANTS: Array[AudioStream] = [
 	preload("res://assets/ui_soft.wav"),
@@ -194,6 +195,8 @@ const SAVE_PATH := "user://clicker_progress.cfg"
 const SAVE_SECTION := "progress"
 const SAVE_SCORE_KEY := "score"
 const SAVE_COINS_KEY := "coins"
+const SAVE_SCORE_BIG_KEY := "score_big"
+const SAVE_COINS_BIG_KEY := "coins_big"
 const SAVE_CLICK_VALUE_KEY := "click_value"
 const SAVE_UNLOCKED_CLICK_VALUE_KEY := "unlocked_click_value"
 const SAVE_BONUS_CHANCE_LEVEL_KEY := "bonus_chance_level"
@@ -205,18 +208,36 @@ const SAVE_BONUS_STREAK_ACTIVATIONS_KEY := "bonus_streak_activations"
 const SAVE_BEST_SINGLE_CLICK_KEY := "best_single_click"
 const SAVE_PASSIVE_CLICKS_PER_MINUTE_KEY := "passive_clicks_per_minute"
 const SAVE_BEST_COIN_BALANCE_KEY := "best_coin_balance"
+const SAVE_BEST_COIN_BALANCE_BIG_KEY := "best_coin_balance_big"
 const SAVE_LAST_SEEN_UNIX_KEY := "last_seen_unix"
 const SAVE_LAST_DAILY_REWARD_DAY_KEY := "last_daily_reward_day"
 const SAVE_DAILY_REWARD_STREAK_KEY := "daily_reward_streak"
 const SAVE_BEST_DAILY_REWARD_STREAK_KEY := "best_daily_reward_streak"
 const SAVE_CLICK_VOLUME_KEY := "click_volume"
 const SAVE_UI_VOLUME_KEY := "ui_volume"
+const SAVE_MASTER_VOLUME_KEY := "master_volume"
+const SAVE_CLICK_SOUNDS_ENABLED_KEY := "click_sounds_enabled"
+const SAVE_UI_SOUNDS_ENABLED_KEY := "ui_sounds_enabled"
+const SAVE_MUTE_UNFOCUSED_KEY := "mute_unfocused"
 const SAVE_LOW_QUALITY_ENABLED_KEY := "low_quality_enabled"
+const SAVE_BATTERY_SAVER_ENABLED_KEY := "battery_saver_enabled"
 const SAVE_OPTIMIZED_TAP_EFFECTS_KEY := "optimized_tap_effects"
+const SAVE_REDUCE_MOTION_ENABLED_KEY := "reduce_motion_enabled"
+const SAVE_BACKGROUND_EFFECTS_ENABLED_KEY := "background_effects_enabled"
+const SAVE_LOW_POWER_UNFOCUSED_KEY := "low_power_unfocused"
 const SAVE_PARTICLE_LIMIT_KEY := "particle_limit"
 const SAVE_HAPTICS_ENABLED_KEY := "haptics_enabled"
+const SAVE_HAPTIC_STRENGTH_KEY := "haptic_strength"
 const SAVE_EVENTS_ENABLED_KEY := "events_enabled"
+const SAVE_FLOATING_NUMBERS_ENABLED_KEY := "floating_numbers_enabled"
+const SAVE_COIN_TRAILS_ENABLED_KEY := "coin_trails_enabled"
+const SAVE_MENU_SWIPE_ENABLED_KEY := "menu_swipe_enabled"
+const SAVE_REVERSE_SLIDERS_ENABLED_KEY := "reverse_sliders_enabled"
 const SAVE_SLIDER_SOUND_STYLE_KEY := "slider_sound_style"
+const SAVE_ABBREVIATE_NUMBERS_KEY := "abbreviate_numbers"
+const SAVE_NUMBER_DETAIL_DIGITS_KEY := "number_detail_digits"
+const SAVE_EXACT_NUMBER_TOOLTIPS_KEY := "exact_number_tooltips"
+const SAVE_GROUP_FULL_NUMBERS_KEY := "group_full_numbers"
 const SAVE_OWNED_SKINS_KEY := "owned_skins"
 const SAVE_EQUIPPED_SKIN_KEY := "equipped_skin"
 const SAVE_EQUIPPED_ROOM_SKIN_KEY := "equipped_room_skin"
@@ -228,6 +249,13 @@ const UPDATE_095_RESOURCE_CAP := 100000000
 const ADMIN_MIN_AMOUNT := 1
 const ADMIN_CLICK_SOFT_MAX := 1000000000000
 const MAX_RESOURCE_VALUE := 9223372036854775807
+const MAX_FULL_NUMBER_DIGITS := 21
+const MIN_NUMBER_DETAIL_DIGITS := 3
+const MAX_NUMBER_DETAIL_DIGITS := 9
+const DEFAULT_NUMBER_DETAIL_DIGITS := 7
+# Familiar suffixes stay readable through trillions. Larger magnitudes use a
+# steadily rising exponent (e15, e16, ...) instead of increasingly obscure names.
+const NUMBER_SUFFIXES: Array[String] = ["", "K", "M", "B", "T"]
 const SAVE_DELAY_SECONDS := 0.8
 const COMBO_STEP := 0.1
 const COMBO_CLICKS_PER_STEP := 8
@@ -425,6 +453,8 @@ const SKIN_SET_DATA: Array[Dictionary] = [
 
 var score: int = 0
 var coins: int = 0
+var score_counter: BigCounter = BigCounter.new()
+var coins_counter: BigCounter = BigCounter.new()
 var click_value: int = 1
 var unlocked_click_value: int = 1
 var bonus_chance_level: int = 1
@@ -436,6 +466,7 @@ var total_bonus_clicks: int = 0
 var bonus_streak_activations: int = 0
 var best_single_click: int = 0
 var best_coin_balance: int = 0
+var best_coin_balance_counter: BigCounter = BigCounter.new()
 var recent_bonus_clicks: Array[bool] = []
 var combo_bonus: float = 0.0
 var combo_drain_elapsed: float = 0.0
@@ -449,12 +480,30 @@ var last_offline_minutes: int = 0
 var last_offline_was_capped := false
 var click_volume: float = 1.0
 var ui_volume: float = 1.0
+var master_volume: float = 1.0
+var click_sounds_enabled := true
+var ui_sounds_enabled := true
+var mute_unfocused := false
 var low_quality_enabled := false
+var battery_saver_enabled := false
 var optimized_tap_effects := false
+var reduce_motion_enabled := false
+var background_effects_enabled := true
+var low_power_unfocused := false
 var particle_limit := PARTICLE_LIMIT_INFINITE
 var haptics_enabled := true
+var haptic_strength := 50
 var events_enabled := true
+var floating_numbers_enabled := true
+var coin_trails_enabled := true
+var menu_swipe_enabled := true
+var reverse_sliders_enabled := false
 var slider_sound_style := 0
+var abbreviate_numbers := true
+var number_detail_digits := DEFAULT_NUMBER_DETAIL_DIGITS
+var exact_number_tooltips := true
+var group_full_numbers := true
+var app_has_focus := true
 var owned_skin_ids: Array[String] = []
 var equipped_skin_id := DEFAULT_SKIN_ID
 var equipped_room_skin_id := DEFAULT_ROOM_SKIN_ID
@@ -502,6 +551,7 @@ var touch_scroll_distance := 0.0
 var touch_scroll: ScrollContainer
 var touch_slider_index := -1
 var touch_slider: Slider
+var mouse_slider_dragging := false
 var app_backgrounded_at_unix := 0
 var app_was_backgrounded := false
 var skins_button: Button
@@ -556,6 +606,12 @@ var active_food_boosts: Dictionary = {}
 var dragged_food_id := ""
 var dragged_food_preview: TextureRect
 var dragged_food_touch_index := -1
+var food_drag_drop_target: Label
+var food_drag_return_to_inventory := false
+var food_drag_candidate_id := ""
+var food_drag_candidate_start := Vector2.ZERO
+var food_drag_candidate_touch_index := -1
+var food_drag_candidate_started_msec := 0
 var modal_close_button: Button
 var modal_decorations: Array[Control] = []
 var combo_was_running_before_overlay := false
@@ -647,12 +703,33 @@ var runtime_quality_reason := ""
 var performance_settings_card: PanelContainer
 var touch_settings_card: PanelContainer
 var low_quality_check_box: CheckButton
+var battery_saver_check_box: CheckButton
 var optimized_tap_check_box: CheckButton
+var reduce_motion_check_box: CheckButton
+var background_effects_check_box: CheckButton
+var low_power_unfocused_check_box: CheckButton
 var particle_limit_slider: HSlider
 var particle_limit_value_label: Label
 var haptics_check_box: CheckButton
+var haptic_strength_slider: HSlider
+var haptic_strength_value_label: Label
 var events_check_box: CheckButton
+var floating_numbers_check_box: CheckButton
+var coin_trails_check_box: CheckButton
+var menu_swipe_check_box: CheckButton
+var reverse_sliders_check_box: CheckButton
 var slider_sound_option: OptionButton
+var master_volume_slider: HSlider
+var master_volume_value_label: Label
+var click_sounds_check_box: CheckButton
+var ui_sounds_check_box: CheckButton
+var mute_unfocused_check_box: CheckButton
+var abbreviate_numbers_check_box: CheckButton
+var number_detail_slider: HSlider
+var number_detail_value_label: Label
+var exact_number_tooltips_check_box: CheckButton
+var group_full_numbers_check_box: CheckButton
+var last_slider_sound_msec := 0
 var settings_icon_sheet_texture: Texture2D
 
 
@@ -679,7 +756,15 @@ func _configure_runtime_quality() -> void:
 func _apply_runtime_quality() -> void:
 	low_quality_mode = low_quality_enabled
 	effects_scale = 0.45 if low_quality_mode else 1.0
-	if low_quality_mode:
+	if not app_has_focus and low_power_unfocused:
+		Engine.max_fps = 15
+		ProjectSettings.set_setting("application/run/low_processor_mode", true)
+		ProjectSettings.set_setting("application/run/low_processor_mode_sleep_usec", 16000)
+	elif battery_saver_enabled:
+		Engine.max_fps = 30
+		ProjectSettings.set_setting("application/run/low_processor_mode", true)
+		ProjectSettings.set_setting("application/run/low_processor_mode_sleep_usec", 10000)
+	elif low_quality_mode:
 		Engine.max_fps = 45
 		ProjectSettings.set_setting("application/run/low_processor_mode", true)
 		ProjectSettings.set_setting("application/run/low_processor_mode_sleep_usec", 6900)
@@ -879,7 +964,23 @@ func _input(event: InputEvent) -> void:
 		if event.is_action_pressed("ui_cancel"):
 			_close_pause_detail_shell()
 			get_viewport().set_input_as_handled()
-		return
+			return
+	if not food_drag_candidate_id.is_empty() and dragged_food_id.is_empty():
+		if event is InputEventMouseMotion and event.global_position.distance_to(food_drag_candidate_start) >= 10.0:
+			_start_food_drag(food_drag_candidate_id, event.global_position)
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventScreenDrag and event.index == food_drag_candidate_touch_index and event.position.distance_to(food_drag_candidate_start) >= 18.0:
+			if Time.get_ticks_msec() - food_drag_candidate_started_msec >= 180:
+				dragged_food_touch_index = event.index
+				_start_food_drag(food_drag_candidate_id, event.position)
+				get_viewport().set_input_as_handled()
+				return
+			_clear_food_drag_candidate()
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			_clear_food_drag_candidate()
+		if event is InputEventScreenTouch and event.index == food_drag_candidate_touch_index and not event.pressed:
+			_clear_food_drag_candidate()
 	if event is InputEventScreenDrag and event.index == dragged_food_touch_index and not dragged_food_id.is_empty():
 		_update_food_drag_preview(event.position)
 		get_viewport().set_input_as_handled()
@@ -1001,11 +1102,17 @@ func _notification(what: int) -> void:
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			_exit_game()
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
+			app_has_focus = false
+			_apply_volume()
+			_apply_runtime_quality()
 			if not app_was_backgrounded:
 				app_backgrounded_at_unix = _get_unix_time()
 				app_was_backgrounded = true
 			_save_game()
 		NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_APPLICATION_FOCUS_IN:
+			app_has_focus = true
+			_apply_volume()
+			_apply_runtime_quality()
 			if app_was_backgrounded:
 				app_was_backgrounded = false
 				_apply_resumed_offline_gain()
@@ -1144,7 +1251,7 @@ func _set_upgrade_progress(progress_bar: ProgressBar, cost: int, maxed: bool = f
 	if is_ready and not was_ready and upgrades_panel.visible:
 		_pop_control(progress_bar, Vector2(1.0, 1.45), 0.24)
 	progress_bar.set_meta("was_ready", is_ready)
-	progress_bar.tooltip_text = "Complete" if maxed else "%s / %s kibbles" % [_format_number(coins), _format_number(cost)]
+	progress_bar.tooltip_text = "Complete" if maxed else "%s / %s kibbles" % [_format_coins(), _format_number(cost)]
 
 
 func _setup_main_ui_visuals() -> void:
@@ -1725,7 +1832,7 @@ func _build_boosts_ui() -> void:
 	menu_panel.get_parent().add_child(boosts_panel)
 	boosts_panel.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.58, 0.34, 0.9, 1.0), 24, 2, -1, 18)
+		_make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.58, 0.34, 0.9, 1.0), 8, 3, 5, 18)
 	)
 
 	var outer_margin := MarginContainer.new()
@@ -1745,7 +1852,7 @@ func _build_boosts_ui() -> void:
 	header.name = "BoostsHero"
 	header.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.09, 0.055, 0.16, 1.0), Color(0.72, 0.48, 1.0, 0.78), 18, 2, 5, 8)
+		_make_upgrade_style(Color(0.09, 0.055, 0.16, 1.0), Color(0.72, 0.48, 1.0, 0.78), 7, 2, 5, 8)
 	)
 	items.add_child(header)
 
@@ -1767,6 +1874,7 @@ func _build_boosts_ui() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 34)
 	title.add_theme_color_override("font_color", Color(0.9, 0.8, 1.0, 1.0))
+	_style_arcade_heading(title)
 	header_items.add_child(title)
 
 	var subtitle := Label.new()
@@ -1808,6 +1916,7 @@ func _build_boosts_ui() -> void:
 	boost_wallet_label = Label.new()
 	boost_wallet_label.add_theme_font_size_override("font_size", 22)
 	boost_wallet_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.46, 1.0))
+	_style_arcade_label_plate(boost_wallet_label, Color(1.0, 0.72, 0.16, 1.0), true)
 	wallet_row.add_child(boost_wallet_label)
 
 	var boost_tabs := HBoxContainer.new()
@@ -1889,7 +1998,7 @@ func _build_food_ui() -> void:
 	food_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	food_panel.hide()
 	menu_panel.get_parent().add_child(food_panel)
-	food_panel.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.055, 0.08, 0.095, 0.98), Color(0.96, 0.68, 0.26, 0.95), 12, 2, -1, 12))
+	food_panel.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.055, 0.08, 0.095, 0.98), Color(0.96, 0.68, 0.26, 0.95), 8, 3, 5, 12))
 
 	var outer_margin := MarginContainer.new()
 	outer_margin.add_theme_constant_override("margin_left", 18)
@@ -1907,12 +2016,14 @@ func _build_food_ui() -> void:
 	food_panel_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	food_panel_title.add_theme_font_size_override("font_size", 34)
 	food_panel_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.54, 1.0))
+	_style_arcade_heading(food_panel_title)
 	content.add_child(food_panel_title)
 
 	food_wallet_label = Label.new()
 	food_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	food_wallet_label.add_theme_font_size_override("font_size", 18)
 	food_wallet_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.9, 1.0))
+	_style_arcade_label_plate(food_wallet_label, Color(0.96, 0.68, 0.26, 1.0), true)
 	food_status_label = Label.new()
 	food_status_label.text = "Use an owned snack to start its boost."
 	food_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2018,7 +2129,7 @@ func _build_compact_inventory_ui() -> void:
 	compact_inventory_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	compact_inventory_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	compact_inventory_panel.custom_minimum_size = Vector2(0.0, 0.0)
-	compact_inventory_panel.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.035, 0.045, 0.08, 0.94), Color(0.96, 0.68, 0.26, 0.9), 12, 2, -1, 10))
+	compact_inventory_panel.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.035, 0.045, 0.08, 0.94), Color(0.96, 0.68, 0.26, 0.9), 8, 3, 5, 10))
 	add_child(compact_inventory_panel)
 	move_child(compact_inventory_panel, menu_overlay.get_index())
 	var margin := MarginContainer.new()
@@ -2046,10 +2157,11 @@ func _refresh_compact_inventory() -> void:
 		compact_inventory_list.remove_child(child)
 		child.queue_free()
 	var title := Label.new()
-	title.text = "SNACK BOOSTS"
+	title.text = "INVENTORY  /  DRAG FOOD TO THE CAT"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_font_size_override("font_size", 13)
 	title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.54, 1.0))
+	_style_arcade_label_plate(title, Color(0.96, 0.68, 0.26, 1.0), true)
 	compact_inventory_list.add_child(title)
 	var found := false
 	for index in range(FOOD_NAMES.size()):
@@ -2064,7 +2176,8 @@ func _refresh_compact_inventory() -> void:
 		card.custom_minimum_size = Vector2(0.0, 82.0)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.tooltip_text = "Drag onto the cat for %d seconds" % int(boost["duration"])
-		card.mouse_filter = Control.MOUSE_FILTER_STOP
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
+		card.mouse_default_cursor_shape = Control.CURSOR_DRAG
 		card.add_theme_stylebox_override("panel", _make_upgrade_card_style(data["accent"] as Color, false))
 		card.gui_input.connect(_on_food_icon_gui_input.bind(food_id))
 		compact_inventory_list.add_child(card)
@@ -2085,7 +2198,12 @@ func _refresh_compact_inventory() -> void:
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(icon)
+		var icon_plate := PanelContainer.new()
+		icon_plate.custom_minimum_size = Vector2(64.0, 64.0)
+		icon_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_plate.add_theme_stylebox_override("panel", _make_arcade_compartment_style(data["accent"] as Color))
+		icon_plate.add_child(icon)
+		row.add_child(icon_plate)
 		var text_column := VBoxContainer.new()
 		text_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		text_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2096,6 +2214,8 @@ func _refresh_compact_inventory() -> void:
 		name_label.add_theme_color_override("font_color", Color.WHITE)
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+		name_label.add_theme_constant_override("shadow_offset_y", 2)
 		text_column.add_child(name_label)
 		var effect_label := Label.new()
 		effect_label.text = String(boost["text"])
@@ -2126,7 +2246,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	var food_id := _get_food_id(index)
 	var data := _get_food_data(index)
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(0.0, 154.0)
+	card.custom_minimum_size = Vector2(0.0, 174.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.gui_input.connect(_on_food_icon_gui_input.bind(food_id))
@@ -2143,13 +2263,18 @@ func _create_food_card(index: int) -> PanelContainer:
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_theme_constant_override("separation", 5)
 	margin.add_child(content)
+	var icon_plate := PanelContainer.new()
+	icon_plate.custom_minimum_size = Vector2(0.0, 58.0)
+	icon_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_plate.add_theme_stylebox_override("panel", _make_arcade_compartment_style(data["accent"] as Color))
+	content.add_child(icon_plate)
 	var icon := TextureRect.new()
 	icon.texture = _get_food_icon(index)
 	icon.custom_minimum_size = Vector2(48.0, 48.0)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(icon)
+	icon_plate.add_child(icon)
 	var name_label := Label.new()
 	name_label.text = String(data["name"]).to_upper()
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2179,6 +2304,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	count_label.add_theme_font_size_override("font_size", 14)
 	count_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
 	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_style_arcade_label_plate(count_label, data["accent"] as Color)
 	content.add_child(count_label)
 	food_card_counts[food_id] = count_label
 	var action := Button.new()
@@ -2187,6 +2313,7 @@ func _create_food_card(index: int) -> PanelContainer:
 	action.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	action.add_theme_font_size_override("font_size", 14)
 	action.pressed.connect(_on_food_card_action_pressed.bind(food_id))
+	_style_upgrade_button(action, data["accent"] as Color)
 	content.add_child(action)
 	card.set_meta("action_button", action)
 	return card
@@ -2335,25 +2462,51 @@ func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_start_food_drag(food_id, event.global_position)
-			get_viewport().set_input_as_handled()
+			food_drag_candidate_id = food_id
+			food_drag_candidate_start = event.global_position
+			food_drag_candidate_touch_index = -1
+			food_drag_candidate_started_msec = Time.get_ticks_msec()
 		elif dragged_food_id == food_id:
 			_finish_food_drag(event.global_position)
 			get_viewport().set_input_as_handled()
-	elif event is InputEventMouseMotion and dragged_food_id == food_id:
-		_update_food_drag_preview(event.global_position)
+		else:
+			_clear_food_drag_candidate()
+	elif event is InputEventMouseMotion:
+		if dragged_food_id == food_id:
+			_update_food_drag_preview(event.global_position)
+		elif food_drag_candidate_id == food_id and event.global_position.distance_to(food_drag_candidate_start) >= 10.0:
+			_start_food_drag(food_id, event.global_position)
+			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenTouch:
 		if event.pressed:
-			dragged_food_touch_index = event.index
-			_start_food_drag(food_id, event.position)
-			get_viewport().set_input_as_handled()
+			food_drag_candidate_id = food_id
+			food_drag_candidate_start = event.position
+			food_drag_candidate_touch_index = event.index
+			food_drag_candidate_started_msec = Time.get_ticks_msec()
 		elif dragged_food_id == food_id and event.index == dragged_food_touch_index:
 			_finish_food_drag(event.position)
 			dragged_food_touch_index = -1
 			get_viewport().set_input_as_handled()
-	elif event is InputEventScreenDrag and dragged_food_id == food_id and event.index == dragged_food_touch_index:
-		_update_food_drag_preview(event.position)
-		get_viewport().set_input_as_handled()
+		elif event.index == food_drag_candidate_touch_index:
+			_clear_food_drag_candidate()
+	elif event is InputEventScreenDrag:
+		if dragged_food_id == food_id and event.index == dragged_food_touch_index:
+			_update_food_drag_preview(event.position)
+			get_viewport().set_input_as_handled()
+		elif food_drag_candidate_id == food_id and event.index == food_drag_candidate_touch_index and event.position.distance_to(food_drag_candidate_start) >= 18.0:
+			if Time.get_ticks_msec() - food_drag_candidate_started_msec >= 180:
+				dragged_food_touch_index = event.index
+				_start_food_drag(food_id, event.position)
+				get_viewport().set_input_as_handled()
+			else:
+				_clear_food_drag_candidate()
+
+
+func _clear_food_drag_candidate() -> void:
+	food_drag_candidate_id = ""
+	food_drag_candidate_start = Vector2.ZERO
+	food_drag_candidate_touch_index = -1
+	food_drag_candidate_started_msec = 0
 
 
 func _buy_food(food_id: String) -> void:
@@ -2375,7 +2528,9 @@ func _start_food_drag(food_id: String, start_position := Vector2.INF) -> void:
 	if int(food_inventory.get(food_id, 0)) <= 0:
 		food_status_label.text = "Buy this food in the shop first."
 		return
+	_clear_food_drag_candidate()
 	dragged_food_id = food_id
+	food_drag_return_to_inventory = food_panel_mode == "inventory" and menu_overlay.visible
 	if not is_instance_valid(dragged_food_preview):
 		dragged_food_preview = TextureRect.new()
 		dragged_food_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2384,7 +2539,9 @@ func _start_food_drag(food_id: String, start_position := Vector2.INF) -> void:
 		dragged_food_preview.pivot_offset = dragged_food_preview.size * 0.5
 		click_popup_layer.add_child(dragged_food_preview)
 	dragged_food_preview.texture = _get_food_icon(_get_food_index(food_id))
+	dragged_food_preview.modulate = Color(1.0, 1.0, 1.0, 0.92)
 	dragged_food_preview.show()
+	_show_food_drop_target()
 	_update_food_drag_preview(get_viewport().get_mouse_position() if start_position == Vector2.INF else start_position)
 	food_status_label.text = "Drop it on the cat."
 	# The drag leaves the inventory page immediately so the cat becomes the drop
@@ -2403,6 +2560,26 @@ func _start_food_drag(food_id: String, start_position := Vector2.INF) -> void:
 func _update_food_drag_preview(global_position: Vector2) -> void:
 	if is_instance_valid(dragged_food_preview):
 		dragged_food_preview.global_position = global_position - dragged_food_preview.pivot_offset
+	if is_instance_valid(food_drag_drop_target):
+		var cat_rect := cat_button.get_global_rect()
+		food_drag_drop_target.global_position = Vector2(cat_rect.get_center().x - food_drag_drop_target.size.x * 0.5, cat_rect.position.y - food_drag_drop_target.size.y - 12.0)
+		food_drag_drop_target.text = "RELEASE TO FEED" if cat_rect.has_point(global_position) else "DROP FOOD HERE"
+
+
+func _show_food_drop_target() -> void:
+	if not is_instance_valid(food_drag_drop_target):
+		food_drag_drop_target = Label.new()
+		food_drag_drop_target.custom_minimum_size = Vector2(220.0, 48.0)
+		food_drag_drop_target.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		food_drag_drop_target.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		food_drag_drop_target.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		food_drag_drop_target.z_index = 79
+		food_drag_drop_target.add_theme_font_size_override("font_size", 16)
+		food_drag_drop_target.add_theme_color_override("font_color", Color.WHITE)
+		food_drag_drop_target.add_theme_stylebox_override("normal", _make_arcade_compartment_style(Color(0.96, 0.68, 0.26, 1.0), true))
+		click_popup_layer.add_child(food_drag_drop_target)
+	food_drag_drop_target.text = "DROP FOOD HERE"
+	food_drag_drop_target.show()
 
 
 func _finish_food_drag(global_position: Vector2) -> void:
@@ -2413,12 +2590,18 @@ func _finish_food_drag(global_position: Vector2) -> void:
 	dragged_food_touch_index = -1
 	if is_instance_valid(dragged_food_preview):
 		dragged_food_preview.hide()
+	if is_instance_valid(food_drag_drop_target):
+		food_drag_drop_target.hide()
 	if is_instance_valid(telegram_navigation):
 		telegram_navigation.set_interaction_enabled(true)
 	if cat_button.get_global_rect().has_point(global_position):
+		food_drag_return_to_inventory = false
 		_feed_cat(food_id)
 	else:
-		food_status_label.text = "Dropped outside the cat."
+		food_status_label.text = "Dropped outside the cat. Food returned to Inventory."
+		if food_drag_return_to_inventory and is_instance_valid(telegram_navigation):
+			_on_telegram_destination_requested("inventory", 0)
+	food_drag_return_to_inventory = false
 
 
 func _feed_cat(food_id: String) -> void:
@@ -2475,14 +2658,15 @@ func _update_food_ui() -> void:
 	if not is_instance_valid(food_panel):
 		return
 	food_panel_title.text = "SHOP" if food_panel_mode == "shop" else "INVENTORY"
-	food_wallet_label.text = "%s KIBBLES" % _format_number(coins)
 	var owned_types := 0
+	var owned_items := 0
 	for index in range(FOOD_NAMES.size()):
 		var food_id := _get_food_id(index)
 		var data := _get_food_data(index)
 		var count := int(food_inventory.get(food_id, 0))
 		if count > 0:
 			owned_types += 1
+			owned_items += count
 		var count_label := food_card_counts.get(food_id) as Label
 		if count_label != null:
 			count_label.text = "OWNED x%d" % count if food_panel_mode == "shop" else "x%d" % count
@@ -2491,20 +2675,24 @@ func _update_food_ui() -> void:
 			continue
 		# The shop remains a catalogue; inventory is only what the player owns.
 		card.visible = food_panel_mode == "shop" or count > 0
-		card.mouse_filter = Control.MOUSE_FILTER_STOP if food_panel_mode == "inventory" else Control.MOUSE_FILTER_PASS
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
 		card.mouse_default_cursor_shape = Control.CURSOR_DRAG if food_panel_mode == "inventory" else Control.CURSOR_ARROW
+		card.tooltip_text = "Hold briefly, then drag onto the cat" if food_panel_mode == "inventory" else "Buy this food boost"
 		var button := card.get_meta("action_button") as Button
 		if button == null:
 			continue
 		if food_panel_mode == "shop":
-			button.text = "%s KIBBLES" % _format_number(int(data["cost"]))
+			button.text = "BUY  •  %s" % _format_number(int(data["cost"]))
 			button.disabled = coins < int(data["cost"])
 		else:
 			var boost: Dictionary = _get_food_boost(index)
 			button.text = "USE  %s" % String(boost["text"])
 			button.disabled = count <= 0
 	if food_panel_mode == "inventory":
-		food_status_label.text = "Choose an owned boost." if owned_types > 0 else "No boosts owned yet — buy one in the shop."
+		food_wallet_label.text = "%d ITEMS  /  %d FOOD TYPES" % [owned_items, owned_types]
+		food_status_label.text = "Drag food onto the cat, or press USE." if owned_types > 0 else "No boosts owned yet — buy one in the shop."
+	else:
+		food_wallet_label.text = "%s KIBBLES AVAILABLE" % _format_coins()
 	food_empty_state.visible = food_panel_mode == "inventory" and owned_types == 0
 
 
@@ -2650,6 +2838,9 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	card.set_meta("description", description)
 	card.set_meta("tier_info", tier_info)
 	card.set_meta("actions", actions)
+	_style_arcade_label_plate(status_label, accent)
+	_style_arcade_label_plate(tier_info, accent)
+	_style_arcade_card_content(card, accent)
 
 
 func _add_skin_card(skin_data: Dictionary) -> void:
@@ -3021,7 +3212,7 @@ func _get_passive_gain_bonus() -> int:
 
 func _get_effective_passive_gain() -> int:
 	var base_gain := passive_clicks_per_minute + _get_passive_gain_bonus()
-	return maxi(1, roundi(float(base_gain) * (1.0 + 0.1 * get_extended_upgrade_level("dream_engine") + get_advanced_upgrade_bonus("idle"))))
+	return _safe_resource_round(float(base_gain) * (1.0 + 0.1 * get_extended_upgrade_level("dream_engine") + get_advanced_upgrade_bonus("idle")), 1)
 
 
 func get_extended_upgrade_level(upgrade_id: String) -> int:
@@ -3057,7 +3248,7 @@ func _apply_skin_gain_bonus(amount: int, gain_type: String) -> int:
 			total *= _get_click_gain_multiplier()
 		"daily_reward":
 			total *= _get_daily_reward_multiplier()
-	return maxi(1, roundi(total))
+	return _safe_resource_round(total, 1)
 
 
 func _has_special_skin_sparkles() -> bool:
@@ -3099,7 +3290,7 @@ func _get_special_skin_sparkle_colors() -> Array[Color]:
 
 
 func _process_special_skin_sparkles(delta: float) -> void:
-	if menu_overlay.visible or not _has_special_skin_sparkles():
+	if not background_effects_enabled or menu_overlay.visible or not _has_special_skin_sparkles():
 		special_skin_sparkle_elapsed = 0.0
 		return
 
@@ -3249,20 +3440,31 @@ func _setup_settings_stats_visuals() -> void:
 func _style_settings_slider(slider: HSlider, accent: Color) -> void:
 	# Slider touches are captured in _input so decorative/overlapping UI cannot
 	# intercept them before the slider receives the drag.
+	slider.custom_minimum_size.y = 48.0
 	slider.mouse_filter = Control.MOUSE_FILTER_STOP
 	slider.focus_mode = Control.FOCUS_NONE
-	slider.add_theme_stylebox_override(
-		"slider",
-		_make_upgrade_style(Color(0.025, 0.03, 0.045, 1.0), Color(0.14, 0.16, 0.22, 1.0), 6, 1)
-	)
-	slider.add_theme_stylebox_override(
-		"grabber_area",
-		_make_upgrade_style(accent.darkened(0.18), accent.lightened(0.12), 6, 1)
-	)
-	slider.add_theme_stylebox_override(
-		"grabber_area_highlight",
-		_make_upgrade_style(accent, Color.WHITE, 6, 1)
-	)
+	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	slider.tick_count = 5
+	slider.ticks_on_borders = true
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(0.25, 0.29, 0.35, 0.72)
+	track.corner_radius_top_left = 4
+	track.corner_radius_top_right = 4
+	track.corner_radius_bottom_left = 4
+	track.corner_radius_bottom_right = 4
+	track.content_margin_top = 3.0
+	track.content_margin_bottom = 3.0
+	var fill := track.duplicate() as StyleBoxFlat
+	fill.bg_color = accent
+	var fill_highlight := fill.duplicate() as StyleBoxFlat
+	fill_highlight.bg_color = accent.lightened(0.12)
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_stylebox_override("grabber_area", fill)
+	slider.add_theme_stylebox_override("grabber_area_highlight", fill_highlight)
+	slider.add_theme_icon_override("grabber", load("res://assets/ui/navigation/slider_grabber.svg") as Texture2D)
+	slider.add_theme_icon_override("grabber_highlight", load("res://assets/ui/navigation/slider_grabber_highlight.svg") as Texture2D)
+	slider.add_theme_icon_override("tick", load("res://assets/ui/navigation/slider_tick.svg") as Texture2D)
+	slider.add_theme_constant_override("center_grabber", 1)
 
 
 func _build_runtime_settings_ui() -> void:
@@ -3281,16 +3483,22 @@ func _build_runtime_settings_ui() -> void:
 
 func _create_settings_card(title_text: String, accent: Color, icon_index: int) -> PanelContainer:
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", _make_upgrade_card_style(accent, false))
+	card.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(Color(0.055, 0.062, 0.078, 0.96), Color(accent.r, accent.g, accent.b, 0.16), 22, 1, -1, 2)
+	)
 	var margin := MarginContainer.new()
-	for side in ["left", "top", "right", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 12)
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_bottom", 12)
 	card.add_child(margin)
 	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 9)
+	content.add_theme_constant_override("separation", 0)
 	margin.add_child(content)
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 10)
+	header.custom_minimum_size.y = 56.0
 	content.add_child(header)
 	header.add_child(_create_settings_icon(icon_index))
 	var title := Label.new()
@@ -3303,11 +3511,30 @@ func _create_settings_card(title_text: String, accent: Color, icon_index: int) -
 		low_quality_check_box = _create_settings_check("Low quality mode", accent)
 		low_quality_check_box.toggled.connect(_on_low_quality_toggled)
 		content.add_child(low_quality_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		battery_saver_check_box = _create_settings_check("Battery saver (30 FPS)", accent)
+		battery_saver_check_box.toggled.connect(_on_battery_saver_toggled)
+		content.add_child(battery_saver_check_box)
+		content.add_child(_create_settings_row_separator(0))
 		optimized_tap_check_box = _create_settings_check("Optimized tap effects", accent)
 		optimized_tap_check_box.toggled.connect(_on_optimized_tap_toggled)
 		content.add_child(optimized_tap_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		reduce_motion_check_box = _create_settings_check("Reduce motion", accent)
+		reduce_motion_check_box.toggled.connect(_on_reduce_motion_toggled)
+		content.add_child(reduce_motion_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		background_effects_check_box = _create_settings_check("Background sparkles", accent)
+		background_effects_check_box.toggled.connect(_on_background_effects_toggled)
+		content.add_child(background_effects_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		low_power_unfocused_check_box = _create_settings_check("Save power when unfocused", accent)
+		low_power_unfocused_check_box.toggled.connect(_on_low_power_unfocused_toggled)
+		content.add_child(low_power_unfocused_check_box)
+		content.add_child(_create_settings_row_separator(0))
 		var particle_row := HBoxContainer.new()
 		particle_row.add_theme_constant_override("separation", 10)
+		particle_row.custom_minimum_size.y = 54.0
 		particle_row.add_child(_create_settings_icon(2))
 		var particle_label := Label.new()
 		particle_label.text = "Particle limit"
@@ -3330,9 +3557,46 @@ func _create_settings_card(title_text: String, accent: Color, icon_index: int) -
 		haptics_check_box = _create_settings_check("Vibration", accent)
 		haptics_check_box.toggled.connect(_on_haptics_toggled)
 		content.add_child(haptics_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		var haptic_row := HBoxContainer.new()
+		haptic_row.custom_minimum_size.y = 48.0
+		var haptic_label := Label.new()
+		haptic_label.text = "Vibration strength"
+		haptic_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		haptic_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		haptic_row.add_child(haptic_label)
+		haptic_strength_value_label = Label.new()
+		haptic_strength_value_label.text = "%d%%" % haptic_strength
+		haptic_strength_value_label.add_theme_color_override("font_color", accent.lightened(0.18))
+		haptic_row.add_child(haptic_strength_value_label)
+		content.add_child(haptic_row)
+		haptic_strength_slider = HSlider.new()
+		haptic_strength_slider.min_value = 0
+		haptic_strength_slider.max_value = 100
+		haptic_strength_slider.step = 5
+		haptic_strength_slider.value_changed.connect(_on_haptic_strength_changed)
+		_style_settings_slider(haptic_strength_slider, accent)
+		content.add_child(haptic_strength_slider)
+		content.add_child(_create_settings_row_separator(0))
 		events_check_box = _create_settings_check("Events", accent)
 		events_check_box.toggled.connect(_on_events_toggled)
 		content.add_child(events_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		floating_numbers_check_box = _create_settings_check("Floating tap numbers", accent)
+		floating_numbers_check_box.toggled.connect(_on_floating_numbers_toggled)
+		content.add_child(floating_numbers_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		coin_trails_check_box = _create_settings_check("Kibble trails", accent)
+		coin_trails_check_box.toggled.connect(_on_coin_trails_toggled)
+		content.add_child(coin_trails_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		menu_swipe_check_box = _create_settings_check("Swipe between settings tabs", accent)
+		menu_swipe_check_box.toggled.connect(_on_menu_swipe_toggled)
+		content.add_child(menu_swipe_check_box)
+		content.add_child(_create_settings_row_separator(0))
+		reverse_sliders_check_box = _create_settings_check("Reverse slider direction", accent)
+		reverse_sliders_check_box.toggled.connect(_on_reverse_sliders_toggled)
+		content.add_child(reverse_sliders_check_box)
 	return card
 
 
@@ -3340,7 +3604,45 @@ func _build_slider_sound_setting() -> void:
 	var audio_items := audio_settings_card.get_node_or_null("CardMargin/CardItems") as VBoxContainer
 	if audio_items == null:
 		return
+	var master_block := VBoxContainer.new()
+	master_block.add_theme_constant_override("separation", 0)
+	var master_row := HBoxContainer.new()
+	master_row.custom_minimum_size.y = 46.0
+	var master_label := Label.new()
+	master_label.text = "Master volume"
+	master_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	master_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	master_row.add_child(master_label)
+	master_volume_value_label = Label.new()
+	master_volume_value_label.text = "%d%%" % roundi(master_volume * 100.0)
+	master_volume_value_label.add_theme_color_override("font_color", Color(0.72, 0.62, 1.0))
+	master_row.add_child(master_volume_value_label)
+	master_block.add_child(master_row)
+	master_volume_slider = HSlider.new()
+	master_volume_slider.min_value = 0
+	master_volume_slider.max_value = 100
+	master_volume_slider.step = 1
+	master_volume_slider.value_changed.connect(_on_master_volume_changed)
+	_style_settings_slider(master_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
+	master_block.add_child(master_volume_slider)
+	audio_items.add_child(master_block)
+	audio_items.move_child(master_block, 1)
+
+	audio_items.add_child(_create_settings_row_separator(0))
+	click_sounds_check_box = _create_settings_check("Click sounds", Color(0.62, 0.48, 1.0, 1.0))
+	click_sounds_check_box.toggled.connect(_on_click_sounds_toggled)
+	audio_items.add_child(click_sounds_check_box)
+	audio_items.add_child(_create_settings_row_separator(0))
+	ui_sounds_check_box = _create_settings_check("Interface sounds", Color(0.62, 0.48, 1.0, 1.0))
+	ui_sounds_check_box.toggled.connect(_on_ui_sounds_toggled)
+	audio_items.add_child(ui_sounds_check_box)
+	audio_items.add_child(_create_settings_row_separator(0))
+	mute_unfocused_check_box = _create_settings_check("Mute when unfocused", Color(0.62, 0.48, 1.0, 1.0))
+	mute_unfocused_check_box.toggled.connect(_on_mute_unfocused_toggled)
+	audio_items.add_child(mute_unfocused_check_box)
+	audio_items.add_child(_create_settings_row_separator(0))
 	var sound_row := HBoxContainer.new()
+	sound_row.custom_minimum_size.y = 58.0
 	sound_row.add_theme_constant_override("separation", 10)
 	sound_row.add_child(_create_settings_icon(5))
 	var sound_label := Label.new()
@@ -3359,19 +3661,59 @@ func _build_slider_sound_setting() -> void:
 func _create_settings_check(text: String, accent: Color) -> CheckButton:
 	var check := CheckButton.new()
 	check.text = text
-	check.custom_minimum_size.y = 64.0
+	check.custom_minimum_size.y = 60.0
 	check.focus_mode = Control.FOCUS_NONE
 	check.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	check.add_theme_font_size_override("font_size", 20)
+	check.add_theme_font_size_override("font_size", 18)
 	check.add_theme_color_override("font_color", Color(0.88, 0.92, 1.0))
-	check.add_theme_color_override("font_pressed_color", accent.lightened(0.2))
+	check.add_theme_color_override("font_pressed_color", Color(0.96, 0.98, 1.0))
 	var switch_off := load("res://assets/ui/navigation/switch_off.svg") as Texture2D
 	var switch_on := load("res://assets/ui/navigation/switch_on.svg") as Texture2D
 	for state in ["unchecked", "unchecked_hover", "unchecked_pressed", "unchecked_disabled"]:
 		check.add_theme_icon_override(state, switch_off)
 	for state in ["checked", "checked_hover", "checked_pressed", "checked_disabled"]:
 		check.add_theme_icon_override(state, switch_on)
+	check.toggled.connect(_animate_settings_toggle.bind(check, accent))
 	return check
+
+
+func _animate_settings_toggle(_enabled: bool, check: CheckButton, _accent: Color) -> void:
+	# Let the setting's own handler run first. This makes Reduce motion take
+	# effect on the same interaction that enables it.
+	await get_tree().process_frame
+	if reduce_motion_enabled or not is_instance_valid(check):
+		check.scale = Vector2.ONE
+		check.modulate = Color.WHITE
+		return
+	var old_tween: Tween
+	if check.has_meta("settings_toggle_tween"):
+		old_tween = check.get_meta("settings_toggle_tween") as Tween
+	if old_tween != null and old_tween.is_valid():
+		old_tween.kill()
+	check.pivot_offset = Vector2(check.size.x, check.size.y * 0.5)
+	check.scale = Vector2.ONE
+	check.modulate = Color.WHITE
+	var tween := create_tween()
+	tween.tween_property(check, "scale", Vector2(1.012, 1.012), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(check, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	check.set_meta("settings_toggle_tween", tween)
+
+
+func _animate_settings_value(label: Label, _accent: Color) -> void:
+	if reduce_motion_enabled or not is_instance_valid(label):
+		return
+	var old_tween: Tween
+	if label.has_meta("settings_value_tween"):
+		old_tween = label.get_meta("settings_value_tween") as Tween
+	if old_tween != null and old_tween.is_valid():
+		old_tween.kill()
+	label.pivot_offset = label.size * 0.5
+	label.scale = Vector2.ONE
+	label.modulate = Color.WHITE
+	var tween := create_tween()
+	tween.tween_property(label, "scale", Vector2(1.075, 1.075), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	label.set_meta("settings_value_tween", tween)
 
 
 func _create_settings_icon(index: int) -> TextureRect:
@@ -3386,9 +3728,9 @@ func _create_settings_icon(index: int) -> TextureRect:
 func _get_settings_icon_texture(index: int) -> Texture2D:
 	var atlas := AtlasTexture.new()
 	if settings_icon_sheet_texture == null:
-		var image := Image.new()
-		if image.load(ProjectSettings.globalize_path(SETTINGS_ICON_SHEET_PATH)) == OK:
-			settings_icon_sheet_texture = ImageTexture.create_from_image(image)
+		# Resource loading respects imported textures in desktop, mobile, and web
+		# exports; direct filesystem Image.load() does not survive packed builds.
+		settings_icon_sheet_texture = load(SETTINGS_ICON_SHEET_PATH) as Texture2D
 	if settings_icon_sheet_texture == null:
 		return null
 	atlas.atlas = settings_icon_sheet_texture
@@ -3400,19 +3742,59 @@ func _get_settings_icon_texture(index: int) -> Texture2D:
 
 func _refresh_runtime_settings_ui() -> void:
 	if is_instance_valid(low_quality_check_box):
-		low_quality_check_box.button_pressed = low_quality_enabled
+		low_quality_check_box.set_pressed_no_signal(low_quality_enabled)
+	if is_instance_valid(battery_saver_check_box):
+		battery_saver_check_box.set_pressed_no_signal(battery_saver_enabled)
 	if is_instance_valid(optimized_tap_check_box):
-		optimized_tap_check_box.button_pressed = optimized_tap_effects
+		optimized_tap_check_box.set_pressed_no_signal(optimized_tap_effects)
+	if is_instance_valid(reduce_motion_check_box):
+		reduce_motion_check_box.set_pressed_no_signal(reduce_motion_enabled)
+	if is_instance_valid(background_effects_check_box):
+		background_effects_check_box.set_pressed_no_signal(background_effects_enabled)
+	if is_instance_valid(low_power_unfocused_check_box):
+		low_power_unfocused_check_box.set_pressed_no_signal(low_power_unfocused)
 	if is_instance_valid(particle_limit_slider):
-		particle_limit_slider.value = particle_limit
+		particle_limit_slider.set_value_no_signal(particle_limit)
 	if is_instance_valid(particle_limit_value_label):
 		particle_limit_value_label.text = _get_particle_limit_text()
 	if is_instance_valid(haptics_check_box):
-		haptics_check_box.button_pressed = haptics_enabled
+		haptics_check_box.set_pressed_no_signal(haptics_enabled)
+	if is_instance_valid(haptic_strength_slider):
+		haptic_strength_slider.set_value_no_signal(haptic_strength)
+	if is_instance_valid(haptic_strength_value_label):
+		haptic_strength_value_label.text = "%d%%" % haptic_strength
 	if is_instance_valid(events_check_box):
-		events_check_box.button_pressed = events_enabled
+		events_check_box.set_pressed_no_signal(events_enabled)
+	if is_instance_valid(floating_numbers_check_box):
+		floating_numbers_check_box.set_pressed_no_signal(floating_numbers_enabled)
+	if is_instance_valid(coin_trails_check_box):
+		coin_trails_check_box.set_pressed_no_signal(coin_trails_enabled)
+	if is_instance_valid(menu_swipe_check_box):
+		menu_swipe_check_box.set_pressed_no_signal(menu_swipe_enabled)
+	if is_instance_valid(reverse_sliders_check_box):
+		reverse_sliders_check_box.set_pressed_no_signal(reverse_sliders_enabled)
+	if is_instance_valid(master_volume_slider):
+		master_volume_slider.set_value_no_signal(master_volume * 100.0)
+	if is_instance_valid(master_volume_value_label):
+		master_volume_value_label.text = "%d%%" % roundi(master_volume * 100.0)
+	if is_instance_valid(click_sounds_check_box):
+		click_sounds_check_box.set_pressed_no_signal(click_sounds_enabled)
+	if is_instance_valid(ui_sounds_check_box):
+		ui_sounds_check_box.set_pressed_no_signal(ui_sounds_enabled)
+	if is_instance_valid(mute_unfocused_check_box):
+		mute_unfocused_check_box.set_pressed_no_signal(mute_unfocused)
 	if is_instance_valid(slider_sound_option):
 		slider_sound_option.select(clampi(slider_sound_style, 0, UI_SOUND_VARIANTS.size() - 1))
+	if is_instance_valid(abbreviate_numbers_check_box):
+		abbreviate_numbers_check_box.set_pressed_no_signal(abbreviate_numbers)
+	if is_instance_valid(number_detail_slider):
+		number_detail_slider.set_value_no_signal(number_detail_digits)
+	if is_instance_valid(number_detail_value_label):
+		number_detail_value_label.text = "%d digits" % number_detail_digits
+	if is_instance_valid(exact_number_tooltips_check_box):
+		exact_number_tooltips_check_box.set_pressed_no_signal(exact_number_tooltips)
+	if is_instance_valid(group_full_numbers_check_box):
+		group_full_numbers_check_box.set_pressed_no_signal(group_full_numbers)
 
 
 func _handle_slider_touch(event: InputEvent) -> bool:
@@ -3425,6 +3807,7 @@ func _handle_slider_touch(event: InputEvent) -> bool:
 				_set_slider_from_touch(slider, event.position)
 				return true
 		elif event.index == touch_slider_index:
+			_complete_slider_motion(touch_slider)
 			touch_slider_index = -1
 			touch_slider = null
 			return true
@@ -3432,6 +3815,26 @@ func _handle_slider_touch(event: InputEvent) -> bool:
 		if is_instance_valid(touch_slider):
 			_set_slider_from_touch(touch_slider, event.position)
 		return true
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			var slider := _get_slider_at_position(event.position)
+			if slider != null:
+				touch_slider = slider
+				mouse_slider_dragging = true
+				_set_slider_from_touch(slider, event.position)
+				return true
+		elif mouse_slider_dragging:
+			_complete_slider_motion(touch_slider)
+			mouse_slider_dragging = false
+			touch_slider = null
+			return true
+	elif event is InputEventMouseMotion and mouse_slider_dragging:
+		if is_instance_valid(touch_slider) and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_set_slider_from_touch(touch_slider, event.position)
+			return true
+		mouse_slider_dragging = false
+		_complete_slider_motion(touch_slider)
+		touch_slider = null
 	return false
 
 
@@ -3453,9 +3856,38 @@ func _set_slider_from_touch(slider: Slider, global_position: Vector2) -> void:
 		return
 	var ratio := 1.0 - ((global_position.y - rect.position.y) / length) if is_vertical else (global_position.x - rect.position.x) / length
 	ratio = clampf(ratio, 0.0, 1.0)
-	if not is_vertical and slider.is_layout_rtl():
+	var reverse_horizontal := slider.is_layout_rtl()
+	if reverse_sliders_enabled:
+		reverse_horizontal = not reverse_horizontal
+	if not is_vertical and reverse_horizontal:
 		ratio = 1.0 - ratio
-	slider.value = lerpf(slider.min_value, slider.max_value, ratio)
+	var target_value := lerpf(slider.min_value, slider.max_value, ratio)
+	if slider.step > 0.0:
+		target_value = snappedf(target_value, slider.step)
+	target_value = clampf(target_value, slider.min_value, slider.max_value)
+	var old_tween: Tween
+	if slider.has_meta("smooth_value_tween"):
+		old_tween = slider.get_meta("smooth_value_tween") as Tween
+	if old_tween != null and old_tween.is_valid():
+		old_tween.kill()
+	slider.set_meta("smooth_target_value", target_value)
+	var value_range := maxf(1.0, slider.max_value - slider.min_value)
+	var distance_ratio := absf(target_value - slider.value) / value_range
+	var duration := lerpf(0.045, 0.09, clampf(distance_ratio * 4.0, 0.0, 1.0))
+	var tween := create_tween()
+	tween.tween_property(slider, "value", target_value, duration).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	slider.set_meta("smooth_value_tween", tween)
+
+
+func _complete_slider_motion(slider: Slider) -> void:
+	if not is_instance_valid(slider):
+		return
+	if slider.has_meta("smooth_value_tween"):
+		var tween := slider.get_meta("smooth_value_tween") as Tween
+		if tween != null and tween.is_valid():
+			tween.kill()
+	if slider.has_meta("smooth_target_value"):
+		slider.value = float(slider.get_meta("smooth_target_value"))
 
 
 func _build_extended_upgrades_ui() -> void:
@@ -3592,16 +4024,20 @@ func _create_extended_upgrade_card(upgrade_data: Dictionary) -> PanelContainer:
 func _setup_upgrade_visuals() -> void:
 	upgrades_panel.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.2, 0.25, 0.36, 1.0), 24, 2, 2, 18)
+		_make_upgrade_style(Color(0.035, 0.043, 0.065, 0.99), Color(0.2, 0.25, 0.36, 1.0), 8, 3, 5, 18)
 	)
 	upgrade_hero.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.065, 0.09, 0.14, 1.0), Color(0.25, 0.7, 1.0, 0.72), 20, 2, 2, 10)
+		_make_upgrade_style(Color(0.065, 0.09, 0.14, 1.0), Color(0.25, 0.7, 1.0, 0.72), 7, 2, 5, 10)
 	)
 	wallet_chip.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.14, 0.105, 0.035, 0.92), Color(1.0, 0.72, 0.16, 0.78), 14, 1, -1, 6)
+		_make_upgrade_style(Color(0.14, 0.105, 0.035, 0.92), Color(1.0, 0.72, 0.16, 0.78), 6, 2, 3, 6)
 	)
+	var upgrades_title := upgrade_hero.find_child("UpgradesTitle", true, false) as Label
+	if upgrades_title != null:
+		upgrades_title.text = "UPGRADES"
+		_style_arcade_heading(upgrades_title)
 
 	var card_data := [
 		[click_upgrade_card, upgrade_purchase_button, click_progress_bar, CLICK_UPGRADE_COLOR],
@@ -3620,13 +4056,7 @@ func _setup_upgrade_visuals() -> void:
 		card.mouse_exited.connect(_set_upgrade_card_hover.bind(card, accent, false))
 		_style_upgrade_button(button, accent)
 		_style_upgrade_progress(progress_bar, accent)
-
-		var badge := card.get_node("CardMargin/CardItems/Header/Badge") as Label
-		badge.add_theme_color_override("font_color", accent.lightened(0.18))
-		badge.add_theme_stylebox_override(
-			"normal",
-			_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.14), Color(accent.r, accent.g, accent.b, 0.55), 8, 1)
-		)
+		_style_arcade_card_content(card, accent)
 
 	for upgrade_id in extended_upgrade_controls:
 		var controls: Dictionary = extended_upgrade_controls[upgrade_id]
@@ -3640,11 +4070,7 @@ func _setup_upgrade_visuals() -> void:
 		card.mouse_exited.connect(_set_upgrade_card_hover.bind(card, accent, false))
 		_style_upgrade_button(button, accent)
 		_style_upgrade_progress(progress_bar, accent)
-		badge.add_theme_color_override("font_color", accent.lightened(0.18))
-		badge.add_theme_stylebox_override(
-			"normal",
-			_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.14), Color(accent.r, accent.g, accent.b, 0.55), 8, 1)
-		)
+		_style_arcade_card_content(card, accent)
 
 	_style_upgrade_button(upgrades_back_button, Color(0.42, 0.5, 0.66, 1.0))
 
@@ -3751,8 +4177,56 @@ func _make_upgrade_card_style(accent: Color, hovered: bool) -> StyleBoxFlat:
 	var background := Color(0.055, 0.06, 0.07, 0.82)
 	if hovered:
 		background = Color(0.075, 0.08, 0.09, 0.94)
-	var border := Color(accent.r, accent.g, accent.b, 0.34 if hovered else 0.13)
-	return _make_upgrade_style(background, border, 20, 1, -1, 3 if hovered else 0)
+	var border := Color(accent.r, accent.g, accent.b, 0.52 if hovered else 0.28)
+	var style := _make_upgrade_style(background, border, 7, 2, 4, 5 if hovered else 3)
+	style.border_width_bottom = 3
+	return style
+
+
+func _make_arcade_compartment_style(accent: Color, strong := false) -> StyleBoxFlat:
+	var background := Color(0.035, 0.043, 0.065, 0.96 if strong else 0.82)
+	var border := Color(accent.r, accent.g, accent.b, 0.68 if strong else 0.38)
+	var style := _make_upgrade_style(background, border, 6, 2, 3, 4 if strong else 2)
+	style.border_width_bottom = 3
+	style.content_margin_left = 8.0
+	style.content_margin_right = 8.0
+	style.content_margin_top = 4.0
+	style.content_margin_bottom = 5.0
+	return style
+
+
+func _style_arcade_label_plate(label: Label, accent: Color, strong := false) -> void:
+	label.add_theme_stylebox_override("normal", _make_arcade_compartment_style(accent, strong))
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.88))
+	label.add_theme_constant_override("shadow_offset_y", 2)
+
+
+func _style_arcade_heading(label: Label) -> void:
+	label.text = label.text.to_upper()
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.92))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 3)
+	label.add_theme_constant_override("outline_size", 2)
+
+
+func _style_arcade_card_content(card: PanelContainer, accent: Color) -> void:
+	var header := card.find_child("Header", true, false) as HBoxContainer
+	if header != null:
+		header.add_theme_constant_override("separation", 8)
+	var badge := card.find_child("Badge", true, false) as Label
+	if badge != null:
+		badge.add_theme_color_override("font_color", accent.lightened(0.18))
+		_style_arcade_label_plate(badge, accent, true)
+	var name_label := card.find_child("Name", true, false) as Label
+	if name_label != null:
+		name_label.text = name_label.text.to_upper()
+		name_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+		name_label.add_theme_constant_override("shadow_offset_y", 2)
+	var items := card.find_child("CardItems", true, false) as VBoxContainer
+	if items != null:
+		items.add_theme_constant_override("separation", 6)
+	for child in card.find_children("*CostLabel", "Label", true, false):
+		_style_arcade_label_plate(child as Label, accent)
 
 
 func _set_upgrade_card_hover(card: PanelContainer, accent: Color, hovered: bool) -> void:
@@ -3770,19 +4244,19 @@ func _style_upgrade_button(button: Button, accent: Color) -> void:
 	button.add_theme_color_override("icon_disabled_color", Color(0.68, 0.58, 0.32, 0.72))
 	button.add_theme_stylebox_override(
 		"normal",
-		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.18), Color(accent.r, accent.g, accent.b, 0.24), 16, 1)
+		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.18), Color(accent.r, accent.g, accent.b, 0.48), 7, 2, 3, 5)
 	)
 	button.add_theme_stylebox_override(
 		"hover",
-		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.3), Color(accent.r, accent.g, accent.b, 0.48), 16, 1, -1, 3)
+		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.3), Color(accent.r, accent.g, accent.b, 0.72), 7, 2, 4, 7)
 	)
 	button.add_theme_stylebox_override(
 		"pressed",
-		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.42), Color(1.0, 1.0, 1.0, 0.42), 16, 1)
+		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.42), Color(1.0, 1.0, 1.0, 0.42), 7, 2, 3, 2)
 	)
 	button.add_theme_stylebox_override(
 		"disabled",
-		_make_upgrade_style(Color(0.07, 0.075, 0.085, 0.56), Color(1.0, 1.0, 1.0, 0.07), 16, 1)
+		_make_upgrade_style(Color(0.07, 0.075, 0.085, 0.56), Color(1.0, 1.0, 1.0, 0.12), 7, 2)
 	)
 
 
@@ -3879,27 +4353,72 @@ func _apply_touch_target_hierarchy(node: Node) -> void:
 
 
 func _style_upgrade_progress(progress_bar: ProgressBar, accent: Color) -> void:
+	progress_bar.custom_minimum_size.y = maxf(progress_bar.custom_minimum_size.y, 14.0)
 	progress_bar.add_theme_stylebox_override(
 		"background",
-		_make_upgrade_style(Color(0.025, 0.03, 0.045, 1.0), Color(0.14, 0.16, 0.22, 1.0), 5, 1)
+		_make_upgrade_style(Color(0.025, 0.03, 0.045, 1.0), Color(0.14, 0.16, 0.22, 1.0), 3, 2)
 	)
 	progress_bar.add_theme_stylebox_override(
 		"fill",
-		_make_upgrade_style(accent.darkened(0.12), accent.lightened(0.18), 5, 1)
+		_make_upgrade_style(accent.darkened(0.12), accent.lightened(0.18), 3, 1)
 	)
+	if progress_bar.has_meta("arcade_segments_added"):
+		return
+	progress_bar.set_meta("arcade_segments_added", true)
+	for segment in range(1, 5):
+		var divider := ColorRect.new()
+		divider.name = "SegmentDivider%d" % segment
+		divider.color = Color(0.025, 0.03, 0.045, 0.72)
+		divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		divider.set_anchor(SIDE_LEFT, float(segment) / 5.0)
+		divider.set_anchor(SIDE_RIGHT, float(segment) / 5.0)
+		divider.set_anchor(SIDE_TOP, 0.0)
+		divider.set_anchor(SIDE_BOTTOM, 1.0)
+		divider.offset_left = -1.0
+		divider.offset_right = 1.0
+		divider.offset_top = 2.0
+		divider.offset_bottom = -2.0
+		progress_bar.add_child(divider)
 
 
 func _format_number(value: int) -> String:
-	var text := str(value)
-	var result := ""
-	var digits := 0
-	for index in range(text.length() - 1, -1, -1):
-		if digits > 0 and digits % 3 == 0:
-			result = "," + result
-		result = text.substr(index, 1) + result
-		digits += 1
+	var negative := value < 0
+	var counter := BigCounter.new()
+	if value == -MAX_RESOURCE_VALUE - 1:
+		counter.set_from_decimal_string("9223372036854775808")
+	else:
+		counter.set_from_int(-value if negative else value)
+	var full_number := counter.to_grouped_string() if group_full_numbers else counter.to_decimal_string()
+	var formatted := counter.to_abbreviated_string(NUMBER_SUFFIXES, number_detail_digits) if abbreviate_numbers else full_number
+	return "-" + formatted if negative else formatted
 
-	return result
+
+func _format_counter(counter: BigCounter) -> String:
+	if abbreviate_numbers:
+		return counter.to_abbreviated_string(NUMBER_SUFFIXES, number_detail_digits)
+	# An unbounded full decimal string can eventually stretch or stall a UI.
+	# Preserve exact display while it fits, then compact it automatically.
+	if counter.digit_count() > MAX_FULL_NUMBER_DIGITS:
+		return counter.to_scientific_string(number_detail_digits)
+	return counter.to_grouped_string() if group_full_numbers else counter.to_decimal_string()
+
+
+func _get_counter_tooltip(counter: BigCounter) -> String:
+	if exact_number_tooltips:
+		return counter.to_grouped_string()
+	return _format_counter(counter)
+
+
+func _format_score() -> String:
+	return _format_counter(score_counter)
+
+
+func _format_coins() -> String:
+	return _format_counter(coins_counter)
+
+
+func _format_best_coin_balance() -> String:
+	return _format_counter(best_coin_balance_counter)
 
 
 func _build_tutorial_ui() -> void:
@@ -4739,12 +5258,14 @@ func _on_click_power_changed(value: float) -> void:
 	click_value = clampi(int(value), 1, unlocked_click_value)
 	click_power_label.text = "Use click value: x%d" % click_value
 	click_value_label.text = "Click value: x%d / unlocked x%d" % [click_value, unlocked_click_value]
+	_animate_settings_value(click_power_label, CLICK_UPGRADE_COLOR)
 	_queue_save()
 
 
 func _on_click_volume_changed(value: float) -> void:
 	click_volume = clamp(value / 100.0, 0.0, 1.0)
 	click_volume_label.text = "Click sound: %d%%" % int(value)
+	_animate_settings_value(click_volume_label, Color(0.62, 0.48, 1.0, 1.0))
 	_apply_volume()
 	_play_slider_sound()
 	_queue_save()
@@ -4753,8 +5274,39 @@ func _on_click_volume_changed(value: float) -> void:
 func _on_ui_volume_changed(value: float) -> void:
 	ui_volume = clamp(value / 100.0, 0.0, 1.0)
 	ui_volume_label.text = "UI sound: %d%%" % int(value)
+	_animate_settings_value(ui_volume_label, Color(0.62, 0.48, 1.0, 1.0))
 	_apply_volume()
 	_play_slider_sound()
+	_queue_save()
+
+
+func _on_master_volume_changed(value: float) -> void:
+	master_volume = clampf(value / 100.0, 0.0, 1.0)
+	if is_instance_valid(master_volume_value_label):
+		master_volume_value_label.text = "%d%%" % roundi(value)
+		_animate_settings_value(master_volume_value_label, Color(0.62, 0.48, 1.0, 1.0))
+	_apply_volume()
+	_play_slider_sound()
+	_queue_save()
+
+
+func _on_click_sounds_toggled(enabled: bool) -> void:
+	click_sounds_enabled = enabled
+	_apply_volume()
+	_queue_save()
+
+
+func _on_ui_sounds_toggled(enabled: bool) -> void:
+	ui_sounds_enabled = enabled
+	_apply_volume()
+	if enabled:
+		_play_ui_sound()
+	_queue_save()
+
+
+func _on_mute_unfocused_toggled(enabled: bool) -> void:
+	mute_unfocused = enabled
+	_apply_volume()
 	_queue_save()
 
 
@@ -4764,15 +5316,82 @@ func _on_low_quality_toggled(enabled: bool) -> void:
 	_queue_save()
 
 
+func _on_battery_saver_toggled(enabled: bool) -> void:
+	battery_saver_enabled = enabled
+	_apply_runtime_quality()
+	_queue_save()
+
+
 func _on_optimized_tap_toggled(enabled: bool) -> void:
 	optimized_tap_effects = enabled
 	_queue_save()
+
+
+func _on_reduce_motion_toggled(enabled: bool) -> void:
+	reduce_motion_enabled = enabled
+	_queue_save()
+
+
+func _on_background_effects_toggled(enabled: bool) -> void:
+	background_effects_enabled = enabled
+	_queue_save()
+
+
+func _on_low_power_unfocused_toggled(enabled: bool) -> void:
+	low_power_unfocused = enabled
+	_apply_runtime_quality()
+	_queue_save()
+
+
+func _on_abbreviate_numbers_toggled(enabled: bool) -> void:
+	abbreviate_numbers = enabled
+	_refresh_number_format_ui()
+	_queue_save()
+
+
+func _on_number_detail_changed(value: float) -> void:
+	number_detail_digits = clampi(roundi(value), MIN_NUMBER_DETAIL_DIGITS, MAX_NUMBER_DETAIL_DIGITS)
+	if is_instance_valid(number_detail_value_label):
+		number_detail_value_label.text = "%d digits" % number_detail_digits
+		_animate_settings_value(number_detail_value_label, CLICK_UPGRADE_COLOR)
+	_refresh_number_format_ui()
+	_play_slider_sound()
+	_queue_save()
+
+
+func _on_exact_number_tooltips_toggled(enabled: bool) -> void:
+	exact_number_tooltips = enabled
+	_refresh_number_format_ui()
+	_queue_save()
+
+
+func _on_group_full_numbers_toggled(enabled: bool) -> void:
+	group_full_numbers = enabled
+	_refresh_number_format_ui()
+	_queue_save()
+
+
+func _refresh_number_format_ui() -> void:
+	_update_score()
+	_update_coins(false)
+	_update_upgrade_ui()
+	_update_stats_ui()
+	_update_daily_reward_ui()
+	_update_food_ui()
+	_update_skins_ui()
+	if boost_logic != null:
+		boost_logic.update_ui()
+	if crate_logic != null:
+		crate_logic.update_ui()
+	if bottomless_bowl_logic != null:
+		bottomless_bowl_logic.update_ui()
 
 
 func _on_particle_limit_changed(value: float) -> void:
 	particle_limit = clampi(int(round(value)), 1, PARTICLE_LIMIT_INFINITE)
 	if is_instance_valid(particle_limit_value_label):
 		particle_limit_value_label.text = _get_particle_limit_text()
+		_animate_settings_value(particle_limit_value_label, Color(0.26, 0.86, 0.82))
 	_play_slider_sound()
 	_queue_save()
 
@@ -4782,10 +5401,41 @@ func _on_haptics_toggled(enabled: bool) -> void:
 	_queue_save()
 
 
+func _on_haptic_strength_changed(value: float) -> void:
+	haptic_strength = clampi(roundi(value), 0, 100)
+	if is_instance_valid(haptic_strength_value_label):
+		haptic_strength_value_label.text = "%d%%" % haptic_strength
+		_animate_settings_value(haptic_strength_value_label, Color(1.0, 0.58, 0.34))
+	_play_slider_sound()
+	_queue_save()
+
+
 func _on_events_toggled(enabled: bool) -> void:
 	events_enabled = enabled
 	if random_event_logic != null:
 		random_event_logic.set_events_enabled(enabled)
+	_queue_save()
+
+
+func _on_floating_numbers_toggled(enabled: bool) -> void:
+	floating_numbers_enabled = enabled
+	_queue_save()
+
+
+func _on_coin_trails_toggled(enabled: bool) -> void:
+	coin_trails_enabled = enabled
+	_queue_save()
+
+
+func _on_menu_swipe_toggled(enabled: bool) -> void:
+	menu_swipe_enabled = enabled
+	if not enabled and (settings_swipe_tracking or settings_swipe_dragging):
+		_reset_settings_drag()
+	_queue_save()
+
+
+func _on_reverse_sliders_toggled(enabled: bool) -> void:
+	reverse_sliders_enabled = enabled
 	_queue_save()
 
 
@@ -4805,17 +5455,29 @@ func _get_effective_particle_limit(base_limit: int = MAX_COIN_PARTICLES) -> int:
 
 
 func _play_slider_sound() -> void:
+	if not ui_sounds_enabled:
+		return
+	var now := Time.get_ticks_msec()
+	if now - last_slider_sound_msec < 65:
+		return
+	last_slider_sound_msec = now
 	ui_sound.stop()
 	ui_sound.stream = UI_SOUND_VARIANTS[clampi(slider_sound_style, 0, UI_SOUND_VARIANTS.size() - 1)]
 	ui_sound.play()
 
 
 func _apply_volume() -> void:
-	cat_click_sound.volume_db = _linear_volume_to_db(click_volume)
-	cat_meow_sound.volume_db = _linear_volume_to_db(click_volume)
-	bonus_sound.volume_db = _linear_volume_to_db(click_volume)
-	special_milestone_sound.volume_db = _linear_volume_to_db(click_volume)
-	ui_sound.volume_db = _linear_volume_to_db(ui_volume)
+	var focus_multiplier := 0.0 if mute_unfocused and not app_has_focus else 1.0
+	var master := master_volume * focus_multiplier
+	var click_level := master * click_volume
+	var interface_level := master * ui_volume
+	cat_click_sound.volume_db = _linear_volume_to_db(click_level if click_sounds_enabled else 0.0)
+	cat_meow_sound.volume_db = _linear_volume_to_db(click_level if click_sounds_enabled else 0.0)
+	bonus_sound.volume_db = _linear_volume_to_db(click_level)
+	special_milestone_sound.volume_db = _linear_volume_to_db(click_level)
+	ui_sound.volume_db = _linear_volume_to_db(interface_level if ui_sounds_enabled else 0.0)
+	for player in [reward_redeem_sound, purchase_sound, crate_open_sound, gem_reveal_sound, gem_discovery_sound]:
+		player.volume_db = _linear_volume_to_db(interface_level)
 
 
 func _linear_volume_to_db(volume: float) -> float:
@@ -4945,13 +5607,15 @@ func _cancel_cat_press_for_navigation() -> void:
 
 
 func _play_tap_haptic(is_bonus: bool) -> void:
-	if not haptics_enabled:
+	if not haptics_enabled or haptic_strength <= 0:
 		return
 	if not OS.has_feature("mobile"):
 		return
 	const HAPTIC_TICK_MS := 20
 	var duration_ms := HAPTIC_TICK_MS * (2 if is_bonus else 1)
-	Input.vibrate_handheld(duration_ms, 0.72 if is_bonus else 0.28)
+	var base_amplitude := 0.72 if is_bonus else 0.28
+	var amplitude := clampf(base_amplitude * (float(haptic_strength) / 50.0), 0.0, 1.0)
+	Input.vibrate_handheld(duration_ms, amplitude)
 
 
 func _pulse_label(label: Label, is_bonus: bool) -> void:
@@ -4962,6 +5626,8 @@ func _pulse_label(label: Label, is_bonus: bool) -> void:
 	label.pivot_offset = label.size * 0.5
 	label.scale = Vector2.ONE
 	label.modulate = Color.WHITE
+	if reduce_motion_enabled:
+		return
 	var pulse_tween := create_tween()
 	pulse_tween.set_parallel(true)
 	var pulse_scale := Vector2(1.16, 1.16) if is_bonus else Vector2(1.08, 1.08)
@@ -5004,6 +5670,9 @@ func _tween_control_scale(control: Control, target_scale: Vector2, duration: flo
 		previous_tween = control.get_meta("scale_tween") as Tween
 	if previous_tween != null and previous_tween.is_valid():
 		previous_tween.kill()
+	if reduce_motion_enabled:
+		control.scale = Vector2.ONE
+		return
 	var tween := create_tween()
 	tween.tween_property(control, "scale", target_scale, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	control.set_meta("scale_tween", tween)
@@ -5016,6 +5685,9 @@ func _pop_control(control: Control, target_scale: Vector2, duration: float) -> v
 	if previous_tween != null and previous_tween.is_valid():
 		previous_tween.kill()
 	control.pivot_offset = control.size * 0.5
+	if reduce_motion_enabled:
+		control.scale = Vector2.ONE
+		return
 	var tween := create_tween()
 	tween.tween_property(control, "scale", target_scale, duration * 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(control, "scale", Vector2.ONE, duration * 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -5751,7 +6423,7 @@ func _apply_food_grid_responsive_style(viewport_width: float = -1.0) -> void:
 		if margin != null:
 			margin.add_theme_constant_override("margin_left", horizontal_margin)
 			margin.add_theme_constant_override("margin_right", horizontal_margin)
-		var action := card.get_meta("action_button", null) as Button
+		var action := _meta_or_null(card, "action_button") as Button
 		if action == null:
 			continue
 		action.custom_minimum_size.x = 0.0
@@ -5908,39 +6580,39 @@ func _apply_boosts_responsive_layout(viewport_width: float = -1.0) -> void:
 			continue
 		card.custom_minimum_size.x = 0.0
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var margin := card.get_meta("margin", null) as MarginContainer
+		var margin := _meta_or_null(card, "margin") as MarginContainer
 		if margin != null:
 			_set_telegram_margins(margin, 9 if compact else 14, 10 if compact else 12, 9 if compact else 14, 10 if compact else 12)
-		var header := card.get_meta("header", null) as HBoxContainer
+		var header := _meta_or_null(card, "header") as HBoxContainer
 		if header != null:
 			header.custom_minimum_size.x = 0.0
 			header.add_theme_constant_override("separation", 5 if compact else 10)
-		var badge := card.get_meta("badge", null) as Label
+		var badge := _meta_or_null(card, "badge") as Label
 		if badge != null:
 			badge.custom_minimum_size = Vector2(52.0 if compact else 64.0, 28.0 if compact else 30.0)
 			badge.clip_text = true
 			badge.add_theme_font_size_override("font_size", 12 if compact else 15)
-		var name_label := card.get_meta("name_label", null) as Label
+		var name_label := _meta_or_null(card, "name_label") as Label
 		if name_label != null:
 			name_label.custom_minimum_size.x = 0.0
 			name_label.clip_text = true
 			name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			name_label.add_theme_font_size_override("font_size", 16 if compact else 20)
-		var status := card.get_meta("status_label", null) as Label
+		var status := _meta_or_null(card, "status_label") as Label
 		if status != null:
 			status.visible = not compact
 			status.custom_minimum_size.x = 0.0
-		var description := card.get_meta("description", null) as Label
+		var description := _meta_or_null(card, "description") as Label
 		if description != null:
 			description.custom_minimum_size.x = 0.0
 			description.add_theme_font_size_override("font_size", 16 if compact else 20)
-		var tier_info := card.get_meta("tier_info", null) as Label
+		var tier_info := _meta_or_null(card, "tier_info") as Label
 		if tier_info != null:
 			tier_info.custom_minimum_size.x = 0.0
 			tier_info.clip_text = true
 			tier_info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			tier_info.add_theme_font_size_override("font_size", 14 if compact else 18)
-		var actions := card.get_meta("actions", null) as HBoxContainer
+		var actions := _meta_or_null(card, "actions") as HBoxContainer
 		if actions != null:
 			actions.custom_minimum_size.x = 0.0
 			actions.add_theme_constant_override("separation", 5 if compact else 8)
@@ -5953,6 +6625,10 @@ func _apply_boosts_responsive_layout(viewport_width: float = -1.0) -> void:
 			action.add_theme_font_size_override("font_size", 14 if compact else 18)
 			var accent: Color = action.get_meta("normal_style_accent", Color(0.68, 0.42, 1.0, 1.0))
 			_style_upgrade_button(action, accent)
+
+
+func _meta_or_null(object: Object, key: StringName) -> Variant:
+	return object.get_meta(key) if object.has_meta(key) else null
 
 
 func _apply_museum_responsive_layout(viewport_width: float = -1.0) -> void:
@@ -6121,6 +6797,8 @@ func _apply_skins_responsive_layout(viewport_width: float = -1.0) -> void:
 
 
 func _spawn_click_popup(amount: int, bonus_multiplier: int = 1, streak_multiplier: int = 1, current_combo_bonus: float = 0.0) -> void:
+	if not floating_numbers_enabled:
+		return
 	if optimized_tap_effects and click_popup_layer.get_child_count() > _get_effective_particle_limit():
 		return
 	var popup := Label.new()
@@ -6166,14 +6844,18 @@ func _spawn_click_popup(amount: int, bonus_multiplier: int = 1, streak_multiplie
 	var drift: Vector2 = Vector2(randf_range(-24.0, 24.0), randf_range(-130.0, -92.0))
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(popup, "position", popup.position + drift, 1.05).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if not reduce_motion_enabled:
+		tween.tween_property(popup, "position", popup.position + drift, 1.05).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	var end_scale := 1.02 + (float(streak_multiplier - 1) * 0.04) + combo_heat * 0.08
-	tween.tween_property(popup, "scale", Vector2(end_scale, end_scale), 0.26).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(popup, "modulate:a", 0.0, 1.05).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if not reduce_motion_enabled:
+		tween.tween_property(popup, "scale", Vector2(end_scale, end_scale), 0.26).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(popup, "modulate:a", 0.0, 0.42 if reduce_motion_enabled else 1.05).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.chain().tween_callback(Callable(popup, "queue_free"))
 
 
 func _spawn_tap_burst(is_bonus: bool) -> void:
+	if reduce_motion_enabled:
+		return
 	if optimized_tap_effects and not is_bonus:
 		return
 	var cat_rect: Rect2 = cat_button.get_global_rect()
@@ -6706,6 +7388,47 @@ func _build_settings_general_group() -> void:
 		menu_coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		menu_coins_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	rows.add_child(_create_settings_row_separator())
+	abbreviate_numbers_check_box = _create_settings_check("Abbreviate numbers (1K, 1M, ...)", CLICK_UPGRADE_COLOR)
+	abbreviate_numbers_check_box.set_pressed_no_signal(abbreviate_numbers)
+	abbreviate_numbers_check_box.toggled.connect(_on_abbreviate_numbers_toggled)
+	rows.add_child(abbreviate_numbers_check_box)
+	rows.add_child(_create_settings_row_separator())
+	var number_detail_block := VBoxContainer.new()
+	number_detail_block.add_theme_constant_override("separation", 0)
+	var number_detail_row := HBoxContainer.new()
+	number_detail_row.custom_minimum_size.y = 48.0
+	var number_detail_title := Label.new()
+	number_detail_title.text = "Number detail"
+	number_detail_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	number_detail_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	number_detail_title.add_theme_font_size_override("font_size", 18)
+	number_detail_row.add_child(number_detail_title)
+	number_detail_value_label = Label.new()
+	number_detail_value_label.text = "%d digits" % number_detail_digits
+	number_detail_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	number_detail_value_label.add_theme_color_override("font_color", CLICK_UPGRADE_COLOR.lightened(0.18))
+	number_detail_row.add_child(number_detail_value_label)
+	number_detail_block.add_child(number_detail_row)
+	number_detail_slider = HSlider.new()
+	number_detail_slider.min_value = MIN_NUMBER_DETAIL_DIGITS
+	number_detail_slider.max_value = MAX_NUMBER_DETAIL_DIGITS
+	number_detail_slider.step = 1
+	number_detail_slider.value = number_detail_digits
+	number_detail_slider.value_changed.connect(_on_number_detail_changed)
+	_style_settings_slider(number_detail_slider, CLICK_UPGRADE_COLOR)
+	number_detail_block.add_child(number_detail_slider)
+	rows.add_child(number_detail_block)
+	rows.add_child(_create_settings_row_separator())
+	exact_number_tooltips_check_box = _create_settings_check("Show exact number tooltips", CLICK_UPGRADE_COLOR)
+	exact_number_tooltips_check_box.set_pressed_no_signal(exact_number_tooltips)
+	exact_number_tooltips_check_box.toggled.connect(_on_exact_number_tooltips_toggled)
+	rows.add_child(exact_number_tooltips_check_box)
+	rows.add_child(_create_settings_row_separator())
+	group_full_numbers_check_box = _create_settings_check("Group full numbers (1,000)", CLICK_UPGRADE_COLOR)
+	group_full_numbers_check_box.set_pressed_no_signal(group_full_numbers)
+	group_full_numbers_check_box.toggled.connect(_on_group_full_numbers_toggled)
+	rows.add_child(group_full_numbers_check_box)
+	rows.add_child(_create_settings_row_separator())
 
 	tutorial_replay_button.reparent(rows)
 	tutorial_replay_button.show()
@@ -6720,11 +7443,11 @@ func _build_settings_general_group() -> void:
 	_style_settings_general_group()
 
 
-func _create_settings_row_separator() -> MarginContainer:
+func _create_settings_row_separator(left_margin: int = 58) -> MarginContainer:
 	var separator_margin := MarginContainer.new()
 	separator_margin.name = "SettingsRowSeparator"
 	separator_margin.custom_minimum_size.y = 1.0
-	separator_margin.add_theme_constant_override("margin_left", 58)
+	separator_margin.add_theme_constant_override("margin_left", left_margin)
 	var separator := ColorRect.new()
 	separator.color = Color(1.0, 1.0, 1.0, 0.09)
 	separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -6849,6 +7572,10 @@ func _show_settings_shell() -> void:
 	settings_shell.position = Vector2(width, 0.0)
 	settings_shell.modulate = Color.WHITE
 	settings_shell.show()
+	call_deferred("_animate_settings_page_content", settings_current_page)
+	if reduce_motion_enabled:
+		settings_shell.position = Vector2.ZERO
+		return
 	settings_shell_tween = create_tween()
 	settings_shell_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 	settings_shell_tween.tween_property(settings_shell, "position:x", 0.0, 0.26)
@@ -6861,6 +7588,9 @@ func _close_settings_shell() -> void:
 		_show_pause_popup()
 	if settings_shell_tween != null and settings_shell_tween.is_valid():
 		settings_shell_tween.kill()
+	if reduce_motion_enabled:
+		_finish_close_settings_shell()
+		return
 	settings_shell_tween = create_tween()
 	settings_shell_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
 	settings_shell_tween.tween_property(settings_shell, "position:x", get_viewport_rect().size.x, 0.22)
@@ -7050,6 +7780,7 @@ func _show_settings_page(index: int, animated := true) -> void:
 	if settings_pages.is_empty():
 		return
 	index = clampi(index, 0, settings_pages.size() - 1)
+	animated = animated and not reduce_motion_enabled
 	if settings_swipe_dragging:
 		_reset_settings_drag()
 	if settings_page_tween != null and settings_page_tween.is_valid():
@@ -7072,6 +7803,8 @@ func _show_settings_page(index: int, animated := true) -> void:
 		for page_index in settings_pages.size():
 			settings_pages[page_index].visible = page_index == index
 		incoming.position = Vector2.ZERO
+		if animated:
+			call_deferred("_animate_settings_page_content", index)
 		return
 	var width := maxf(settings_pager_host.size.x, get_viewport_rect().size.x)
 	outgoing.show()
@@ -7088,6 +7821,28 @@ func _finish_settings_page_transition(index: int) -> void:
 	for page_index in settings_pages.size():
 		settings_pages[page_index].visible = page_index == index
 		settings_pages[page_index].position = Vector2.ZERO
+	_animate_settings_page_content(index)
+
+
+func _animate_settings_page_content(index: int) -> void:
+	if reduce_motion_enabled or index < 0 or index >= settings_page_contents.size():
+		return
+	var content := settings_page_contents[index]
+	if not is_instance_valid(content) or not content.is_visible_in_tree():
+		return
+	var old_tween: Tween
+	if content.has_meta("settings_entrance_tween"):
+		old_tween = content.get_meta("settings_entrance_tween") as Tween
+	if old_tween != null and old_tween.is_valid():
+		old_tween.kill()
+	content.pivot_offset = Vector2(content.size.x * 0.5, 0.0)
+	content.scale = Vector2(0.985, 0.985)
+	content.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	var tween := create_tween().set_parallel(true)
+	tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	tween.tween_property(content, "scale", Vector2.ONE, 0.24)
+	tween.tween_property(content, "modulate:a", 1.0, 0.2)
+	content.set_meta("settings_entrance_tween", tween)
 
 
 func _update_settings_tab_states() -> void:
@@ -7138,10 +7893,14 @@ func _move_settings_tab_indicator_progress(from_index: int, to_index: int, progr
 
 
 func _handle_settings_shell_swipe(event: InputEvent) -> bool:
+	if not menu_swipe_enabled:
+		if settings_swipe_tracking or settings_swipe_dragging:
+			_reset_settings_drag()
+		return false
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			settings_swipe_start = event.position
-			settings_swipe_tracking = event.position.y >= telegram_top_height
+			settings_swipe_tracking = event.position.y >= telegram_top_height and _get_slider_at_position(event.position) == null
 			settings_swipe_dragging = false
 			settings_swipe_velocity_x = 0.0
 			return false
@@ -7158,7 +7917,7 @@ func _handle_settings_shell_swipe(event: InputEvent) -> bool:
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			settings_swipe_start = event.position
-			settings_swipe_tracking = event.position.y >= telegram_top_height
+			settings_swipe_tracking = event.position.y >= telegram_top_height and _get_slider_at_position(event.position) == null
 			settings_swipe_dragging = false
 			settings_swipe_velocity_x = 0.0
 			return false
@@ -7854,15 +8613,30 @@ func _apply_telegram_root_spacing(panel: Control) -> void:
 
 func _apply_telegram_settings_style() -> void:
 	settings_shell.color = NORMAL_SHELL_BACKGROUND
-	audio_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(Color(0.62, 0.48, 1.0, 1.0), false))
+	audio_settings_card.add_theme_stylebox_override(
+		"panel",
+		_make_upgrade_style(Color(0.055, 0.062, 0.078, 0.96), Color(0.62, 0.48, 1.0, 0.16), 22, 1, -1, 2)
+	)
 	if is_instance_valid(performance_settings_card):
-		performance_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(Color(0.26, 0.86, 0.82), false))
+		performance_settings_card.add_theme_stylebox_override(
+			"panel",
+			_make_upgrade_style(Color(0.055, 0.062, 0.078, 0.96), Color(0.26, 0.86, 0.82, 0.16), 22, 1, -1, 2)
+		)
 	if is_instance_valid(touch_settings_card):
-		touch_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(Color(1.0, 0.58, 0.34), false))
+		touch_settings_card.add_theme_stylebox_override(
+			"panel",
+			_make_upgrade_style(Color(0.055, 0.062, 0.078, 0.96), Color(1.0, 0.58, 0.34, 0.16), 22, 1, -1, 2)
+		)
 	_style_settings_slider(click_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
 	_style_settings_slider(ui_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
+	if is_instance_valid(master_volume_slider):
+		_style_settings_slider(master_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
 	if is_instance_valid(particle_limit_slider):
 		_style_settings_slider(particle_limit_slider, Color(0.26, 0.86, 0.82))
+	if is_instance_valid(haptic_strength_slider):
+		_style_settings_slider(haptic_strength_slider, Color(1.0, 0.58, 0.34))
+	if is_instance_valid(number_detail_slider):
+		_style_settings_slider(number_detail_slider, CLICK_UPGRADE_COLOR)
 	if is_instance_valid(slider_sound_option):
 		slider_sound_option.custom_minimum_size.y = 56.0
 		slider_sound_option.add_theme_font_size_override("font_size", 18)
@@ -8267,6 +9041,8 @@ func _get_scaled_meow_interval(current_score: int) -> int:
 
 
 func _play_ui_sound() -> void:
+	if not ui_sounds_enabled:
+		return
 	ui_sound.stop()
 	ui_sound.stream = UI_SOUND_VARIANTS[ui_sound_variant_index]
 	ui_sound_variant_index = (ui_sound_variant_index + 1) % UI_SOUND_VARIANTS.size()
@@ -8336,6 +9112,14 @@ func _clamp_resource_value(value: int) -> int:
 	return clampi(value, 0, MAX_RESOURCE_VALUE)
 
 
+func _safe_resource_round(value: float, minimum: int = 0) -> int:
+	if is_nan(value) or value <= float(minimum):
+		return minimum
+	if is_inf(value) or value >= float(MAX_RESOURCE_VALUE):
+		return MAX_RESOURCE_VALUE
+	return clampi(roundi(value), minimum, MAX_RESOURCE_VALUE)
+
+
 func _add_resource_value(value: int, amount: int) -> int:
 	value = _clamp_resource_value(value)
 	if amount >= MAX_RESOURCE_VALUE:
@@ -8348,33 +9132,41 @@ func _add_resource_value(value: int, amount: int) -> int:
 func _add_score(amount: int) -> int:
 	if amount <= 0:
 		return 0
-	var previous := score
-	score = _add_resource_value(score, amount)
-	return score - previous
+	score_counter.add_int(amount)
+	score = score_counter.to_clamped_int(MAX_RESOURCE_VALUE)
+	return amount
 
 
 func _add_coins(amount: int) -> int:
 	if amount <= 0:
 		return 0
-	var previous := coins
-	coins = _add_resource_value(coins, amount)
-	best_coin_balance = maxi(best_coin_balance, coins)
-	return coins - previous
+	coins_counter.add_int(amount)
+	coins = coins_counter.to_clamped_int(MAX_RESOURCE_VALUE)
+	if coins_counter.compare(best_coin_balance_counter) > 0:
+		best_coin_balance_counter.copy_from(coins_counter)
+	best_coin_balance = best_coin_balance_counter.to_clamped_int(MAX_RESOURCE_VALUE)
+	return amount
 
 
 func _spend_coins(amount: int) -> bool:
 	if amount <= 0:
 		return true
-	if coins < amount:
+	if not coins_counter.subtract_int(amount):
 		return false
-	coins = _clamp_resource_value(coins - amount)
+	coins = coins_counter.to_clamped_int(MAX_RESOURCE_VALUE)
 	return true
 
 
 func _sync_resource_bounds() -> void:
-	score = _clamp_resource_value(score)
-	coins = _clamp_resource_value(coins)
-	best_coin_balance = _clamp_resource_value(maxi(best_coin_balance, coins))
+	score = score_counter.to_clamped_int(MAX_RESOURCE_VALUE)
+	coins = coins_counter.to_clamped_int(MAX_RESOURCE_VALUE)
+	if coins_counter.compare(best_coin_balance_counter) > 0:
+		best_coin_balance_counter.copy_from(coins_counter)
+	best_coin_balance = best_coin_balance_counter.to_clamped_int(MAX_RESOURCE_VALUE)
+
+
+func _coins_exceed_display_int() -> bool:
+	return coins_counter.exceeds_int(MAX_RESOURCE_VALUE)
 
 
 func _build_admin_panel() -> void:
@@ -8964,6 +9756,7 @@ func _on_admin_add_coins_pressed() -> void:
 
 
 func _on_admin_reset_clicks_pressed() -> void:
+	score_counter.set_zero()
 	score = 0
 	combo_bonus = 0.0
 	combo_drain_elapsed = 0.0
@@ -8982,6 +9775,8 @@ func _on_admin_reset_clicks_pressed() -> void:
 
 
 func _on_admin_reset_coins_pressed() -> void:
+	coins_counter.set_zero()
+	best_coin_balance_counter.set_zero()
 	coins = 0
 	best_coin_balance = 0
 	_update_coins(false)

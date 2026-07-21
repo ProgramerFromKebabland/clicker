@@ -12,7 +12,8 @@ func _init(game_ref) -> void:
 
 
 func update_score() -> void:
-	game.score_label.text = game._format_number(game.score)
+	game.score_label.text = game._format_score()
+	game.score_label.tooltip_text = game._get_counter_tooltip(game.score_counter)
 
 
 func update_coins(animated: bool = true) -> void:
@@ -39,9 +40,9 @@ func set_coin_display(value: float) -> void:
 		game.displayed_coins = game.MAX_RESOURCE_VALUE
 	else:
 		game.displayed_coins = roundi(value)
-	var formatted = game._format_number(game.displayed_coins)
+	var formatted = game._format_coins() if game._coins_exceed_display_int() else game._format_number(game.displayed_coins)
 	game.coins_label.text = formatted
-	game.coins_label.tooltip_text = formatted
+	game.coins_label.tooltip_text = game._get_counter_tooltip(game.coins_counter)
 	game.call_deferred("_animate_hud_coin_text")
 	game.menu_wallet_coins_label.text = "%s KIBBLES" % formatted
 	game.menu_coins_label.text = formatted
@@ -61,7 +62,7 @@ func set_coin_display(value: float) -> void:
 func animate_coin_counter(from_value: int, to_value: int, duration: float = 0.32) -> void:
 	if game.coin_counter_tween != null and game.coin_counter_tween.is_valid():
 		game.coin_counter_tween.kill()
-	if from_value < 0 or to_value < 0 or abs(to_value - from_value) > 1000000000000000:
+	if game._coins_exceed_display_int() or from_value < 0 or to_value < 0 or abs(to_value - from_value) > 1000000000000000:
 		set_coin_display(to_value)
 		return
 	game.coin_counter_tween = game.create_tween()
@@ -79,7 +80,7 @@ func gain_coins(amount: int, origin_global: Vector2) -> void:
 
 
 func spawn_coin_stream(amount: int, origin_global: Vector2) -> void:
-	if amount <= 0 or not game.is_inside_tree():
+	if amount <= 0 or not game.is_inside_tree() or not game.coin_trails_enabled:
 		return
 
 	var particle_count := mini(game._get_effective_particle_limit(game.MAX_COIN_PARTICLES), maxi(1, ceili(sqrt(float(amount)))))
@@ -225,9 +226,9 @@ func start_hud_icon_idle_effect() -> void:
 
 
 func update_volume_ui() -> void:
-	game.click_power_slider.value = game.click_value
-	game.click_volume_slider.value = round(game.click_volume * 100.0)
-	game.ui_volume_slider.value = round(game.ui_volume * 100.0)
+	game.click_power_slider.set_value_no_signal(game.click_value)
+	game.click_volume_slider.set_value_no_signal(round(game.click_volume * 100.0))
+	game.ui_volume_slider.set_value_no_signal(round(game.ui_volume * 100.0))
 	game.click_volume_label.text = "Click sound: %d%%" % int(game.click_volume_slider.value)
 	game.ui_volume_label.text = "UI sound: %d%%" % int(game.ui_volume_slider.value)
 	game._refresh_runtime_settings_ui()
@@ -244,8 +245,8 @@ func update_stats_ui() -> void:
 			"color": Color(0.42, 0.86, 1.0, 1.0),
 			"entries": [
 				["TOTAL TAPS", game._format_number(game.total_taps)],
-				["TOTAL SCORE", game._format_number(game.score)],
-				["KIBBLES SAVED", game._format_number(game.coins)],
+				["TOTAL SCORE", game._format_score()],
+				["KIBBLES SAVED", game._format_coins()],
 				["BEST CLICK", game._format_number(game.best_single_click)],
 				["COMBO", "x%.1f" % game._get_combo_multiplier()],
 				["DAILY STREAK", str(game.daily_reward_streak)],

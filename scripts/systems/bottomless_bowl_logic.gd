@@ -24,6 +24,7 @@ var reward_label: Label
 var milestone_label: Label
 var donate_edit: LineEdit
 var donate_button: Button
+var donate_all_button: Button
 
 func _init(game_ref) -> void:
 	game = game_ref
@@ -87,7 +88,7 @@ func build_ui() -> void:
 	donate_edit = LineEdit.new(); donate_edit.placeholder_text = "Amount of kibble"; donate_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER; donate_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL; row.add_child(donate_edit)
 	donate_button = Button.new(); donate_button.text = "DONATE"; donate_button.custom_minimum_size = Vector2(170, 54); game._style_upgrade_button(donate_button, Color(0.94, 0.55, 0.16)); row.add_child(donate_button)
 	donate_button.pressed.connect(_donate)
-	var all_button := Button.new(); all_button.text = "DONATE ALL KIBBLE"; all_button.custom_minimum_size = Vector2(0, 50); game._style_upgrade_button(all_button, Color(0.65, 0.35, 0.75)); content.add_child(all_button); all_button.pressed.connect(func(): donate_edit.text = str(game.coins); _donate())
+	donate_all_button = Button.new(); donate_all_button.text = "DONATE ALL KIBBLE"; donate_all_button.custom_minimum_size = Vector2(0, 50); game._style_upgrade_button(donate_all_button, Color(0.65, 0.35, 0.75)); content.add_child(donate_all_button); donate_all_button.pressed.connect(_donate_maximum)
 	reward_label = Label.new(); reward_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; reward_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; reward_label.add_theme_font_size_override("font_size", 16); content.add_child(reward_label)
 	milestone_label = Label.new(); milestone_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; milestone_label.add_theme_color_override("font_color", Color(0.82, 0.72, 1.0)); content.add_child(milestone_label)
 	var back := Button.new(); back.text = "BACK TO MUSEUM"; back.custom_minimum_size = Vector2(0, 56); game._style_upgrade_button(back, Color(0.65, 0.4, 0.18)); root.add_child(back); back.pressed.connect(game._show_museum)
@@ -147,28 +148,43 @@ func apply_responsive_layout(viewport_width: float = -1.0) -> void:
 		action.add_theme_font_size_override("font_size", 16 if compact else 20)
 
 func get_cost(for_level: int = level) -> int:
-	return mini(game.MAX_RESOURCE_VALUE, int(round(BASE_COST * pow(2.35, for_level))))
+	return game._safe_resource_round(float(BASE_COST) * pow(2.35, for_level), 1)
 
 func _donate() -> void:
 	_check_week()
+	_normalize_progress()
 	var amount: int = mini(game.coins, maxi(0, int(donate_edit.text)))
 	if amount <= 0 or not game._spend_coins(amount): return
-	progress += amount
-	while progress >= get_cost():
-		progress -= get_cost(); level += 1; _grant_reward()
+	var remaining := amount
+	while remaining > 0:
+		var cost := get_cost()
+		var needed := cost - progress
+		if remaining < needed:
+			progress += remaining
+			remaining = 0
+		else:
+			remaining -= needed
+			progress = 0
+			level = game._add_resource_value(level, 1)
+			_grant_reward()
 	donate_edit.clear(); game._update_coins(false); game._update_score(); update_ui(); game._queue_save()
 
+
+func _donate_maximum() -> void:
+	donate_edit.text = str(game.coins)
+	_donate()
+
 func _grant_reward() -> void:
-	rewards_earned += 1
+	rewards_earned = game._add_resource_value(rewards_earned, 1)
 	match (rewards_earned - 1) % 6:
 		0: _grant_gem()
-		1: cozy_crates += 1
-		2: boost_end_time = maxi(boost_end_time, int(game._get_unix_time())) + 600
+		1: cozy_crates = game._add_resource_value(cozy_crates, 1)
+		2: boost_end_time = game._add_resource_value(maxi(boost_end_time, int(game._get_unix_time())), 600)
 		3: _grant_food()
 		4:
 			var kibble_reward: int = maxi(1000, get_cost(maxi(0, level - 1)) / 4)
 			game._add_score(kibble_reward); game._add_coins(kibble_reward)
-		5: crate_keys += 1
+		5: crate_keys = game._add_resource_value(crate_keys, 1)
 	if game.special_milestone_sound != null: game.special_milestone_sound.play()
 
 func _grant_gem() -> void:
@@ -198,6 +214,13 @@ func _check_week() -> void:
 	if week_id == 0: week_id = current
 	elif week_id != current: week_id = current; level = 0; progress = 0
 
+
+func _normalize_progress() -> void:
+	while progress >= get_cost():
+		progress -= get_cost()
+		level = game._add_resource_value(level, 1)
+		_grant_reward()
+
 func update_ui() -> void:
 	if not is_instance_valid(level_label): return
 	_check_week()
@@ -205,7 +228,8 @@ func update_ui() -> void:
 	level_label.text = "WEEKLY BOWL  •  LEVEL %d" % level
 	progress_bar.max_value = cost; progress_bar.value = progress
 	progress_label.text = "%s / %s KIBBLE" % [game._format_number(progress), game._format_number(cost)]
-	wallet_label.text = "WALLET: %s KIBBLE" % game._format_number(game.coins)
+	wallet_label.text = "WALLET: %s KIBBLE" % game._format_coins()
+	donate_all_button.text = "DONATE MAX PER TAP" if game._coins_exceed_display_int() else "DONATE ALL KIBBLE"
 	var reward_names: Array[String] = ["CAT GEM", "COZY CRATE", "10 MIN +50% BOOST", "FOOD", "KIBBLES", "UNIVERSAL CRATE KEY"]
 	reward_label.text = "NEXT REWARD: %s\nLevels become substantially more expensive (×2.35 each)." % reward_names[rewards_earned % reward_names.size()]
 	milestone_label.text = "BOWL REWARDS\n%d earned  •  %d Cozy Crates  •  %d universal keys\nKeys make any crate free. Cozy Crates make a Cozy Crate free." % [rewards_earned, cozy_crates, crate_keys]

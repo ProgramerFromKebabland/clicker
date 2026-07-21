@@ -35,12 +35,12 @@ func perform_tap(is_ghost: bool) -> bool:
 		increase_combo()
 	var base_combo_multiplier: float = 1.0 + game.combo_bonus
 	var combo_multiplier: float = get_combo_multiplier()
-	var unboosted_click_amount: int = maxi(1, roundi(float(game.click_value) * base_combo_multiplier))
+	var unboosted_click_amount: int = game._safe_resource_round(float(game.click_value) * base_combo_multiplier, 1)
 	unboosted_click_amount = game._apply_skin_gain_bonus(unboosted_click_amount, "click")
-	var click_amount: int = maxi(1, roundi(float(game.click_value) * combo_multiplier))
+	var click_amount: int = game._safe_resource_round(float(game.click_value) * combo_multiplier, 1)
 	click_amount = game._apply_skin_gain_bonus(click_amount, "click")
-	click_amount = maxi(1, roundi(float(click_amount) * game.boost_logic.get_tap_multiplier() * game.get_food_tap_multiplier()))
-	click_amount += game.boost_logic.get_flat_tap_bonus()
+	click_amount = game._safe_resource_round(float(click_amount) * game.boost_logic.get_tap_multiplier() * game.get_food_tap_multiplier(), 1)
+	click_amount = game._add_resource_value(click_amount, game.boost_logic.get_flat_tap_bonus())
 	var bonus_multiplier: int = game._roll_bonus_multiplier()
 	var unboosted_bonus_multiplier: int = bonus_multiplier
 	bonus_multiplier = game.boost_logic.transform_bonus_multiplier(bonus_multiplier)
@@ -51,21 +51,21 @@ func perform_tap(is_ghost: bool) -> bool:
 	if bonus_hit and get_recent_bonus_count() >= 2:
 		unboosted_streak_multiplier = game.bonus_streak_multiplier + game._get_streak_bonus()
 		streak_multiplier = unboosted_streak_multiplier
-		streak_multiplier = maxi(1, roundi(float(streak_multiplier) * game.boost_logic.get_streak_multiplier()))
+		streak_multiplier = game._safe_resource_round(float(streak_multiplier) * game.boost_logic.get_streak_multiplier(), 1)
 		bonus_multiplier *= streak_multiplier
-		game.bonus_streak_activations += 1
+		game.bonus_streak_activations = game._add_resource_value(game.bonus_streak_activations, 1)
 
 	if bonus_hit:
-		unboosted_click_amount *= unboosted_bonus_multiplier * unboosted_streak_multiplier
-		click_amount *= bonus_multiplier
-		click_amount = maxi(1, roundi(float(click_amount) * game.boost_logic.get_bonus_payout_multiplier() * game.get_food_bonus_payout_multiplier()))
+		unboosted_click_amount = game._safe_resource_round(float(unboosted_click_amount) * float(unboosted_bonus_multiplier) * float(unboosted_streak_multiplier), 1)
+		click_amount = game._safe_resource_round(float(click_amount) * float(bonus_multiplier), 1)
+		click_amount = game._safe_resource_round(float(click_amount) * game.boost_logic.get_bonus_payout_multiplier() * game.get_food_bonus_payout_multiplier(), 1)
 	click_amount = game.boost_logic.cap_boosted_click(click_amount, unboosted_click_amount)
 	if is_ghost:
-		click_amount = maxi(1, roundi(float(click_amount) * 0.5))
+		click_amount = game._safe_resource_round(float(click_amount) * 0.5, 1)
 
-	game.total_taps += 1
+	game.total_taps = game._add_resource_value(game.total_taps, 1)
 	if bonus_hit:
-		game.total_bonus_clicks += 1
+		game.total_bonus_clicks = game._add_resource_value(game.total_bonus_clicks, 1)
 	game.best_single_click = maxi(game.best_single_click, click_amount)
 	var cat_rect: Rect2 = game.cat_button.get_global_rect()
 	var kibble_origin := Vector2(cat_rect.get_center().x, cat_rect.end.y)
@@ -183,5 +183,9 @@ func get_scaled_meow_interval(current_score: int) -> int:
 	var threshold: int = game.MILESTONE_SCALE_START
 	while current_score >= threshold:
 		interval *= 10
+		# Multiplying a threshold above this point would overflow a signed
+		# 64-bit integer, turn it negative, and make this loop run forever.
+		if threshold > game.MAX_RESOURCE_VALUE / 10:
+			break
 		threshold *= 10
 	return interval

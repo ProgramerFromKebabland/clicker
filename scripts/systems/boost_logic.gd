@@ -369,7 +369,7 @@ func get_global_gain_multiplier() -> float:
 
 
 func cap_boosted_click(boosted_amount: int, unboosted_amount: int) -> int:
-	var maximum: int = maxi(unboosted_amount, roundi(float(unboosted_amount) * MAX_COMBINED_CLICK_BOOST))
+	var maximum: int = maxi(unboosted_amount, game._safe_resource_round(float(unboosted_amount) * MAX_COMBINED_CLICK_BOOST))
 	return mini(boosted_amount, maximum)
 
 
@@ -427,7 +427,7 @@ func purchase(boost_id: String, tier: int) -> void:
 func update_ui() -> void:
 	if not is_instance_valid(game.boost_wallet_label):
 		return
-	game.boost_wallet_label.text = "%s KIBBLES" % game._format_number(game.coins)
+	game.boost_wallet_label.text = "%s KIBBLES" % game._format_coins()
 
 	for data in BOOST_DATA:
 		var boost_id := String(data["id"])
@@ -466,7 +466,7 @@ func update_ui() -> void:
 			elif recharging:
 				button.text = "RECHARGE\n%s" % format_seconds(recharge_remaining)
 			else:
-				button.text = "%s KIBBLES" % game._format_number(cost) if String(data.get("category", "classical")) != "classical" else "%s\n%s" % [get_tier_name(tier), game._format_number(cost)]
+				button.text = "ACTIVATE\n%s  •  %s" % [get_tier_name(tier), game._format_number(cost)]
 
 func get_data(boost_id: String) -> Dictionary:
 	for data in BOOST_DATA:

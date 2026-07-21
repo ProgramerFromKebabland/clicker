@@ -544,7 +544,7 @@ func update_wallet() -> void:
 		return
 	var bowl_keys: int = game.bottomless_bowl_logic.crate_keys if game.bottomless_bowl_logic != null else 0
 	var cozy_crates: int = game.bottomless_bowl_logic.cozy_crates if game.bottomless_bowl_logic != null else 0
-	wallet_label.text = "%s KIBBLES  |  KEYS: %d  |  COZY CRATES: %d" % [game._format_number(game.coins), bowl_keys, cozy_crates]
+	wallet_label.text = "%s KIBBLES  |  KEYS: %d  |  COZY CRATES: %d" % [game._format_coins(), bowl_keys, cozy_crates]
 	for crate_data in CRATE_DATA:
 		var crate_id := String(crate_data["id"])
 		var open_button := crate_buttons.get(crate_id) as Button
@@ -816,7 +816,7 @@ func open_crate(crate_id: String) -> void:
 			"level_up": get_gem_level(skin_id) > old_level,
 		})
 
-	total_crates_opened += 1
+	total_crates_opened = game._add_resource_value(total_crates_opened, 1)
 	game._update_coins(false)
 	game._update_upgrade_ui()
 	game._update_stats_ui()
@@ -1189,11 +1189,11 @@ func get_workshop_data(upgrade_id: String) -> Dictionary:
 func get_crate_cost(crate_data: Dictionary) -> int:
 	var discount := 1.0 - (0.05 * float(get_workshop_level("treasure_sense")))
 	var repeat_scale := minf(4.0, 1.0 + 0.12 * sqrt(float(total_crates_opened)))
-	return maxi(1, roundi(float(crate_data["cost"]) * maxf(0.6, discount) * repeat_scale))
+	return game._safe_resource_round(float(crate_data["cost"]) * maxf(0.6, discount) * repeat_scale, 1)
 
 
 func get_workshop_cost(upgrade_data: Dictionary, current_level: int) -> int:
-	return int(round(float(upgrade_data["base_cost"]) * pow(2.35, current_level)))
+	return game._safe_resource_round(float(upgrade_data["base_cost"]) * pow(2.35, current_level), 1)
 
 
 func get_workshop_level(upgrade_id: String) -> int:

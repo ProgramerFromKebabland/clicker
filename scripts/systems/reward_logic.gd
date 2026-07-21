@@ -40,14 +40,19 @@ func can_claim_daily_reward() -> bool:
 func get_next_daily_reward_streak() -> int:
 	var today = game._get_current_day_number()
 	if game.last_daily_reward_day == today - 1:
-		return game.daily_reward_streak + 1
+		return game._add_resource_value(game.daily_reward_streak, 1)
 	return 1
 
 
 func get_daily_reward_amount(streak: int = -1) -> int:
 	if streak < 0:
 		streak = game.daily_reward_streak
-	var base_reward = game.DAILY_REWARD_BASE_COINS + (streak * game.DAILY_REWARD_STREAK_BONUS) + (game.click_value * 10) + (game._get_effective_passive_gain() * 5)
+	var base_reward: int = game._safe_resource_round(
+		float(game.DAILY_REWARD_BASE_COINS)
+		+ (float(streak) * float(game.DAILY_REWARD_STREAK_BONUS))
+		+ (float(game.click_value) * 10.0)
+		+ (float(game._get_effective_passive_gain()) * 5.0)
+	)
 	return game._apply_skin_gain_bonus(base_reward, "daily_reward")
 
 
@@ -67,7 +72,7 @@ func claim_daily_reward() -> void:
 
 	var today = game._get_current_day_number()
 	if game.last_daily_reward_day == today - 1:
-		game.daily_reward_streak += 1
+		game.daily_reward_streak = game._add_resource_value(game.daily_reward_streak, 1)
 	else:
 		game.daily_reward_streak = 1
 
