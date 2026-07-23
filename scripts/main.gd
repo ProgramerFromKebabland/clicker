@@ -20,6 +20,13 @@ const BottomlessBowlLogic = preload("res://scripts/systems/bottomless_bowl_logic
 const TelegramNavigation = preload("res://scripts/telegram_navigation.gd")
 const BOOSTS_UI_ICON = preload("res://assets/ui/boosts.png")
 const MUSEUM_UI_ICON = preload("res://assets/ui/museum.png")
+const BACKPACK_UI_ICON = preload("res://assets/ui/navigation/backpack.svg")
+const BOOST_TIER_ICONS := {
+	"classical": preload("res://assets/boosts/boost_classical.png"),
+	"advanced": preload("res://assets/boosts/boost_advanced.png"),
+	"legendary": preload("res://assets/boosts/boost_legendary.png"),
+	"mythic": preload("res://assets/boosts/boost_mythic.png"),
+}
 const SKINS_UI_ICON = preload("res://assets/ui/skins.png")
 const SETTINGS_ICON_SHEET_PATH := "res://assets/ui/settings_icons.png"
 const SETTINGS_PAGE_LABELS: Array[String] = ["General", "Performance", "Audio", "Controls"]
@@ -481,28 +488,28 @@ var last_offline_was_capped := false
 var click_volume: float = 1.0
 var ui_volume: float = 1.0
 var master_volume: float = 1.0
-var click_sounds_enabled := true
-var ui_sounds_enabled := true
+var click_sounds_enabled := false
+var ui_sounds_enabled := false
 var mute_unfocused := false
 var low_quality_enabled := false
 var battery_saver_enabled := false
 var optimized_tap_effects := false
 var reduce_motion_enabled := false
-var background_effects_enabled := true
+var background_effects_enabled := false
 var low_power_unfocused := false
 var particle_limit := PARTICLE_LIMIT_INFINITE
-var haptics_enabled := true
+var haptics_enabled := false
 var haptic_strength := 50
-var events_enabled := true
-var floating_numbers_enabled := true
-var coin_trails_enabled := true
-var menu_swipe_enabled := true
+var events_enabled := false
+var floating_numbers_enabled := false
+var coin_trails_enabled := false
+var menu_swipe_enabled := false
 var reverse_sliders_enabled := false
 var slider_sound_style := 0
-var abbreviate_numbers := true
+var abbreviate_numbers := false
 var number_detail_digits := DEFAULT_NUMBER_DETAIL_DIGITS
-var exact_number_tooltips := true
-var group_full_numbers := true
+var exact_number_tooltips := false
+var group_full_numbers := false
 var app_has_focus := true
 var owned_skin_ids: Array[String] = []
 var equipped_skin_id := DEFAULT_SKIN_ID
@@ -595,6 +602,14 @@ var food_wallet_label: Label
 var food_status_label: Label
 var food_empty_state: PanelContainer
 var food_list: GridContainer
+var food_scroll_content: VBoxContainer
+var inventory_tabs_bar: HBoxContainer
+var inventory_tab_buttons: Dictionary = {}
+var inventory_active_tab := "food"
+var boost_inventory_grid: GridContainer
+var boost_inventory_empty: PanelContainer
+var boost_inventory: Dictionary = {}
+var boost_inventory_cards: Dictionary = {}
 var food_scroll: ScrollContainer
 var food_back_button: Button
 var food_inventory: Dictionary = {}
@@ -612,6 +627,11 @@ var food_drag_candidate_id := ""
 var food_drag_candidate_start := Vector2.ZERO
 var food_drag_candidate_touch_index := -1
 var food_drag_candidate_started_msec := 0
+var dragged_boost_key := ""
+var boost_drag_candidate_key := ""
+var shop_section_bars: Array[HBoxContainer] = []
+var shop_section_buttons: Array[Dictionary] = []
+var active_shop_section := "upgrades"
 var modal_close_button: Button
 var modal_decorations: Array[Control] = []
 var combo_was_running_before_overlay := false
@@ -799,6 +819,7 @@ func _ready() -> void:
 	bottomless_bowl_logic.build_ui()
 	_build_bottomless_bowl_button()
 	_build_inventory_shop_buttons()
+	_build_shop_section_navigation()
 	# Still available inside the museum, without a second main-HUD button.
 	bottomless_bowl_button.hide()
 	crate_logic.build_ui()
@@ -2008,6 +2029,7 @@ func _build_food_ui() -> void:
 	food_panel.add_child(outer_margin)
 
 	var content := VBoxContainer.new()
+	content.name = "FoodItems"
 	content.add_theme_constant_override("separation", 12)
 	outer_margin.add_child(content)
 
@@ -2032,12 +2054,26 @@ func _build_food_ui() -> void:
 	food_status_label.add_theme_color_override("font_color", Color(0.9, 0.78, 0.58, 1.0))
 	content.add_child(food_status_label)
 
+	inventory_tabs_bar = HBoxContainer.new()
+	inventory_tabs_bar.name = "InventoryTabs"
+	inventory_tabs_bar.add_theme_constant_override("separation", 10)
+	content.add_child(inventory_tabs_bar)
+	for tab_id in ["food", "boosts"]:
+		var tab := Button.new()
+		tab.text = tab_id.to_upper()
+		tab.custom_minimum_size.y = 52.0
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab.pressed.connect(_show_inventory_tab.bind(tab_id))
+		_style_upgrade_button(tab, Color(0.96, 0.68, 0.26) if tab_id == "food" else Color(0.48, 0.76, 1.0))
+		inventory_tabs_bar.add_child(tab)
+		inventory_tab_buttons[tab_id] = tab
+
 	food_scroll = ScrollContainer.new()
 	_configure_touch_scroll(food_scroll)
 	food_scroll.custom_minimum_size = Vector2(0.0, 470.0)
 	food_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(food_scroll)
-	var food_scroll_content := VBoxContainer.new()
+	food_scroll_content = VBoxContainer.new()
 	food_scroll_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	food_scroll_content.add_theme_constant_override("separation", 12)
 	food_scroll.add_child(food_scroll_content)
@@ -2096,6 +2132,27 @@ func _build_food_ui() -> void:
 		food_inventory[food_id] = int(food_inventory.get(food_id, 0))
 		food_list.add_child(_create_food_card(index))
 
+	boost_inventory_empty = PanelContainer.new()
+	boost_inventory_empty.custom_minimum_size.y = 240.0
+	boost_inventory_empty.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.04, 0.055, 0.09, 0.94), Color(0.48, 0.76, 1.0, 0.55), 18, 1, -1, 3))
+	food_scroll_content.add_child(boost_inventory_empty)
+	var boost_empty_label := Label.new()
+	boost_empty_label.text = "NO BOOSTS YET\nBuy one in Shop, then drag its artwork onto the cat."
+	boost_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boost_empty_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	boost_empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	boost_empty_label.add_theme_font_size_override("font_size", 18)
+	boost_empty_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.96))
+	boost_inventory_empty.add_child(boost_empty_label)
+
+	boost_inventory_grid = GridContainer.new()
+	boost_inventory_grid.name = "BoostInventoryGrid"
+	boost_inventory_grid.columns = 3
+	boost_inventory_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	boost_inventory_grid.add_theme_constant_override("h_separation", 10)
+	boost_inventory_grid.add_theme_constant_override("v_separation", 10)
+	food_scroll_content.add_child(boost_inventory_grid)
+
 	# Keep the useful inventory content above the currency readout.
 	content.add_child(food_wallet_label)
 
@@ -2107,20 +2164,207 @@ func _build_food_ui() -> void:
 	content.add_child(food_back_button)
 
 
+func _show_inventory_tab(tab_id: String) -> void:
+	inventory_active_tab = tab_id if tab_id in ["food", "boosts"] else "food"
+	if food_panel_mode != "inventory":
+		inventory_active_tab = "food"
+	var showing_food := inventory_active_tab == "food"
+	food_list.visible = showing_food
+	food_empty_state.visible = showing_food and _get_owned_food_type_count() == 0
+	boost_inventory_grid.visible = not showing_food
+	boost_inventory_empty.visible = not showing_food and _get_owned_boost_count() == 0
+	food_status_label.text = "Drag food onto the cat." if showing_food else "Drag boost artwork onto the cat to activate it."
+	for key in inventory_tab_buttons:
+		var button := inventory_tab_buttons[key] as Button
+		button.disabled = String(key) == inventory_active_tab
+	if is_instance_valid(food_scroll):
+		food_scroll.scroll_vertical = 0
+
+
+func _get_owned_food_type_count() -> int:
+	var total := 0
+	for count in food_inventory.values():
+		if int(count) > 0:
+			total += 1
+	return total
+
+
+func _get_owned_boost_count() -> int:
+	var total := 0
+	for count in boost_inventory.values():
+		total += maxi(0, int(count))
+	return total
+
+
+func _get_boost_inventory_key(boost_id: String, tier: int) -> String:
+	return "%s:%d" % [boost_id, clampi(tier, 1, 3)]
+
+
+func _get_boost_icon(boost_data: Dictionary) -> Texture2D:
+	return BOOST_TIER_ICONS.get(String(boost_data.get("category", "classical")), BOOST_TIER_ICONS["classical"]) as Texture2D
+
+
+func _refresh_boost_inventory_ui() -> void:
+	if not is_instance_valid(boost_inventory_grid):
+		return
+	for child in boost_inventory_grid.get_children():
+		boost_inventory_grid.remove_child(child)
+		child.queue_free()
+	boost_inventory_cards.clear()
+	for data in BoostLogic.BOOST_DATA:
+		var boost_id := String(data["id"])
+		for tier in range(1, 4):
+			var key := _get_boost_inventory_key(boost_id, tier)
+			var count := int(boost_inventory.get(key, 0))
+			if count <= 0:
+				continue
+			var card := PanelContainer.new()
+			card.custom_minimum_size = Vector2(0.0, 190.0)
+			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			card.mouse_filter = Control.MOUSE_FILTER_STOP
+			card.mouse_default_cursor_shape = Control.CURSOR_DRAG
+			card.tooltip_text = "Drag onto the cat to activate"
+			card.add_theme_stylebox_override("panel", _make_upgrade_card_style(data["accent"] as Color, false))
+			card.gui_input.connect(_on_boost_icon_gui_input.bind(key))
+			boost_inventory_grid.add_child(card)
+			boost_inventory_cards[key] = card
+			var margin := MarginContainer.new()
+			margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_set_telegram_margins(margin, 8, 8, 8, 8)
+			card.add_child(margin)
+			var items := VBoxContainer.new()
+			items.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			items.add_theme_constant_override("separation", 4)
+			margin.add_child(items)
+			var icon := TextureRect.new()
+			icon.texture = _get_boost_icon(data)
+			icon.custom_minimum_size = Vector2(0.0, 104.0)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			items.add_child(icon)
+			var name := Label.new()
+			name.text = String(data["name"])
+			name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			name.clip_text = true
+			name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			name.add_theme_font_size_override("font_size", 12)
+			name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			items.add_child(name)
+			var count_label := Label.new()
+			count_label.text = "TIER %d  x%d" % [tier, count]
+			count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			count_label.add_theme_font_size_override("font_size", 13)
+			count_label.add_theme_color_override("font_color", data["accent"] as Color)
+			count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			items.add_child(count_label)
+	boost_inventory_empty.visible = inventory_active_tab == "boosts" and _get_owned_boost_count() == 0
+
+
 func _build_inventory_shop_buttons() -> void:
 	inventory_shop_bar = HBoxContainer.new()
 	inventory_shop_bar.name = "InventoryShopBar"
-	inventory_shop_bar.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	inventory_shop_bar.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	inventory_shop_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	inventory_shop_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	inventory_shop_bar.add_theme_constant_override("separation", 10)
 	add_child(inventory_shop_bar)
 	move_child(inventory_shop_bar, menu_overlay.get_index())
-	inventory_button = _make_bottom_nav_button("INVENTORY")
+	inventory_button = _make_bottom_nav_button("")
+	inventory_button.name = "BackpackButton"
+	inventory_button.icon = BACKPACK_UI_ICON
+	inventory_button.expand_icon = true
+	inventory_button.add_theme_constant_override("icon_max_width", 48)
+	inventory_button.tooltip_text = "Open backpack"
 	shop_button = _make_bottom_nav_button("SHOP")
 	inventory_shop_bar.add_child(inventory_button)
 	inventory_shop_bar.add_child(shop_button)
 	_build_compact_inventory_ui()
+
+
+func _build_shop_section_navigation() -> void:
+	var hosts: Array[VBoxContainer] = [
+		upgrades_items,
+		boosts_panel.find_child("BoostsItems", true, false) as VBoxContainer,
+		food_panel.find_child("FoodItems", true, false) as VBoxContainer,
+	]
+	var current_sections := ["upgrades", "boosts", "food"]
+	for host_index in range(hosts.size()):
+		var host := hosts[host_index]
+		if host == null:
+			continue
+		var bar := HBoxContainer.new()
+		bar.name = "ShopSectionTabs"
+		bar.set_meta("shop_section_host", current_sections[host_index])
+		bar.add_theme_constant_override("separation", 8)
+		host.add_child(bar)
+		host.move_child(bar, mini(1, host.get_child_count() - 1))
+		var buttons := {}
+		for section in ["upgrades", "boosts", "food"]:
+			var tab := Button.new()
+			tab.text = String(section).to_upper()
+			tab.custom_minimum_size.y = 48.0
+			tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tab.pressed.connect(_show_shop_section.bind(section))
+			var accent := Color(0.25, 0.78, 1.0) if section == "upgrades" else (Color(0.68, 0.42, 1.0) if section == "boosts" else Color(0.96, 0.68, 0.26))
+			_style_upgrade_button(tab, accent)
+			bar.add_child(tab)
+			buttons[section] = tab
+		shop_section_bars.append(bar)
+		shop_section_buttons.append(buttons)
+		bar.visible = current_sections[host_index] != "food" or food_panel_mode == "shop"
+	_refresh_shop_section_tabs()
+
+
+func _refresh_shop_section_tabs() -> void:
+	for buttons in shop_section_buttons:
+		for raw_section in buttons:
+			var section := String(raw_section)
+			var tab := buttons[raw_section] as Button
+			if tab != null:
+				tab.disabled = section == active_shop_section
+
+
+func _prepare_shop_section(section: String) -> Control:
+	active_shop_section = section if section in ["upgrades", "boosts", "food"] else "upgrades"
+	_refresh_shop_section_tabs()
+	match active_shop_section:
+		"boosts":
+			boost_logic.update_ui()
+			_apply_telegram_page_style(boosts_panel)
+			_apply_boosts_responsive_layout()
+			return boosts_panel
+		"food":
+			food_panel_mode = "shop"
+			food_status_label.text = "Buy food here, then use it from the backpack."
+			_update_food_ui()
+			for bar in shop_section_bars:
+				if String(bar.get_meta("shop_section_host", "")) == "food":
+					bar.show()
+			_apply_telegram_page_style(food_panel)
+			_apply_food_grid_responsive_style()
+			return food_panel
+		_:
+			_update_upgrade_ui()
+			_update_stats_ui()
+			_update_daily_reward_ui()
+			_apply_telegram_page_style(upgrades_panel)
+			_apply_upgrades_responsive_layout()
+			return upgrades_panel
+
+
+func _show_shop_section(section: String) -> void:
+	_play_ui_sound()
+	var panel := _prepare_shop_section(section)
+	_show_overlay_panel(panel)
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_destination("shop")
+	if section == "boosts":
+		_tutorial_notify("boosts_opened")
+	elif section == "food":
+		_tutorial_notify("shop_opened")
+	else:
+		_tutorial_notify("upgrades_opened")
 
 
 func _build_compact_inventory_ui() -> void:
@@ -2502,6 +2746,102 @@ func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
 				_clear_food_drag_candidate()
 
 
+func _on_boost_icon_gui_input(event: InputEvent, boost_key: String) -> void:
+	if food_panel_mode != "inventory" or inventory_active_tab != "boosts":
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			boost_drag_candidate_key = boost_key
+			food_drag_candidate_start = event.global_position
+		else:
+			if dragged_boost_key == boost_key:
+				_finish_boost_drag(event.global_position)
+				get_viewport().set_input_as_handled()
+			boost_drag_candidate_key = ""
+	elif event is InputEventMouseMotion:
+		if dragged_boost_key == boost_key:
+			_update_food_drag_preview(event.global_position)
+		elif boost_drag_candidate_key == boost_key and event.global_position.distance_to(food_drag_candidate_start) >= 10.0:
+			_start_boost_drag(boost_key, event.global_position)
+			get_viewport().set_input_as_handled()
+	elif event is InputEventScreenTouch:
+		if event.pressed:
+			boost_drag_candidate_key = boost_key
+			food_drag_candidate_start = event.position
+			food_drag_candidate_touch_index = event.index
+		elif event.index == food_drag_candidate_touch_index:
+			if dragged_boost_key == boost_key:
+				_finish_boost_drag(event.position)
+				get_viewport().set_input_as_handled()
+			boost_drag_candidate_key = ""
+	elif event is InputEventScreenDrag and event.index == food_drag_candidate_touch_index:
+		if dragged_boost_key == boost_key:
+			_update_food_drag_preview(event.position)
+		elif boost_drag_candidate_key == boost_key and event.position.distance_to(food_drag_candidate_start) >= 18.0:
+			_start_boost_drag(boost_key, event.position)
+			get_viewport().set_input_as_handled()
+
+
+func _start_boost_drag(boost_key: String, start_position: Vector2) -> void:
+	if int(boost_inventory.get(boost_key, 0)) <= 0:
+		return
+	dragged_boost_key = boost_key
+	boost_drag_candidate_key = ""
+	var boost_data: Dictionary = boost_logic.get_data(boost_key.get_slice(":", 0))
+	if boost_data.is_empty():
+		dragged_boost_key = ""
+		return
+	if not is_instance_valid(dragged_food_preview):
+		dragged_food_preview = TextureRect.new()
+		dragged_food_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dragged_food_preview.z_index = 80
+		dragged_food_preview.size = Vector2(92.0, 92.0)
+		dragged_food_preview.pivot_offset = dragged_food_preview.size * 0.5
+		click_popup_layer.add_child(dragged_food_preview)
+	dragged_food_preview.texture = _get_boost_icon(boost_data)
+	dragged_food_preview.modulate = Color.WHITE
+	dragged_food_preview.show()
+	_show_food_drop_target()
+	_update_food_drag_preview(start_position)
+	food_status_label.text = "Drop the boost on the cat."
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_destination("main", false)
+		telegram_navigation.set_interaction_enabled(false)
+	telegram_current_panel = null
+	menu_overlay.hide()
+	_resume_combo_after_menu()
+	_resume_gameplay_time_after_menu()
+
+
+func _finish_boost_drag(global_position: Vector2) -> void:
+	if dragged_boost_key.is_empty():
+		return
+	var boost_key := dragged_boost_key
+	dragged_boost_key = ""
+	if is_instance_valid(dragged_food_preview):
+		dragged_food_preview.hide()
+	if is_instance_valid(food_drag_drop_target):
+		food_drag_drop_target.hide()
+	if is_instance_valid(telegram_navigation):
+		telegram_navigation.set_interaction_enabled(true)
+	if not cat_button.get_global_rect().has_point(global_position):
+		food_status_label.text = "Boost returned to your backpack."
+		_show_inventory()
+		return
+	var boost_id := boost_key.get_slice(":", 0)
+	var tier := clampi(int(boost_key.get_slice(":", 1)), 1, 3)
+	if not boost_logic.activate_owned(boost_id, tier):
+		food_status_label.text = "That boost is already active or recharging."
+		_show_inventory()
+		return
+	boost_inventory[boost_key] = maxi(0, int(boost_inventory.get(boost_key, 0)) - 1)
+	_refresh_boost_inventory_ui()
+	_queue_save()
+	var data: Dictionary = boost_logic.get_data(boost_id)
+	_animate_cat_feed()
+	_spawn_floating_text(cat_button.get_global_rect().get_center(), String(data.get("name", "BOOST")), data.get("accent", Color.CYAN) as Color)
+
+
 func _clear_food_drag_candidate() -> void:
 	food_drag_candidate_id = ""
 	food_drag_candidate_start = Vector2.ZERO
@@ -2657,7 +2997,11 @@ func _is_food_boost_active(boost_id: String) -> bool:
 func _update_food_ui() -> void:
 	if not is_instance_valid(food_panel):
 		return
-	food_panel_title.text = "SHOP" if food_panel_mode == "shop" else "INVENTORY"
+	food_panel_title.text = "SHOP / FOOD" if food_panel_mode == "shop" else "BACKPACK"
+	inventory_tabs_bar.visible = food_panel_mode == "inventory"
+	for bar in shop_section_bars:
+		if String(bar.get_meta("shop_section_host", "")) == "food":
+			bar.visible = food_panel_mode == "shop"
 	var owned_types := 0
 	var owned_items := 0
 	for index in range(FOOD_NAMES.size()):
@@ -2682,18 +3026,22 @@ func _update_food_ui() -> void:
 		if button == null:
 			continue
 		if food_panel_mode == "shop":
-			button.text = "BUY  •  %s" % _format_number(int(data["cost"]))
+			button.text = "BUY  -  %s" % _format_number(int(data["cost"]))
 			button.disabled = coins < int(data["cost"])
 		else:
 			var boost: Dictionary = _get_food_boost(index)
 			button.text = "USE  %s" % String(boost["text"])
 			button.disabled = count <= 0
 	if food_panel_mode == "inventory":
-		food_wallet_label.text = "%d ITEMS  /  %d FOOD TYPES" % [owned_items, owned_types]
-		food_status_label.text = "Drag food onto the cat, or press USE." if owned_types > 0 else "No boosts owned yet — buy one in the shop."
+		food_wallet_label.text = "%d FOOD  /  %d BOOSTS" % [owned_items, _get_owned_boost_count()]
+		_refresh_boost_inventory_ui()
+		_show_inventory_tab(inventory_active_tab)
 	else:
 		food_wallet_label.text = "%s KIBBLES AVAILABLE" % _format_coins()
-	food_empty_state.visible = food_panel_mode == "inventory" and owned_types == 0
+		food_list.show()
+		food_empty_state.hide()
+		boost_inventory_grid.hide()
+		boost_inventory_empty.hide()
 
 
 func _open_shop_from_inventory() -> void:
@@ -2762,18 +3110,13 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	header.add_theme_constant_override("separation", 10)
 	card_items.add_child(header)
 
-	var badge := Label.new()
+	var badge := TextureRect.new()
 	badge.name = "Badge"
-	badge.text = String(boost_data["badge"])
-	badge.custom_minimum_size = Vector2(64.0, 30.0)
-	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	badge.add_theme_font_size_override("font_size", 13)
-	badge.add_theme_color_override("font_color", accent.lightened(0.18))
-	badge.add_theme_stylebox_override(
-		"normal",
-		_make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.14), Color(accent.r, accent.g, accent.b, 0.55), 8, 1)
-	)
+	badge.texture = _get_boost_icon(boost_data)
+	badge.custom_minimum_size = Vector2(58.0, 58.0)
+	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge.tooltip_text = String(boost_data["badge"])
 	header.add_child(badge)
 
 	var name_label := Label.new()
@@ -3398,6 +3741,8 @@ func _setup_settings_stats_visuals() -> void:
 	click_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(CLICK_UPGRADE_COLOR, false))
 	audio_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(Color(0.62, 0.48, 1.0, 1.0), false))
 	offline_settings_card.add_theme_stylebox_override("panel", _make_upgrade_card_style(PASSIVE_UPGRADE_COLOR, false))
+	_style_arcade_label_plate(settings_passive_gain_cost_label, PASSIVE_UPGRADE_COLOR)
+	_style_arcade_label_plate(offline_info_label, PASSIVE_UPGRADE_COLOR)
 	_style_settings_slider(click_power_slider, CLICK_UPGRADE_COLOR)
 	_style_settings_slider(click_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
 	_style_settings_slider(ui_volume_slider, Color(0.62, 0.48, 1.0, 1.0))
@@ -3442,6 +3787,10 @@ func _style_settings_slider(slider: HSlider, accent: Color) -> void:
 	# intercept them before the slider receives the drag.
 	slider.custom_minimum_size.y = 48.0
 	slider.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Gameplay/settings values always grow from left to right. Text locale must
+	# not silently flip slider geometry; the explicit accessibility option below
+	# is the only setting allowed to reverse it.
+	slider.layout_direction = Control.LAYOUT_DIRECTION_LTR
 	slider.focus_mode = Control.FOCUS_NONE
 	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	slider.tick_count = 5
@@ -3856,9 +4205,7 @@ func _set_slider_from_touch(slider: Slider, global_position: Vector2) -> void:
 		return
 	var ratio := 1.0 - ((global_position.y - rect.position.y) / length) if is_vertical else (global_position.x - rect.position.x) / length
 	ratio = clampf(ratio, 0.0, 1.0)
-	var reverse_horizontal := slider.is_layout_rtl()
-	if reverse_sliders_enabled:
-		reverse_horizontal = not reverse_horizontal
+	var reverse_horizontal := reverse_sliders_enabled
 	if not is_vertical and reverse_horizontal:
 		ratio = 1.0 - ratio
 	var target_value := lerpf(slider.min_value, slider.max_value, ratio)
@@ -6322,16 +6669,14 @@ func _apply_mobile_layout() -> void:
 	boosts_button.add_theme_font_size_override("font_size", 17 if phone_layout else 19)
 
 	if is_instance_valid(inventory_shop_bar):
-		var food_button_height := 58.0
-		var food_bar_width := upgrade_width
-		inventory_shop_bar.offset_left = upgrade_button.offset_left
-		inventory_shop_bar.offset_top = boosts_button.offset_top - food_button_height - 12.0
-		inventory_shop_bar.offset_right = upgrade_button.offset_right
-		inventory_shop_bar.offset_bottom = boosts_button.offset_top - 12.0
-		inventory_button.custom_minimum_size = Vector2((food_bar_width - 10.0) * 0.5, food_button_height)
-		shop_button.custom_minimum_size = Vector2((food_bar_width - 10.0) * 0.5, food_button_height)
-		inventory_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
-		shop_button.add_theme_font_size_override("font_size", 15 if phone_layout else 17)
+		var backpack_size := 68.0 if short_phone else 76.0
+		var backpack_top := telegram_top_height + 12.0
+		inventory_shop_bar.offset_left = -side_margin - backpack_size
+		inventory_shop_bar.offset_top = backpack_top
+		inventory_shop_bar.offset_right = -side_margin
+		inventory_shop_bar.offset_bottom = backpack_top + backpack_size
+		inventory_button.custom_minimum_size = Vector2(backpack_size, backpack_size)
+		shop_button.hide()
 
 	var menu_size := 70.0 if short_phone else 78.0
 	var menu_top := telegram_top_height + 12.0 if is_instance_valid(telegram_navigation) else side_margin
@@ -6587,11 +6932,9 @@ func _apply_boosts_responsive_layout(viewport_width: float = -1.0) -> void:
 		if header != null:
 			header.custom_minimum_size.x = 0.0
 			header.add_theme_constant_override("separation", 5 if compact else 10)
-		var badge := _meta_or_null(card, "badge") as Label
+		var badge := _meta_or_null(card, "badge") as TextureRect
 		if badge != null:
-			badge.custom_minimum_size = Vector2(52.0 if compact else 64.0, 28.0 if compact else 30.0)
-			badge.clip_text = true
-			badge.add_theme_font_size_override("font_size", 12 if compact else 15)
+			badge.custom_minimum_size = Vector2(52.0 if compact else 64.0, 52.0 if compact else 64.0)
 		var name_label := _meta_or_null(card, "name_label") as Label
 		if name_label != null:
 			name_label.custom_minimum_size.x = 0.0
@@ -6916,6 +7259,8 @@ func _show_settings() -> void:
 
 func _show_upgrades() -> void:
 	_play_ui_sound()
+	active_shop_section = "upgrades"
+	_refresh_shop_section_tabs()
 	if is_instance_valid(settings_shell) and settings_shell.visible:
 		settings_back_to_pause = false
 		_hide_settings_shell_immediate()
@@ -6927,7 +7272,7 @@ func _show_upgrades() -> void:
 	_refresh_telegram_segment_buttons(upgrade_category_buttons, upgrade_active_category)
 	_show_overlay_panel(upgrades_panel)
 	if is_instance_valid(telegram_navigation):
-		telegram_navigation.set_destination("upgrades")
+		telegram_navigation.set_destination("shop")
 	call_deferred("_animate_upgrade_screen")
 	_tutorial_notify("upgrades_opened")
 
@@ -6967,13 +7312,15 @@ func _show_skins() -> void:
 
 func _show_boosts() -> void:
 	_play_ui_sound()
+	active_shop_section = "boosts"
+	_refresh_shop_section_tabs()
 	boost_logic.update_ui()
 	_apply_telegram_page_style(boosts_panel)
 	_apply_boosts_responsive_layout()
 	_refresh_telegram_segment_buttons(boost_category_buttons, boost_active_category)
 	_show_overlay_panel(boosts_panel)
 	if is_instance_valid(telegram_navigation):
-		telegram_navigation.set_destination("boosts")
+		telegram_navigation.set_destination("shop")
 	call_deferred("_animate_boost_screen")
 	_tutorial_notify("boosts_opened")
 
@@ -6981,7 +7328,7 @@ func _show_boosts() -> void:
 func _show_inventory() -> void:
 	_play_ui_sound()
 	food_panel_mode = "inventory"
-	food_status_label.text = "Your collected food and active consumables."
+	food_status_label.text = "Choose Food or Boosts, then drag an item onto the cat."
 	_update_food_ui()
 	_show_overlay_panel(food_panel)
 	call_deferred("_animate_food_screen")
@@ -6989,13 +7336,7 @@ func _show_inventory() -> void:
 
 
 func _show_shop() -> void:
-	_play_ui_sound()
-	food_panel_mode = "shop"
-	food_status_label.text = "Every food costs %s kibbles." % _format_number(FOOD_COST)
-	_update_food_ui()
-	_show_overlay_panel(food_panel)
-	call_deferred("_animate_food_screen")
-	_tutorial_notify("shop_opened")
+	_show_shop_section("food")
 
 
 func _show_crates() -> void:
@@ -7130,12 +7471,13 @@ func _build_telegram_navigation() -> void:
 	_build_pause_detail_shell()
 	# The shell owns primary navigation. Legacy HUD shortcuts stay alive for
 	# tutorial callbacks, but are no longer visible or interactive.
-	menu_button.show()
+	menu_button.hide()
 	upgrade_button.hide()
 	upgrade_alert_badge.hide()
 	skins_button.hide()
 	boosts_button.hide()
-	inventory_shop_bar.hide()
+	inventory_shop_bar.show()
+	shop_button.hide()
 	museum_button.hide()
 	if mission_logic != null and is_instance_valid(mission_logic.button):
 		mission_logic.button.hide()
@@ -8174,7 +8516,9 @@ func _on_telegram_destination_requested(destination: String, direction: int) -> 
 
 func _sync_main_pause_button(destination: String) -> void:
 	if is_instance_valid(menu_button):
-		menu_button.visible = destination == "main"
+		menu_button.hide()
+	if is_instance_valid(inventory_shop_bar):
+		inventory_shop_bar.visible = destination == "main"
 
 
 func _notify_telegram_destination(destination: String) -> void:
@@ -8403,12 +8747,7 @@ func _prepare_telegram_destination(destination: String, play_sound := true) -> C
 		_play_ui_sound()
 	match destination:
 		"shop":
-			food_panel_mode = "shop"
-			food_status_label.text = "Every food costs %s kibbles." % _format_number(FOOD_COST)
-			_update_food_ui()
-			_apply_telegram_page_style(food_panel)
-			_apply_food_grid_responsive_style()
-			return food_panel
+			return _prepare_shop_section(active_shop_section)
 		"inventory":
 			food_panel_mode = "inventory"
 			food_status_label.text = "Your collected food and active consumables."

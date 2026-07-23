@@ -7,15 +7,14 @@ signal pager_drag_started(direction: int)
 signal pager_dragged(delta_x: float, velocity_x: float, direction: int)
 signal pager_drag_released(delta_x: float, velocity_x: float, direction: int)
 
-const TOP_DESTINATIONS: Array[String] = ["main", "skins", "missions", "museum", "inventory"]
-const BOTTOM_DESTINATIONS: Array[String] = ["shop", "main", "upgrades", "boosts"]
-const TOP_LABELS: Array[String] = ["Main", "Skin", "Mission", "Museum", "Inventory"]
-const BOTTOM_LABELS: Array[String] = ["Shop", "Main", "Upgrades", "Boosts"]
+const TOP_DESTINATIONS: Array[String] = ["main", "skins", "missions", "museum"]
+const BOTTOM_DESTINATIONS: Array[String] = ["shop", "main", "pause"]
+const TOP_LABELS: Array[String] = ["Main", "Skin", "Mission", "Museum"]
+const BOTTOM_LABELS: Array[String] = ["Shop", "Main", "Pause"]
 const BOTTOM_ICON_PATHS: Array[String] = [
 	"res://assets/ui/navigation/shop.svg",
 	"res://assets/ui/navigation/main.svg",
-	"res://assets/ui/navigation/upgrades.svg",
-	"res://assets/ui/navigation/boosts.svg",
+	"res://assets/ui/navigation/pause.svg",
 ]
 const GOLD_ACCENT := Color("#f2b84b")
 const SURFACE := Color(0.035, 0.038, 0.045, 0.98)
@@ -26,12 +25,10 @@ const TOP_ACCENTS: Array[Color] = [
 	Color(0.36, 0.82, 1.0),
 	Color(0.3, 0.9, 0.5),
 	Color(0.92, 0.58, 0.22),
-	Color(0.96, 0.68, 0.26),
 ]
 const BOTTOM_ACCENTS: Array[Color] = [
 	Color(0.96, 0.68, 0.26),
 	GOLD_ACCENT,
-	Color(0.25, 0.78, 1.0),
 	Color(0.68, 0.42, 1.0),
 ]
 # Telegram measures these surfaces in density-independent pixels. The project

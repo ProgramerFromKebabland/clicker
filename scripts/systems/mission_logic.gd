@@ -8,6 +8,7 @@ const MISSION_COUNT := 250
 const SLOT_COUNT := 3
 const GEM_KIBBLE_VALUE := 100000
 const BOARD_CLEAR_BONUS_MULTIPLIER := 0.25
+const BASE_REROLL_COST := 100
 const MISSIONS_UI_ICON = preload("res://assets/ui/daily_missions.png")
 
 var game
@@ -17,7 +18,7 @@ var active_ids: Array[int] = []
 var baselines: Dictionary = {}
 var claimed: Dictionary = {}
 var board_bonus_claimed := false
-var reroll_used := false
+var reroll_count := 0
 var last_ui_second := -1
 var last_cards_signature := ""
 
@@ -170,8 +171,8 @@ func build_ui() -> void:
 	board_bonus_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.3))
 	status_items.add_child(board_bonus_label)
 	reroll_button = Button.new()
-	reroll_button.text = "REROLL BOARD  -  1 FREE"
-	reroll_button.tooltip_text = "Replace unfinished missions once per board"
+	reroll_button.text = "REROLL BOARD  -  100 KIBBLES"
+	reroll_button.tooltip_text = "Replace unfinished missions. The price doubles after every reroll."
 	game._style_upgrade_button(reroll_button, Color(0.55, 0.42, 0.95))
 	reroll_button.pressed.connect(_reroll_board)
 	status_items.add_child(reroll_button)
@@ -182,8 +183,11 @@ func build_ui() -> void:
 	status_items.add_child(timer_label)
 	var scroll := ScrollContainer.new()
 	scroll.name = "MissionScroll"
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	game._configure_touch_scroll(scroll)
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.scroll_vertical_custom_step = 140.0
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.clip_contents = true
 	root.add_child(scroll)
 	list = VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -202,7 +206,6 @@ func _refresh_cycle() -> void:
 	baselines.clear()
 	claimed.clear()
 	board_bonus_claimed = false
-	reroll_used = false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = cycle_id * 7919 + 104729
 	var buckets := [[0, 85], [85, 170], [170, 250]]
@@ -236,8 +239,9 @@ func update_ui() -> void:
 	cycle_progress.value = completed
 	board_bonus_label.text = "CLEAR BONUS CLAIMED!" if board_bonus_claimed else "CLEAR BONUS  +25% of all mission prizes"
 	board_bonus_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.64) if board_bonus_claimed else Color(1.0, 0.78, 0.3))
-	reroll_button.text = "REROLL USED" if reroll_used else "REROLL BOARD  -  1 FREE"
-	reroll_button.disabled = reroll_used or completed > 0
+	var reroll_cost := _get_reroll_cost()
+	reroll_button.text = "REROLL BOARD  -  %s KIBBLES" % game._format_number(reroll_cost)
+	reroll_button.disabled = completed > 0 or game.coins < reroll_cost
 	if not panel.visible and list.get_child_count() > 0:
 		return
 	var card_signature := _get_cards_signature()
@@ -391,7 +395,7 @@ func _get_cards_signature() -> String:
 		var progress := mini(_progress(id), int(mission["target"]))
 		parts.append("%d:%d:%s" % [id, progress, str(claimed.get(str(id), false))])
 	parts.append("bonus:%s" % str(board_bonus_claimed))
-	parts.append("reroll:%s" % str(reroll_used))
+	parts.append("rerolls:%d" % reroll_count)
 	return "|".join(parts)
 
 
@@ -419,12 +423,13 @@ func _cycle_status_text(completed: int, ready: int) -> String:
 
 
 func _reroll_board() -> void:
-	if reroll_used:
-		return
 	for id in active_ids:
 		if bool(claimed.get(str(id), false)):
 			return
-	reroll_used = true
+	var reroll_cost := _get_reroll_cost()
+	if not game._spend_coins(reroll_cost):
+		return
+	reroll_count += 1
 	var rng := RandomNumberGenerator.new()
 	rng.seed = cycle_id * 15485863 + int(game._get_unix_time()) + 32452843
 	var buckets := [[0, 85], [85, 170], [170, 250]]
@@ -441,11 +446,12 @@ func _reroll_board() -> void:
 	for id in active_ids:
 		baselines[str(id)] = _counter(String(missions[id]["kind"]))
 	game._queue_save()
+	game._update_coins(false)
 	last_ui_second = -1
 	_rebuild_cards()
 	update_ui()
 	if game.has_method("_show_admin_status"):
-		game._show_admin_status("A fresh mission board has arrived!", Color(0.72, 0.62, 1.0))
+		game._show_admin_status("Fresh missions! Next reroll: %s kibbles." % game._format_number(_get_reroll_cost()), Color(0.72, 0.62, 1.0))
 	else:
 		_spawn_board_notice("FRESH MISSIONS!", Color(0.72, 0.62, 1.0))
 
@@ -603,8 +609,13 @@ func _celebrate_claim(board_cleared: bool) -> void:
 		spark_tween.chain().tween_callback(spark.queue_free)
 
 
+func _get_reroll_cost() -> int:
+	# Cap the exponent so corrupted or very old saves cannot overflow an int.
+	return BASE_REROLL_COST * (1 << mini(reroll_count, 50))
+
+
 func get_save_data() -> Dictionary:
-	return {"cycle_id": cycle_id, "active_ids": active_ids.duplicate(), "baselines": baselines.duplicate(true), "claimed": claimed.duplicate(true), "board_bonus_claimed": board_bonus_claimed, "reroll_used": reroll_used}
+	return {"cycle_id": cycle_id, "active_ids": active_ids.duplicate(), "baselines": baselines.duplicate(true), "claimed": claimed.duplicate(true), "board_bonus_claimed": board_bonus_claimed, "reroll_count": reroll_count}
 
 
 func load_save_data(data: Dictionary) -> void:
@@ -614,4 +625,4 @@ func load_save_data(data: Dictionary) -> void:
 	baselines = data.get("baselines", {}).duplicate(true)
 	claimed = data.get("claimed", {}).duplicate(true)
 	board_bonus_claimed = bool(data.get("board_bonus_claimed", false))
-	reroll_used = bool(data.get("reroll_used", false))
+	reroll_count = maxi(0, int(data.get("reroll_count", 1 if bool(data.get("reroll_used", false)) else 0)))

@@ -105,7 +105,7 @@ func show_achievement_popup(achievement_text: String) -> void:
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	background.add_theme_stylebox_override(
 		"panel",
-		game._make_upgrade_style(Color(0.055, 0.07, 0.11, 0.97), Color(1.0, 0.76, 0.22, 0.95), 16, 2, -1, 10)
+		game._make_upgrade_style(Color(0.055, 0.07, 0.11, 0.97), Color(1.0, 0.76, 0.22, 0.95), 7, 3, 5, 10)
 	)
 	popup.add_child(background)
 
@@ -129,6 +129,7 @@ func show_achievement_popup(achievement_text: String) -> void:
 	title.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
 	title.add_theme_constant_override("shadow_offset_x", 1)
 	title.add_theme_constant_override("shadow_offset_y", 1)
+	game._style_arcade_heading(title)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup.add_child(title)
 

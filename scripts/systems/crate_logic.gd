@@ -492,18 +492,28 @@ func _add_workshop_card(parent: VBoxContainer, upgrade_data: Dictionary) -> void
 	header.add_theme_constant_override("separation", 8)
 	items.add_child(header)
 	var badge := Label.new()
+	badge.name = "WorkshopBadge"
 	badge.text = String(upgrade_data["badge"])
 	badge.add_theme_font_size_override("font_size", 12)
 	badge.add_theme_color_override("font_color", accent.lightened(0.2))
 	badge.add_theme_stylebox_override("normal", game._make_upgrade_style(Color(accent.r, accent.g, accent.b, 0.14), Color(accent.r, accent.g, accent.b, 0.55), 8, 1))
 	header.add_child(badge)
 	var name_label := Label.new()
+	name_label.name = "WorkshopName"
 	name_label.text = String(upgrade_data["name"])
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_label.add_theme_font_size_override("font_size", 18)
 	name_label.add_theme_color_override("font_color", Color(0.9, 0.93, 0.98, 1.0))
 	header.add_child(name_label)
 	var value_label := Label.new()
+	value_label.name = "WorkshopValue"
+	value_label.custom_minimum_size.x = 68.0
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_END
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.clip_text = true
+	value_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	value_label.add_theme_font_size_override("font_size", 18)
 	value_label.add_theme_color_override("font_color", accent.lightened(0.15))
 	header.add_child(value_label)
@@ -643,12 +653,37 @@ func apply_responsive_layout(viewport_width: float = -1.0) -> void:
 			if header != null:
 				header.custom_minimum_size.x = 0.0
 				header.add_theme_constant_override("separation", 5 if compact else 8)
+			var workshop_badge := card.find_child("WorkshopBadge", true, false) as Label
+			if workshop_badge != null:
+				workshop_badge.custom_minimum_size.x = 72.0 if compact else 96.0
+				workshop_badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+				workshop_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+				workshop_badge.clip_text = true
+				workshop_badge.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			var workshop_name := card.find_child("WorkshopName", true, false) as Label
+			if workshop_name != null:
+				workshop_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				workshop_name.autowrap_mode = TextServer.AUTOWRAP_OFF
+				workshop_name.clip_text = true
+				workshop_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			var workshop_value := card.find_child("WorkshopValue", true, false) as Label
+			if workshop_value != null:
+				workshop_value.custom_minimum_size.x = 58.0 if compact else 82.0
+				workshop_value.size_flags_horizontal = Control.SIZE_SHRINK_END
+				workshop_value.autowrap_mode = TextServer.AUTOWRAP_OFF
+				workshop_value.clip_text = true
+				workshop_value.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		for card_label_node in card.find_children("*", "Label", true, false):
 			var card_label := card_label_node as Label
 			if card_label == null:
 				continue
 			card_label.custom_minimum_size.x = 0.0
-			card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			if card_label.get_parent() is HBoxContainer:
+				card_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+				card_label.clip_text = true
+				card_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			else:
+				card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			card_label.add_theme_font_size_override("font_size", 15 if compact else maxi(18, card_label.get_theme_font_size("font_size")))
 		for button_node in card.find_children("*", "Button", true, false):
 			var action := button_node as Button

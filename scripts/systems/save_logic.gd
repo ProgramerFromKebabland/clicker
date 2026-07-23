@@ -80,6 +80,7 @@ func save_game() -> void:
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EQUIPPED_ROOM_SKIN_KEY, game.equipped_room_skin_id)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_EXTENDED_UPGRADES_KEY, game.extended_upgrade_levels)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_FOOD_INVENTORY_KEY, game.food_inventory)
+	save_file.set_value(game.SAVE_SECTION, "boost_inventory", game.boost_inventory)
 	save_file.set_value(game.SAVE_SECTION, game.SAVE_TUTORIAL_COMPLETED_KEY, game.tutorial_completed)
 	save_file.set_value(game.SAVE_SECTION, "active_boost_end_times", game.active_boost_end_times)
 	save_file.set_value(game.SAVE_SECTION, "boost_recharge_end_times", game.boost_recharge_end_times)
@@ -142,28 +143,28 @@ func load_game() -> void:
 	game.click_volume = clamp(float(save_file.get_value(game.SAVE_SECTION, game.SAVE_CLICK_VOLUME_KEY, 1.0)), 0.0, 1.0)
 	game.ui_volume = clamp(float(save_file.get_value(game.SAVE_SECTION, game.SAVE_UI_VOLUME_KEY, 1.0)), 0.0, 1.0)
 	game.master_volume = clamp(float(save_file.get_value(game.SAVE_SECTION, game.SAVE_MASTER_VOLUME_KEY, 1.0)), 0.0, 1.0)
-	game.click_sounds_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_CLICK_SOUNDS_ENABLED_KEY, true))
-	game.ui_sounds_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_UI_SOUNDS_ENABLED_KEY, true))
+	game.click_sounds_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_CLICK_SOUNDS_ENABLED_KEY, false))
+	game.ui_sounds_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_UI_SOUNDS_ENABLED_KEY, false))
 	game.mute_unfocused = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_MUTE_UNFOCUSED_KEY, false))
 	game.low_quality_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_LOW_QUALITY_ENABLED_KEY, false))
 	game.battery_saver_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_BATTERY_SAVER_ENABLED_KEY, false))
 	game.optimized_tap_effects = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_OPTIMIZED_TAP_EFFECTS_KEY, false))
 	game.reduce_motion_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_REDUCE_MOTION_ENABLED_KEY, false))
-	game.background_effects_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_BACKGROUND_EFFECTS_ENABLED_KEY, true))
+	game.background_effects_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_BACKGROUND_EFFECTS_ENABLED_KEY, false))
 	game.low_power_unfocused = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_LOW_POWER_UNFOCUSED_KEY, false))
 	game.particle_limit = clampi(int(save_file.get_value(game.SAVE_SECTION, game.SAVE_PARTICLE_LIMIT_KEY, game.PARTICLE_LIMIT_INFINITE)), 1, game.PARTICLE_LIMIT_INFINITE)
-	game.haptics_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_HAPTICS_ENABLED_KEY, true))
+	game.haptics_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_HAPTICS_ENABLED_KEY, false))
 	game.haptic_strength = clampi(int(save_file.get_value(game.SAVE_SECTION, game.SAVE_HAPTIC_STRENGTH_KEY, 50)), 0, 100)
-	game.events_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_EVENTS_ENABLED_KEY, true))
-	game.floating_numbers_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_FLOATING_NUMBERS_ENABLED_KEY, true))
-	game.coin_trails_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_COIN_TRAILS_ENABLED_KEY, true))
-	game.menu_swipe_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_MENU_SWIPE_ENABLED_KEY, true))
+	game.events_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_EVENTS_ENABLED_KEY, false))
+	game.floating_numbers_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_FLOATING_NUMBERS_ENABLED_KEY, false))
+	game.coin_trails_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_COIN_TRAILS_ENABLED_KEY, false))
+	game.menu_swipe_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_MENU_SWIPE_ENABLED_KEY, false))
 	game.reverse_sliders_enabled = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_REVERSE_SLIDERS_ENABLED_KEY, false))
 	game.slider_sound_style = clampi(int(save_file.get_value(game.SAVE_SECTION, game.SAVE_SLIDER_SOUND_STYLE_KEY, 0)), 0, game.UI_SOUND_VARIANTS.size() - 1)
-	game.abbreviate_numbers = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_ABBREVIATE_NUMBERS_KEY, true))
+	game.abbreviate_numbers = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_ABBREVIATE_NUMBERS_KEY, false))
 	game.number_detail_digits = clampi(int(save_file.get_value(game.SAVE_SECTION, game.SAVE_NUMBER_DETAIL_DIGITS_KEY, game.DEFAULT_NUMBER_DETAIL_DIGITS)), game.MIN_NUMBER_DETAIL_DIGITS, game.MAX_NUMBER_DETAIL_DIGITS)
-	game.exact_number_tooltips = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_EXACT_NUMBER_TOOLTIPS_KEY, true))
-	game.group_full_numbers = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_GROUP_FULL_NUMBERS_KEY, true))
+	game.exact_number_tooltips = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_EXACT_NUMBER_TOOLTIPS_KEY, false))
+	game.group_full_numbers = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_GROUP_FULL_NUMBERS_KEY, false))
 	game.tutorial_completed = bool(save_file.get_value(game.SAVE_SECTION, game.SAVE_TUTORIAL_COMPLETED_KEY, false))
 	game.owned_skin_ids.clear()
 	var saved_owned_skins: PackedStringArray = save_file.get_value(game.SAVE_SECTION, game.SAVE_OWNED_SKINS_KEY, PackedStringArray())
@@ -192,6 +193,14 @@ func load_game() -> void:
 	for index in range(game.FOOD_NAMES.size()):
 		var food_id: String = game._get_food_id(index)
 		game.food_inventory[food_id] = maxi(0, int(saved_food_inventory.get(food_id, 0)))
+	var saved_boost_inventory: Dictionary = save_file.get_value(game.SAVE_SECTION, "boost_inventory", {})
+	game.boost_inventory.clear()
+	for raw_key in saved_boost_inventory:
+		var boost_key := String(raw_key)
+		var boost_id := boost_key.get_slice(":", 0)
+		var tier := int(boost_key.get_slice(":", 1))
+		if not game.boost_logic.get_data(boost_id).is_empty() and tier in [1, 2, 3]:
+			game.boost_inventory[boost_key] = maxi(0, int(saved_boost_inventory[raw_key]))
 	game.nine_lives_taps_left = maxi(0, int(save_file.get_value(game.SAVE_SECTION, "nine_lives_taps_left", 0)))
 	game.nine_lives_recharge_duration = maxf(0.0, float(save_file.get_value(game.SAVE_SECTION, "nine_lives_recharge_duration", 0.0)))
 	if game.crate_logic != null:
@@ -256,18 +265,15 @@ func show_offline_gain_message() -> void:
 
 	var side_margin := clampf(game.size.x * 0.045, 16.0, 28.0)
 	var popup_width := minf(game.size.x - side_margin * 2.0, 440.0)
-	popup.size = Vector2(popup_width, 136.0)
+	popup.size = Vector2(popup_width, 174.0)
 	var shell_top := float(game.get("telegram_top_height")) if game.get("telegram_top_height") != null else 0.0
 	popup.position = Vector2((game.size.x - popup_width) * 0.5, shell_top + 12.0)
 	popup.modulate.a = 0.0
 	popup.scale = Vector2(0.97, 0.97)
 	popup.pivot_offset = popup.size * 0.5
 
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color("#253443")
-	box.set_corner_radius_all(10)
-	box.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
-	box.shadow_size = 6
+	var accent := Color(0.48, 1.0, 0.58, 1.0)
+	var box: StyleBoxFlat = game._make_upgrade_style(Color(0.035, 0.055, 0.07, 0.98), Color(accent.r, accent.g, accent.b, 0.82), 7, 3, 5, 14)
 	box.content_margin_left = 18.0
 	box.content_margin_right = 18.0
 	box.content_margin_top = 14.0
@@ -278,42 +284,52 @@ func show_offline_gain_message() -> void:
 	body_margin.add_theme_constant_override("margin_right", 40)
 	popup.add_child(body_margin)
 	var text_stack := VBoxContainer.new()
-	text_stack.add_theme_constant_override("separation", 2)
+	text_stack.add_theme_constant_override("separation", 6)
 	body_margin.add_child(text_stack)
+	var badge := Label.new()
+	badge.text = "OFFLINE REWARD"
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.add_theme_font_size_override("font_size", 12)
+	badge.add_theme_color_override("font_color", accent.lightened(0.16))
+	game._style_arcade_label_plate(badge, accent, true)
+	text_stack.add_child(badge)
 	var title := Label.new()
-	title.text = "Welcome back"
-	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_color_override("font_color", Color("#f2f5f7"))
+	title.text = "WELCOME BACK"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color(0.95, 0.98, 1.0, 1.0))
+	game._style_arcade_heading(title)
 	text_stack.add_child(title)
 	var amount := Label.new()
-	amount.text = "+%s kibbles while you were away" % game._format_number(game.last_offline_gain)
+	amount.text = "+%s KIBBLES  •  WHILE AWAY" % game._format_number(game.last_offline_gain)
 	amount.add_theme_font_size_override("font_size", 16)
-	amount.add_theme_color_override("font_color", Color("#64b5ef"))
+	amount.add_theme_color_override("font_color", accent.lightened(0.18))
+	game._style_arcade_label_plate(amount, accent)
 	text_stack.add_child(amount)
 	var detail := Label.new()
-	detail.text = "%d min counted%s" % [game.last_offline_minutes, cap_text]
+	detail.text = "%d MIN COUNTED%s" % [game.last_offline_minutes, cap_text.to_upper()]
 	detail.add_theme_font_size_override("font_size", 14)
-	detail.add_theme_color_override("font_color", Color("#8d9baa"))
+	detail.add_theme_color_override("font_color", Color(0.66, 0.72, 0.8, 1.0))
 	text_stack.add_child(detail)
 	game._animate_coin_counter(maxi(0, game.coins - game.last_offline_gain), game.coins, 0.9)
 	game._spawn_coin_stream(game.last_offline_gain, popup.get_global_rect().get_center())
 
 	var close_button := Button.new()
 	close_button.name = "CloseButton"
-	close_button.text = "×"
+	close_button.text = "X"
 	close_button.tooltip_text = "Close"
 	var close_layer := Control.new()
 	close_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup.add_child(close_layer)
 	close_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	close_button.offset_left = -38.0
-	close_button.offset_top = -6.0
-	close_button.offset_bottom = 32.0
-	close_button.flat = true
+	close_button.offset_left = -42.0
+	close_button.offset_top = -8.0
+	close_button.offset_right = 0.0
+	close_button.offset_bottom = 34.0
 	close_button.focus_mode = Control.FOCUS_NONE
-	close_button.add_theme_font_size_override("font_size", 22)
-	close_button.add_theme_color_override("font_color", Color("#8d9baa"))
+	close_button.add_theme_font_size_override("font_size", 15)
+	close_button.add_theme_color_override("font_color", Color(0.78, 0.84, 0.9, 1.0))
 	close_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	game._style_upgrade_button(close_button, accent)
 	close_layer.add_child(close_button)
 	var tween = game.create_tween()
 	popup.set_meta("dismiss_tween", tween)
@@ -322,7 +338,7 @@ func show_offline_gain_message() -> void:
 	tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 	tween.tween_property(popup, "modulate:a", 1.0, 0.16)
 	tween.tween_property(popup, "scale", Vector2.ONE, 0.20)
-	tween.chain().tween_interval(3.0)
+	tween.chain().tween_interval(4.0)
 	tween.chain().tween_property(popup, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(Callable(popup, "queue_free"))
 

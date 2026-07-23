@@ -127,13 +127,7 @@ func build_ui() -> void:
 	banner.size = Vector2(184, 160)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(banner)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.055, 0.075, 0.12, 0.96)
-	style.border_color = Color(1.0, 0.72, 0.12, 1.0)
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(18)
-	style.shadow_color = Color(1.0, 0.48, 0.05, 0.55)
-	style.shadow_size = 18
+	var style: StyleBoxFlat = game._make_upgrade_style(Color(0.055, 0.075, 0.12, 0.96), Color(1.0, 0.72, 0.12, 1.0), 7, 3, 5, 14)
 	banner.add_theme_stylebox_override("panel", style)
 	var margin := MarginContainer.new()
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -152,6 +146,7 @@ func build_ui() -> void:
 	live_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	live_badge.add_theme_font_size_override("font_size", 9)
 	live_badge.add_theme_color_override("font_color", Color(1.0, 0.92, 0.58))
+	game._style_arcade_label_plate(live_badge, Color(1.0, 0.72, 0.12, 1.0), true)
 	live_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(live_badge)
 	event_icon = TextureRect.new()
@@ -214,22 +209,7 @@ func build_ui() -> void:
 	action_button.add_theme_font_size_override("font_size", 10)
 	action_button.add_theme_color_override("font_color", Color.WHITE)
 	action_button.add_theme_color_override("font_hover_color", Color.WHITE)
-	var button_normal := StyleBoxFlat.new()
-	button_normal.bg_color = Color(0.96, 0.32, 0.06)
-	button_normal.border_color = Color(1.0, 0.82, 0.28)
-	button_normal.set_border_width_all(2)
-	button_normal.set_corner_radius_all(18)
-	button_normal.shadow_color = Color(1.0, 0.55, 0.08, 0.35)
-	button_normal.shadow_size = 11
-	action_button.add_theme_stylebox_override("normal", button_normal)
-	var button_hover := button_normal.duplicate() as StyleBoxFlat
-	button_hover.bg_color = Color(1.0, 0.64, 0.12)
-	button_hover.shadow_size = 10
-	action_button.add_theme_stylebox_override("hover", button_hover)
-	var button_pressed := button_normal.duplicate() as StyleBoxFlat
-	button_pressed.bg_color = Color(0.72, 0.28, 0.04)
-	button_pressed.set_content_margin_all(3)
-	action_button.add_theme_stylebox_override("pressed", button_pressed)
+	game._style_upgrade_button(action_button, Color(1.0, 0.58, 0.08, 1.0))
 	action_button.pressed.connect(_on_action_pressed)
 	column.add_child(action_button)
 	banner.hide()
@@ -559,13 +539,7 @@ func _build_active_boosts_panel() -> void:
 	active_boosts_panel.size = Vector2(218, 0)
 	active_boosts_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(active_boosts_panel)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.035, 0.045, 0.08, 0.88)
-	style.border_color = Color(0.72, 0.5, 1.0, 0.72)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(15)
-	style.shadow_color = Color(0.35, 0.2, 0.8, 0.35)
-	style.shadow_size = 10
+	var style: StyleBoxFlat = game._make_upgrade_style(Color(0.035, 0.045, 0.08, 0.88), Color(0.72, 0.5, 1.0, 0.72), 7, 2, 4, 8)
 	active_boosts_panel.add_theme_stylebox_override("panel", style)
 	var margin := MarginContainer.new()
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE

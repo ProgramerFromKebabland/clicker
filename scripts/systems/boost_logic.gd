@@ -386,9 +386,6 @@ func consume_protected_tap() -> void:
 
 func purchase(boost_id: String, tier: int) -> void:
 	tier = clampi(tier, 1, 3)
-	if is_active(boost_id) or is_recharging(boost_id):
-		return
-
 	var data := get_data(boost_id)
 	if data.is_empty():
 		return
@@ -398,6 +395,28 @@ func purchase(boost_id: String, tier: int) -> void:
 
 	if not game._spend_coins(cost):
 		return
+	var inventory_key: String = game._get_boost_inventory_key(boost_id, tier)
+	game.boost_inventory[inventory_key] = int(game.boost_inventory.get(inventory_key, 0)) + 1
+	game._refresh_boost_inventory_ui()
+
+	game._update_coins(false)
+	update_ui()
+	game._play_purchase_sound()
+	game._save_game()
+	game._tutorial_notify("boost_bought")
+
+	var card := game.boost_cards.get(boost_id) as Control
+	if card != null:
+		game._celebrate_upgrade(card, data["accent"] as Color, "PACKED!")
+
+
+func activate_owned(boost_id: String, tier: int) -> bool:
+	tier = clampi(tier, 1, 3)
+	if is_active(boost_id) or is_recharging(boost_id):
+		return false
+	var data := get_data(boost_id)
+	if data.is_empty():
+		return false
 	var duration := float(data["duration"])
 	if duration > 0.0:
 		var active_duration := duration * float(tier)
@@ -410,18 +429,14 @@ func purchase(boost_id: String, tier: int) -> void:
 				game.nine_lives_taps_left = 3 * tier
 				game.nine_lives_recharge_duration = 18.0 * float(tier)
 
-	game._update_coins(false)
 	game._update_upgrade_ui()
 	game._update_achievements_ui()
 	game._update_stats_ui()
 	update_ui()
-	game._play_purchase_sound()
+	game._play_bonus_sound()
 	game._save_game()
 	game._tutorial_notify("boost_used")
-
-	var card := game.boost_cards.get(boost_id) as Control
-	if card != null:
-		game._celebrate_upgrade(card, data["accent"] as Color, "BOOSTED!")
+	return true
 
 
 func update_ui() -> void:
@@ -435,7 +450,6 @@ func update_ui() -> void:
 		var buttons: Array = game.boost_action_buttons.get(boost_id, [])
 		var remaining := get_remaining_seconds(boost_id)
 		var recharge_remaining := get_recharge_seconds(boost_id)
-		var active: bool = remaining > 0.0 or (boost_id == "nine_lives" and game.nine_lives_taps_left > 0)
 		var recharging: bool = recharge_remaining > 0.0
 
 		if status_label != null:
@@ -458,15 +472,8 @@ func update_ui() -> void:
 				continue
 			var tier := index + 1
 			var cost := get_tier_cost(int(data["cost"]), tier)
-			button.disabled = active or recharging or game.coins < cost
-			if remaining > 0.0:
-				button.text = format_seconds(remaining)
-			elif boost_id == "nine_lives" and game.nine_lives_taps_left > 0:
-				button.text = "%d TAPS" % game.nine_lives_taps_left
-			elif recharging:
-				button.text = "RECHARGE\n%s" % format_seconds(recharge_remaining)
-			else:
-				button.text = "ACTIVATE\n%s  •  %s" % [get_tier_name(tier), game._format_number(cost)]
+			button.disabled = game.coins < cost
+			button.text = "BUY\n%s  -  %s" % [get_tier_name(tier), game._format_number(cost)]
 
 func get_data(boost_id: String) -> Dictionary:
 	for data in BOOST_DATA:
