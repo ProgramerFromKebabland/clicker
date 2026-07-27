@@ -201,8 +201,15 @@ const BOOST_DATA: Array[Dictionary] = [
 	{"id": "crown_overdrive", "category": "mythic", "name": "CROWN OVERDRIVE", "badge": "x6 BONUS", "cost": 3400000000000, "duration": 11.0, "description": "Multiplies all successful bonus payouts by six.", "accent": Color(1.0, 0.54, 0.3)},
 	{"id": "singularity_surge", "category": "mythic", "name": "SINGULARITY SURGE", "badge": "x6 COMBO", "cost": 5100000000000, "duration": 12.0, "description": "Multiplies current combo power by six.", "accent": Color(0.82, 0.6, 1.0)},
 	{"id": "eternity_army", "category": "mythic", "name": "ETERNITY ARMY", "badge": "+10 GHOST", "cost": 7600000000000, "duration": 12.0, "description": "Each press fires ten additional ghost taps.", "accent": Color(0.42, 0.96, 1.0)},
+	{"id": "ascendant_frenzy", "category": "ascendant", "name": "ASCENDANT FRENZY", "badge": "x16 TAP", "cost": 100000000000000, "duration": 14.0, "description": "Multiplies tap power by sixteen.", "accent": Color(1.0, 0.48, 0.82)},
+	{"id": "ascendant_fortune", "category": "ascendant", "name": "ASCENDANT FORTUNE", "badge": "+200%", "cost": 150000000000000, "duration": 14.0, "description": "Adds 200 percentage points to bonus chance.", "accent": Color(1.0, 0.84, 0.3)},
+	{"id": "ascendant_rain", "category": "ascendant", "name": "ASCENDANT RAIN", "badge": "x12 ALL", "cost": 225000000000000, "duration": 16.0, "description": "Multiplies every source of kibble income by twelve.", "accent": Color(0.42, 0.86, 1.0)},
+	{"id": "ascendant_jackpot", "category": "ascendant", "name": "ASCENDANT JACKPOT", "badge": "x12 BONUS", "cost": 340000000000000, "duration": 13.0, "description": "Multiplies all successful bonus payouts by twelve.", "accent": Color(1.0, 0.5, 0.28)},
+	{"id": "ascendant_singularity", "category": "ascendant", "name": "ASCENDANT SINGULARITY", "badge": "x12 COMBO", "cost": 510000000000000, "duration": 14.0, "description": "Multiplies current combo power by twelve.", "accent": Color(0.82, 0.58, 1.0)},
+	{"id": "ascendant_army", "category": "ascendant", "name": "ASCENDANT ARMY", "badge": "+20 GHOST", "cost": 760000000000000, "duration": 14.0, "description": "Each press fires twenty additional ghost taps.", "accent": Color(0.42, 1.0, 0.86)},
 ]
-const MAX_COMBINED_CLICK_BOOST := 10.0
+const MAX_BOOST_TIER := 5
+const MAX_COMBINED_CLICK_BOOST := 100.0
 
 var game
 var ui_elapsed := 0.0
@@ -288,6 +295,8 @@ func get_temporary_bonus_chance() -> float:
 		bonus += 60.0
 	if is_active("miracle_fortune"):
 		bonus += 100.0
+	if is_active("ascendant_fortune"):
+		bonus += 200.0
 	return bonus
 
 
@@ -301,6 +310,8 @@ func get_tap_multiplier() -> float:
 		multiplier *= 4.0
 	if is_active("galaxy_frenzy"):
 		multiplier *= 8.0
+	if is_active("ascendant_frenzy"):
+		multiplier *= 16.0
 	return multiplier
 
 
@@ -316,15 +327,17 @@ func get_bonus_payout_multiplier() -> float:
 		multiplier *= 3.0
 	if is_active("crown_overdrive"):
 		multiplier *= 6.0
+	if is_active("ascendant_jackpot"):
+		multiplier *= 12.0
 	return multiplier
 
 
 func get_extra_ghost_taps() -> int:
-	return (1 if is_active("purrstorm") else 0) + (3 if is_active("ghost_army") else 0) + (5 if is_active("starlight_army") else 0) + (10 if is_active("eternity_army") else 0)
+	return (1 if is_active("purrstorm") else 0) + (3 if is_active("ghost_army") else 0) + (5 if is_active("starlight_army") else 0) + (10 if is_active("eternity_army") else 0) + (20 if is_active("ascendant_army") else 0)
 
 
 func get_combo_power_multiplier() -> float:
-	return (1.15 if is_active("combo_nova") else 1.0) * (2.0 if is_active("combo_singularity") else 1.0) * (3.0 if is_active("gravity_surge") else 1.0) * (6.0 if is_active("singularity_surge") else 1.0)
+	return (1.15 if is_active("combo_nova") else 1.0) * (2.0 if is_active("combo_singularity") else 1.0) * (3.0 if is_active("gravity_surge") else 1.0) * (6.0 if is_active("singularity_surge") else 1.0) * (12.0 if is_active("ascendant_singularity") else 1.0)
 
 
 func get_streak_multiplier() -> float:
@@ -365,6 +378,8 @@ func get_global_gain_multiplier() -> float:
 		multiplier *= 3.0
 	if is_active("infinity_rain"):
 		multiplier *= 6.0
+	if is_active("ascendant_rain"):
+		multiplier *= 12.0
 	return multiplier
 
 
@@ -385,7 +400,7 @@ func consume_protected_tap() -> void:
 
 
 func purchase(boost_id: String, tier: int) -> void:
-	tier = clampi(tier, 1, 3)
+	tier = clampi(tier, 1, MAX_BOOST_TIER)
 	var data := get_data(boost_id)
 	if data.is_empty():
 		return
@@ -411,7 +426,7 @@ func purchase(boost_id: String, tier: int) -> void:
 
 
 func activate_owned(boost_id: String, tier: int) -> bool:
-	tier = clampi(tier, 1, 3)
+	tier = clampi(tier, 1, MAX_BOOST_TIER)
 	if is_active(boost_id) or is_recharging(boost_id):
 		return false
 	var data := get_data(boost_id)
@@ -473,7 +488,8 @@ func update_ui() -> void:
 			var tier := index + 1
 			var cost := get_tier_cost(int(data["cost"]), tier)
 			button.disabled = game.coins < cost
-			button.text = "BUY\n%s  -  %s" % [get_tier_name(tier), game._format_number(cost)]
+			button.text = "BUY T%d\n%s" % [tier, game._format_number(cost)]
+			button.tooltip_text = "%s tier: %s kibbles" % [get_tier_name(tier), game._format_number(cost)]
 
 func get_data(boost_id: String) -> Dictionary:
 	for data in BOOST_DATA:
@@ -492,6 +508,10 @@ func get_tier_name(tier: int) -> String:
 			return "DOUBLE"
 		3:
 			return "TRIPLE"
+		4:
+			return "QUADRUPLE"
+		5:
+			return "QUINTUPLE"
 		_:
 			return "NORMAL"
 

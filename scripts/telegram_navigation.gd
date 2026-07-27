@@ -7,9 +7,9 @@ signal pager_drag_started(direction: int)
 signal pager_dragged(delta_x: float, velocity_x: float, direction: int)
 signal pager_drag_released(delta_x: float, velocity_x: float, direction: int)
 
-const TOP_DESTINATIONS: Array[String] = ["main", "skins", "missions", "museum"]
+const TOP_DESTINATIONS: Array[String] = ["main", "inventory", "skins", "missions", "museum"]
 const BOTTOM_DESTINATIONS: Array[String] = ["shop", "main", "pause"]
-const TOP_LABELS: Array[String] = ["Main", "Skin", "Mission", "Museum"]
+const TOP_LABELS: Array[String] = ["Main", "Inventory", "Skins", "Missions", "Museum"]
 const BOTTOM_LABELS: Array[String] = ["Shop", "Main", "Pause"]
 const BOTTOM_ICON_PATHS: Array[String] = [
 	"res://assets/ui/navigation/shop.svg",
@@ -22,6 +22,7 @@ const SURFACE_RAISED := Color(0.06, 0.066, 0.078, 0.98)
 const TEXT_MUTED := Color("#a5adbb")
 const TOP_ACCENTS: Array[Color] = [
 	GOLD_ACCENT,
+	Color(0.96, 0.68, 0.26),
 	Color(0.36, 0.82, 1.0),
 	Color(0.3, 0.9, 0.5),
 	Color(0.92, 0.58, 0.22),
@@ -363,6 +364,16 @@ func get_bottom_height() -> float:
 
 func get_safe_top() -> float:
 	return safe_top_inset
+
+
+func get_destination_button(destination: String) -> Button:
+	var top_index := TOP_DESTINATIONS.find(destination)
+	if top_index >= 0 and top_index < top_buttons.size():
+		return top_buttons[top_index]
+	var bottom_index := BOTTOM_DESTINATIONS.find(destination)
+	if bottom_index >= 0 and bottom_index < bottom_buttons.size():
+		return bottom_buttons[bottom_index]
+	return null
 
 
 func _input(event: InputEvent) -> void:

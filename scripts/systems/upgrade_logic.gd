@@ -98,7 +98,7 @@ func update_extended_upgrade_ui() -> void:
 		var upgrade_data: Dictionary = raw_upgrade_data
 		var upgrade_id: String = String(upgrade_data["id"])
 		var level: int = int(game.get_extended_upgrade_level(upgrade_id))
-		var max_level: int = int(upgrade_data["max_level"])
+		var max_level: int = game.MAX_EXTENDED_UPGRADE_LEVEL
 		var controls: Dictionary = game.extended_upgrade_controls.get(upgrade_id, {})
 		if controls.is_empty():
 			continue
@@ -144,7 +144,7 @@ func has_affordable_upgrade() -> bool:
 		var upgrade_data: Dictionary = raw_upgrade_data
 		var upgrade_id: String = String(upgrade_data["id"])
 		var level: int = int(game.get_extended_upgrade_level(upgrade_id))
-		if level < int(upgrade_data["max_level"]) and game.coins >= get_extended_upgrade_cost(upgrade_data, level):
+		if level < game.MAX_EXTENDED_UPGRADE_LEVEL and game.coins >= get_extended_upgrade_cost(upgrade_data, level):
 			return true
 	return false
 
@@ -401,7 +401,7 @@ func upgrade_extended(upgrade_id: String) -> void:
 	if upgrade_data.is_empty():
 		return
 	var level: int = int(game.get_extended_upgrade_level(upgrade_id))
-	if level >= int(upgrade_data["max_level"]):
+	if level >= game.MAX_EXTENDED_UPGRADE_LEVEL:
 		return
 	var cost: int = get_extended_upgrade_cost(upgrade_data, level)
 	if game.coins < cost:

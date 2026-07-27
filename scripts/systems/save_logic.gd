@@ -183,7 +183,7 @@ func load_game() -> void:
 	for raw_upgrade_data in game.EXTENDED_UPGRADE_DATA:
 		var upgrade_data: Dictionary = raw_upgrade_data
 		var upgrade_id: String = String(upgrade_data["id"])
-		var max_level: int = int(upgrade_data["max_level"])
+		var max_level: int = game.MAX_EXTENDED_UPGRADE_LEVEL
 		game.extended_upgrade_levels[upgrade_id] = clampi(int(saved_extended_upgrades.get(upgrade_id, 0)), 0, max_level)
 	game.active_boost_end_times = save_file.get_value(game.SAVE_SECTION, "active_boost_end_times", {})
 	game.boost_recharge_end_times = save_file.get_value(game.SAVE_SECTION, "boost_recharge_end_times", {})
@@ -199,7 +199,7 @@ func load_game() -> void:
 		var boost_key := String(raw_key)
 		var boost_id := boost_key.get_slice(":", 0)
 		var tier := int(boost_key.get_slice(":", 1))
-		if not game.boost_logic.get_data(boost_id).is_empty() and tier in [1, 2, 3]:
+		if not game.boost_logic.get_data(boost_id).is_empty() and tier >= 1 and tier <= game.boost_logic.MAX_BOOST_TIER:
 			game.boost_inventory[boost_key] = maxi(0, int(saved_boost_inventory[raw_key]))
 	game.nine_lives_taps_left = maxi(0, int(save_file.get_value(game.SAVE_SECTION, "nine_lives_taps_left", 0)))
 	game.nine_lives_recharge_duration = maxf(0.0, float(save_file.get_value(game.SAVE_SECTION, "nine_lives_recharge_duration", 0.0)))

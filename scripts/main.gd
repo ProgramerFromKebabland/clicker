@@ -26,6 +26,53 @@ const BOOST_TIER_ICONS := {
 	"advanced": preload("res://assets/boosts/boost_advanced.png"),
 	"legendary": preload("res://assets/boosts/boost_legendary.png"),
 	"mythic": preload("res://assets/boosts/boost_mythic.png"),
+	"ascendant": preload("res://assets/boosts/boost_mythic.png"),
+}
+const UPGRADE_CATEGORIES: Array[String] = [
+	"classical", "advanced", "legendary", "mythic", "ascendant",
+	"divine", "cosmic", "eternal", "transcendent", "omega",
+]
+const BOOST_CATEGORIES: Array[String] = ["classical", "advanced", "legendary", "mythic", "ascendant"]
+const BOOST_ICONS := {
+	"cat_frenzy": preload("res://assets/boosts/custom/cat_frenzy.png"),
+	"lucky_paws": preload("res://assets/boosts/custom/lucky_paws.png"),
+	"time_freeze": preload("res://assets/boosts/custom/time_freeze.png"),
+	"purrstorm": preload("res://assets/boosts/custom/purrstorm.png"),
+	"golden_meow": preload("res://assets/boosts/custom/golden_meow.png"),
+	"whisker_rush": preload("res://assets/boosts/custom/whisker_rush.png"),
+	"nine_lives": preload("res://assets/boosts/custom/nine_lives.png"),
+	"kibble_storm": preload("res://assets/boosts/custom/kibble_storm.png"),
+	"combo_nova": preload("res://assets/boosts/custom/combo_nova.png"),
+	"streak_surge": preload("res://assets/boosts/custom/streak_surge.png"),
+	"jackpot_engine": preload("res://assets/boosts/custom/jackpot_engine.png"),
+	"combo_overclock": preload("res://assets/boosts/custom/combo_overclock.png"),
+	"payday_pulse": preload("res://assets/boosts/custom/payday_pulse.png"),
+	"meteor_paws": preload("res://assets/boosts/custom/meteor_paws.png"),
+	"gem_magnet": preload("res://assets/boosts/custom/gem_magnet.png"),
+	"lucky_lock": preload("res://assets/boosts/custom/lucky_lock.png"),
+	"royal_treat": preload("res://assets/boosts/custom/royal_treat.png"),
+	"supernova_paws": preload("res://assets/boosts/custom/supernova_paws.png"),
+	"fortune_orbit": preload("res://assets/boosts/custom/fortune_orbit.png"),
+	"royal_banquet": preload("res://assets/boosts/custom/royal_banquet.png"),
+	"quantum_frenzy": preload("res://assets/boosts/custom/quantum_frenzy.png"),
+	"infinite_fortune": preload("res://assets/boosts/custom/infinite_fortune.png"),
+	"celestial_rain": preload("res://assets/boosts/custom/celestial_rain.png"),
+	"ghost_army": preload("res://assets/boosts/custom/ghost_army.png"),
+	"jackpot_overdrive": preload("res://assets/boosts/custom/jackpot_overdrive.png"),
+	"combo_singularity": preload("res://assets/boosts/custom/combo_singularity.png"),
+	"time_emperor": preload("res://assets/boosts/custom/time_emperor.png"),
+	"prismatic_frenzy": preload("res://assets/boosts/custom/prismatic_frenzy.png"),
+	"solar_fortune": preload("res://assets/boosts/custom/solar_fortune.png"),
+	"nebula_rain": preload("res://assets/boosts/custom/nebula_rain.png"),
+	"citadel_jackpot": preload("res://assets/boosts/custom/citadel_jackpot.png"),
+	"gravity_surge": preload("res://assets/boosts/custom/gravity_surge.png"),
+	"starlight_army": preload("res://assets/boosts/custom/starlight_army.png"),
+	"galaxy_frenzy": preload("res://assets/boosts/custom/galaxy_frenzy.png"),
+	"miracle_fortune": preload("res://assets/boosts/custom/miracle_fortune.png"),
+	"infinity_rain": preload("res://assets/boosts/custom/infinity_rain.png"),
+	"crown_overdrive": preload("res://assets/boosts/custom/crown_overdrive.png"),
+	"singularity_surge": preload("res://assets/boosts/custom/singularity_surge.png"),
+	"eternity_army": preload("res://assets/boosts/custom/eternity_army.png"),
 }
 const SKINS_UI_ICON = preload("res://assets/ui/skins.png")
 const SETTINGS_ICON_SHEET_PATH := "res://assets/ui/settings_icons.png"
@@ -282,8 +329,8 @@ const MIN_PASSIVE_UPGRADE_COST := 1000
 const MAX_PASSIVE_UPGRADE_COST := 10000000
 const OFFLINE_GAIN_MAX_SECONDS := 3 * 60 * 60
 const MAX_EXTENDED_UPGRADE_LEVEL := 10
-const MAX_COMBO_MOMENTUM_LEVEL := 5
-const MAX_OFFLINE_STORAGE_LEVEL := 5
+const MAX_COMBO_MOMENTUM_LEVEL := MAX_EXTENDED_UPGRADE_LEVEL
+const MAX_OFFLINE_STORAGE_LEVEL := MAX_EXTENDED_UPGRADE_LEVEL
 const DAILY_REWARD_BASE_COINS := 100
 const DAILY_REWARD_STREAK_BONUS := 25
 const BONUS_MULTIPLIERS := [2, 3, 5, 25, 100]
@@ -307,6 +354,16 @@ const FOOD_NAMES := [
 	"Ice Cream Bean", "Watermelon Wedge", "Banana Button", "Popcorn Puff", "Coffee Bean",
 	"Royal Jelly", "Golden Kibble", "Lucky Biscuit", "Meteor Meatball", "Nova Nugget",
 	"Dream Dumpling", "Orbit Orange", "Galaxy Gel", "Void Velvet", "Celestial Cake",
+	"Moonlight Morsel", "Starlight Salmon", "Comet Cookie", "Asteroid Anchovy", "Rocket Ravioli",
+	"Planetary Pudding", "Nebula Noodle", "Cosmic Croissant", "Solar Sardine", "Lunar Lasagna",
+	"Rainbow Ration", "Prism Pretzel", "Crystal Cupcake", "Diamond Dumpling", "Ruby Roll",
+	"Sapphire Snack", "Emerald Egg", "Amethyst Apple", "Topaz Toast", "Pearl Pastry",
+	"King's Kibble", "Queen's Quiche", "Prince's Pizza", "Duchess Donut", "Baron's Biscuit",
+	"Knight's Nibble", "Wizard Waffle", "Dragon Drumstick", "Phoenix Fillet", "Unicorn Udon",
+	"Mermaid Mackerel", "Kraken Kebab", "Goblin Gumdrop", "Fairy Flan", "Golem Granola",
+	"Ninja Nacho", "Samurai Sushi", "Pirate Pancake", "Viking Veggie", "Astronaut Almond",
+	"Cyber Cheese", "Neon Nugget", "Quantum Quesadilla", "Pixel Pudding", "Turbo Tuna",
+	"Inferno Ice Cream", "Frostbite Fish", "Thunder Tart", "Eclipse Eclair", "Infinity Souffle",
 ]
 const FOOD_BOOSTS := [
 	{"id": "snack_click", "name": "Tap boost", "text": "+35% taps", "duration": 18.0},
@@ -347,6 +404,24 @@ const EXTENDED_UPGRADE_DATA: Array[Dictionary] = [
 	{"id": "crown_jackpot", "category": "mythic", "badge": "CROWN+", "name": "CROWN JACKPOT", "description": "Increases successful bonus payouts by 100% per level.", "accent": Color(1.0, 0.54, 0.3), "max_level": 5, "base_cost": 3400000000000, "effect": "bonus", "amount": 1.0},
 	{"id": "singularity_combo", "category": "mythic", "badge": "SING", "name": "SINGULARITY COMBO", "description": "Raises maximum combo power by x1 per level.", "accent": Color(0.82, 0.6, 1.0), "max_level": 5, "base_cost": 5100000000000, "effect": "combo", "amount": 1.0},
 	{"id": "eternity_reactor", "category": "mythic", "badge": "ETERN", "name": "ETERNITY REACTOR", "description": "Increases offline income by 150% per level.", "accent": Color(0.42, 0.96, 1.0), "max_level": 5, "base_cost": 7600000000000, "effect": "idle", "amount": 1.50},
+	{"id": "ascendant_paws", "category": "ascendant", "badge": "ASC", "name": "ASCENDANT PAWS", "description": "Increases tap earnings by 140% per level.", "accent": Color(1.0, 0.48, 0.82), "max_level": 10, "base_cost": 10000000000000, "effect": "tap", "amount": 1.40},
+	{"id": "ascendant_vault", "category": "ascendant", "badge": "VAULT V", "name": "ASCENDANT VAULT", "description": "Increases all kibble income by 110% per level.", "accent": Color(0.48, 0.9, 1.0), "max_level": 10, "base_cost": 15000000000000, "effect": "all", "amount": 1.10},
+	{"id": "ascendant_crown", "category": "ascendant", "badge": "CROWN V", "name": "ASCENDANT CROWN", "description": "Increases bonus payouts by 160% per level.", "accent": Color(1.0, 0.72, 0.26), "max_level": 10, "base_cost": 22500000000000, "effect": "bonus", "amount": 1.60},
+	{"id": "divine_paws", "category": "divine", "badge": "DIVINE", "name": "DIVINE PAWS", "description": "Increases tap earnings by 200% per level.", "accent": Color(1.0, 0.88, 0.42), "max_level": 10, "base_cost": 50000000000000, "effect": "tap", "amount": 2.0},
+	{"id": "divine_fortune", "category": "divine", "badge": "LUCK VI", "name": "DIVINE FORTUNE", "description": "Adds 12 percentage points of bonus chance per level.", "accent": Color(1.0, 0.66, 0.28), "max_level": 10, "base_cost": 75000000000000, "effect": "luck", "amount": 12.0},
+	{"id": "divine_reactor", "category": "divine", "badge": "CORE VI", "name": "DIVINE REACTOR", "description": "Increases offline income by 240% per level.", "accent": Color(0.52, 0.86, 1.0), "max_level": 10, "base_cost": 110000000000000, "effect": "idle", "amount": 2.40},
+	{"id": "cosmic_paws", "category": "cosmic", "badge": "COSMIC", "name": "COSMIC PAWS", "description": "Increases tap earnings by 300% per level.", "accent": Color(0.52, 1.0, 0.88), "max_level": 10, "base_cost": 200000000000000, "effect": "tap", "amount": 3.0},
+	{"id": "cosmic_vault_x", "category": "cosmic", "badge": "VAULT VII", "name": "COSMIC VAULT", "description": "Increases all kibble income by 250% per level.", "accent": Color(0.42, 0.76, 1.0), "max_level": 10, "base_cost": 300000000000000, "effect": "all", "amount": 2.50},
+	{"id": "cosmic_combo", "category": "cosmic", "badge": "COMBO VII", "name": "COSMIC COMBO", "description": "Raises maximum combo power by x3 per level.", "accent": Color(0.78, 0.52, 1.0), "max_level": 10, "base_cost": 450000000000000, "effect": "combo", "amount": 3.0},
+	{"id": "eternal_paws", "category": "eternal", "badge": "ETERNAL", "name": "ETERNAL PAWS", "description": "Increases tap earnings by 450% per level.", "accent": Color(0.5, 1.0, 0.68), "max_level": 10, "base_cost": 800000000000000, "effect": "tap", "amount": 4.50},
+	{"id": "eternal_jackpot", "category": "eternal", "badge": "JACK VIII", "name": "ETERNAL JACKPOT", "description": "Increases bonus payouts by 500% per level.", "accent": Color(1.0, 0.52, 0.3), "max_level": 10, "base_cost": 1200000000000000, "effect": "bonus", "amount": 5.0},
+	{"id": "eternal_storage", "category": "eternal", "badge": "TIME VIII", "name": "ETERNAL STORAGE", "description": "Adds 48 hours of offline storage per level.", "accent": Color(0.38, 0.82, 1.0), "max_level": 10, "base_cost": 1800000000000000, "effect": "storage", "amount": 48.0},
+	{"id": "transcendent_paws", "category": "transcendent", "badge": "TRANS", "name": "TRANSCENDENT PAWS", "description": "Increases tap earnings by 700% per level.", "accent": Color(1.0, 0.45, 0.72), "max_level": 10, "base_cost": 3000000000000000, "effect": "tap", "amount": 7.0},
+	{"id": "transcendent_vault", "category": "transcendent", "badge": "VAULT IX", "name": "TRANSCENDENT VAULT", "description": "Increases all kibble income by 600% per level.", "accent": Color(0.4, 0.92, 1.0), "max_level": 10, "base_cost": 4500000000000000, "effect": "all", "amount": 6.0},
+	{"id": "transcendent_streak", "category": "transcendent", "badge": "STREAK IX", "name": "TRANSCENDENT STREAK", "description": "Adds eight permanent streak multipliers per level.", "accent": Color(1.0, 0.72, 0.2), "max_level": 10, "base_cost": 6500000000000000, "effect": "streak", "amount": 8.0},
+	{"id": "omega_paws", "category": "omega", "badge": "OMEGA", "name": "OMEGA PAWS", "description": "Increases tap earnings by 1000% per level.", "accent": Color(0.72, 1.0, 0.48), "max_level": 10, "base_cost": 10000000000000000, "effect": "tap", "amount": 10.0},
+	{"id": "omega_vault", "category": "omega", "badge": "VAULT X", "name": "OMEGA VAULT", "description": "Increases all kibble income by 900% per level.", "accent": Color(0.38, 0.8, 1.0), "max_level": 10, "base_cost": 14000000000000000, "effect": "all", "amount": 9.0},
+	{"id": "omega_crown", "category": "omega", "badge": "CROWN X", "name": "OMEGA CROWN", "description": "Increases bonus payouts by 1200% per level.", "accent": Color(1.0, 0.5, 0.3), "max_level": 10, "base_cost": 17500000000000000, "effect": "bonus", "amount": 12.0},
 ]
 const MAX_COIN_PARTICLES := 18
 const PARTICLE_LIMIT_INFINITE := 1000
@@ -356,28 +431,21 @@ const TUTORIAL_STARTER_GOAL := 10
 const TUTORIAL_STARTER_REWARD := 90
 const TUTORIAL_CARD_MAX_WIDTH := 520.0
 const TUTORIAL_STEPS: Array[Dictionary] = [
-	{"title": "Click", "body": "Tap the cat 3 times.", "target": "cat", "wait_for": "cat_clicks", "count": 3},
-	{"title": "Counters", "body": "Top = clicks. Bowl = spendable kibbles.", "target": "wallet", "wait_for": "continue"},
-	{"title": "Starter kibbles", "body": "A small starter gift for the upgrade lesson.", "target": "wallet", "wait_for": "continue", "reward": TUTORIAL_STARTER_REWARD},
-	{"title": "Open upgrades", "body": "Open Upgrades.", "target": "upgrade_button", "wait_for": "upgrades_opened"},
-	{"title": "Buy power", "target": "buy_click_power", "wait_for": "upgrade_or_continue", "affordable_body": "You can afford Click Power x%d. Buy it now.", "unaffordable_body": "Click Power x%d costs %s kibbles. Keep tapping, then buy it when it lights up.", "maxed_body": "Click Power is maxed. Nice."},
-	{"title": "Combo", "body": "Tap 5 times to build combo flow.", "target": "cat", "wait_for": "cat_clicks", "count": 5},
-	{"title": "Open boosts", "body": "Open Boosts.", "target": "boosts_button", "wait_for": "boosts_opened"},
-	{"title": "Boosts", "target": "boosts_panel", "wait_for": "boost_or_continue", "affordable_body": "You can activate %s. Try it now.", "unaffordable_body": "Boosts are paid activations. Cheapest: %s kibbles.", "active_body": "Boost is active. Tap fast while it lasts."},
-	{"title": "Open shop", "body": "Open Shop.", "target": "shop_button", "wait_for": "shop_opened"},
-	{"title": "Shop", "target": "shop_panel", "wait_for": "food_buy_or_continue", "affordable_body": "You can buy food. Buy one now.", "unaffordable_body": "Food costs %s kibbles. Come back after more taps.", "owned_body": "You own food already. Open Inventory next."},
-	{"title": "Open inventory", "body": "Open Inventory.", "target": "inventory_button", "wait_for": "inventory_opened"},
-	{"title": "Inventory", "target": "inventory_panel", "wait_for": "food_use_or_continue", "owned_body": "Drag food onto the cat to use it.", "empty_body": "No food owned. Buy one in Shop first.", "active_body": "Food boost active. Nice."},
-	{"title": "Open skins", "body": "Open Skins.", "target": "skins_button", "wait_for": "skins_opened"},
-	{"title": "Skins", "body": "Cat skins and gem progress live here.", "target": "skins_panel", "wait_for": "continue"},
-	{"title": "Open crates", "body": "Open Crates.", "target": "crates_tab", "wait_for": "crates_opened"},
-	{"title": "Crates", "target": "crates_panel", "wait_for": "crate_or_continue", "affordable_body": "You can open %s. Try it.", "unaffordable_body": "Crates drop gems. Cheapest: %s kibbles.", "opened_body": "Crates drop gem fragments for skins."},
-	{"title": "Open rooms", "body": "Open Background.", "target": "background_tab", "wait_for": "background_opened"},
-	{"title": "Background", "target": "background_panel", "wait_for": "background_or_continue", "body": "Equip room backgrounds here."},
-	{"title": "Open missions", "body": "Open Missions.", "target": "missions_button", "wait_for": "missions_opened"},
-	{"title": "Missions", "body": "Finish goals, then claim rewards.", "target": "missions_panel", "wait_for": "continue"},
-	{"title": "Events", "body": "When an event appears, tap its button before time runs out.", "target": "event_banner", "wait_for": "continue"},
-	{"title": "Ready", "body": "Click, upgrade, boost, collect, and claim.", "target": "cat", "wait_for": "continue"},
+	{"title": "Click", "body": "Tap the cat 3 times.", "target": "cat", "wait_for": "cat_clicks", "count": 3, "destination": "main"},
+	{"title": "Your kibbles", "body": "This counter shows the kibbles you can spend.", "target": "wallet", "wait_for": "continue", "reward": TUTORIAL_STARTER_REWARD},
+	{"title": "Open Shop", "body": "Tap Shop in the bottom bar.", "target": "shop_button", "wait_for": "shop_opened"},
+	{"title": "Upgrades", "body": "Upgrades permanently improve tapping, luck, combos, and idle income.", "target": "upgrades_panel", "wait_for": "continue", "destination": "shop", "shop_section": "upgrades"},
+	{"title": "Boosts", "body": "Every boost now has unique artwork. Buy boosts here; owned boosts go to Inventory.", "target": "boosts_panel", "wait_for": "continue", "destination": "shop", "shop_section": "boosts"},
+	{"title": "Food", "body": "Food is another temporary boost. Buy it here, then use it from Inventory.", "target": "shop_panel", "wait_for": "continue", "destination": "shop", "shop_section": "food"},
+	{"title": "Open Inventory", "body": "Tap Inventory in the upper tab list.", "target": "inventory_button", "wait_for": "inventory_opened"},
+	{"title": "Inventory", "body": "Tap USE NOW for instant activation, or drag an item onto the cat.", "target": "inventory_panel", "wait_for": "continue", "destination": "inventory"},
+	{"title": "Open Skins", "body": "Tap Skins in the upper tab list.", "target": "skins_button", "wait_for": "skins_opened"},
+	{"title": "Skins and crates", "body": "Collect cat skins, open crates, and equip room backgrounds here.", "target": "skins_panel", "wait_for": "continue", "destination": "skins"},
+	{"title": "Open Missions", "body": "Tap Missions in the upper tab list.", "target": "missions_button", "wait_for": "missions_opened"},
+	{"title": "Missions", "body": "Complete mission goals and claim their rewards.", "target": "missions_panel", "wait_for": "continue", "destination": "missions"},
+	{"title": "Open Pause", "body": "Tap Pause in the bottom bar.", "target": "pause_button", "wait_for": "menu_opened"},
+	{"title": "Pause menu", "body": "Settings, achievements, statistics, and tutorial replay live here. Tap outside to close it.", "target": "pause_panel", "wait_for": "continue"},
+	{"title": "Ready", "body": "Tap, upgrade, use boosts, collect skins, and finish missions.", "target": "cat", "wait_for": "continue", "destination": "main"},
 ]
 const TAP_BURST_COLORS := [
 	Color(1.0, 0.88, 0.33, 0.95),
@@ -680,6 +748,7 @@ var tutorial_step_index := -1
 var tutorial_clicks_this_step := 0
 var tutorial_reward_given := false
 var tutorial_step_completing := false
+var tutorial_step_generation := 0
 var tutorial_target: Control
 var tutorial_overlay: Control
 var tutorial_dim: ColorRect
@@ -925,7 +994,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	# Screen-drag events own the preview position on touch devices. Polling the
 	# emulated mouse at the same time makes the food snap back under the finger.
-	if not dragged_food_id.is_empty() and dragged_food_touch_index < 0:
+	if (not dragged_food_id.is_empty() or not dragged_boost_key.is_empty()) and dragged_food_touch_index < 0:
 		_update_food_drag_preview(get_viewport().get_mouse_position())
 	if boost_logic != null:
 		boost_logic.process(delta)
@@ -992,32 +1061,51 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event is InputEventScreenDrag and event.index == food_drag_candidate_touch_index and event.position.distance_to(food_drag_candidate_start) >= 18.0:
-			if Time.get_ticks_msec() - food_drag_candidate_started_msec >= 180:
-				dragged_food_touch_index = event.index
-				_start_food_drag(food_drag_candidate_id, event.position)
-				get_viewport().set_input_as_handled()
-				return
-			_clear_food_drag_candidate()
+			dragged_food_touch_index = event.index
+			_start_food_drag(food_drag_candidate_id, event.position)
+			get_viewport().set_input_as_handled()
+			return
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			_clear_food_drag_candidate()
 		if event is InputEventScreenTouch and event.index == food_drag_candidate_touch_index and not event.pressed:
 			_clear_food_drag_candidate()
-	if event is InputEventScreenDrag and event.index == dragged_food_touch_index and not dragged_food_id.is_empty():
+	if not boost_drag_candidate_key.is_empty() and dragged_boost_key.is_empty():
+		if event is InputEventMouseMotion and event.global_position.distance_to(food_drag_candidate_start) >= 10.0:
+			_start_boost_drag(boost_drag_candidate_key, event.global_position)
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventScreenDrag and event.index == food_drag_candidate_touch_index and event.position.distance_to(food_drag_candidate_start) >= 18.0:
+			dragged_food_touch_index = event.index
+			_start_boost_drag(boost_drag_candidate_key, event.position)
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			boost_drag_candidate_key = ""
+		if event is InputEventScreenTouch and event.index == food_drag_candidate_touch_index and not event.pressed:
+			boost_drag_candidate_key = ""
+
+	if event is InputEventScreenDrag and event.index == dragged_food_touch_index and (not dragged_food_id.is_empty() or not dragged_boost_key.is_empty()):
 		_update_food_drag_preview(event.position)
 		get_viewport().set_input_as_handled()
 		return
 
-	if event is InputEventScreenTouch and event.index == dragged_food_touch_index and not event.pressed and not dragged_food_id.is_empty():
-		_finish_food_drag(event.position)
+	if event is InputEventScreenTouch and event.index == dragged_food_touch_index and not event.pressed and (not dragged_food_id.is_empty() or not dragged_boost_key.is_empty()):
+		if not dragged_food_id.is_empty():
+			_finish_food_drag(event.position)
+		else:
+			_finish_boost_drag(event.position)
 		dragged_food_touch_index = -1
 		get_viewport().set_input_as_handled()
 		return
 
-	if event is InputEventMouseMotion and not dragged_food_id.is_empty():
+	if event is InputEventMouseMotion and (not dragged_food_id.is_empty() or not dragged_boost_key.is_empty()):
 		_update_food_drag_preview(event.global_position)
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and not dragged_food_id.is_empty():
-		_finish_food_drag(event.global_position)
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and (not dragged_food_id.is_empty() or not dragged_boost_key.is_empty()):
+		if not dragged_food_id.is_empty():
+			_finish_food_drag(event.global_position)
+		else:
+			_finish_boost_drag(event.global_position)
 		get_viewport().set_input_as_handled()
 		return
 
@@ -1322,11 +1410,11 @@ func _setup_main_ui_visuals() -> void:
 func _setup_pause_menu_visuals() -> void:
 	menu_panel.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.035, 0.038, 0.045, 0.96), Color(1.0, 1.0, 1.0, 0.1), 28, 1, -1, 8)
+		_make_upgrade_style(Color(0.025, 0.032, 0.052, 0.98), Color(0.96, 0.72, 0.3, 0.38), 30, 2, -1, 14)
 	)
 	menu_header.add_theme_stylebox_override(
 		"panel",
-		_make_upgrade_style(Color(0.07, 0.075, 0.085, 0.72), Color(1.0, 1.0, 1.0, 0.08), 20, 1, -1, 3)
+		_make_upgrade_style(Color(0.075, 0.09, 0.14, 0.94), Color(0.42, 0.86, 1.0, 0.28), 22, 1, -1, 6)
 	)
 	menu_wallet.add_theme_stylebox_override(
 		"panel",
@@ -1340,8 +1428,8 @@ func _setup_pause_menu_visuals() -> void:
 	_style_upgrade_button(settings_button, CLICK_UPGRADE_COLOR)
 	_style_upgrade_button(achievements_button, Color(0.82, 0.66, 0.22, 1.0))
 	_style_upgrade_button(stats_button, Color(0.56, 0.48, 1.0, 1.0))
-	_style_upgrade_button(resume_button, PASSIVE_UPGRADE_COLOR)
-	_style_upgrade_button(exit_button, VALUE_UPGRADE_COLOR)
+	resume_button.hide()
+	exit_button.hide()
 
 
 func _build_skins_ui() -> void:
@@ -1901,7 +1989,7 @@ func _build_boosts_ui() -> void:
 	var subtitle := Label.new()
 	subtitle.name = "BoostsSubtitle"
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	subtitle.text = "NORMAL price, DOUBLE +50%, TRIPLE +100%"
+	subtitle.text = "Five tiers: each higher tier adds 50% of the base price"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 14)
 	subtitle.add_theme_color_override("font_color", Color(0.68, 0.6, 0.82, 1.0))
@@ -1940,11 +2028,13 @@ func _build_boosts_ui() -> void:
 	_style_arcade_label_plate(boost_wallet_label, Color(1.0, 0.72, 0.16, 1.0), true)
 	wallet_row.add_child(boost_wallet_label)
 
-	var boost_tabs := HBoxContainer.new()
+	var boost_tabs := GridContainer.new()
 	boost_tabs.name = "BoostCategoryTabs"
-	boost_tabs.add_theme_constant_override("separation", 10)
+	boost_tabs.columns = BOOST_CATEGORIES.size()
+	boost_tabs.add_theme_constant_override("h_separation", 10)
+	boost_tabs.add_theme_constant_override("v_separation", 8)
 	items.add_child(boost_tabs)
-	for category in ["classical", "advanced", "legendary", "mythic"]:
+	for category in BOOST_CATEGORIES:
 		var tab := Button.new()
 		tab.text = _get_upgrade_category_label(category)
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1956,6 +2046,8 @@ func _build_boosts_ui() -> void:
 			accent = Color(1.0, 0.72, 0.24)
 		elif category == "mythic":
 			accent = Color(0.45, 0.95, 0.82)
+		elif category == "ascendant":
+			accent = Color(1.0, 0.48, 0.82)
 		_style_upgrade_button(tab, accent)
 		tab.set_meta("telegram_segment_accent", accent)
 		tab.pressed.connect(_show_boost_category.bind(category))
@@ -2008,6 +2100,18 @@ func _get_upgrade_category_label(category: String) -> String:
 			return "III"
 		"mythic":
 			return "IV"
+		"ascendant":
+			return "V"
+		"divine":
+			return "VI"
+		"cosmic":
+			return "VII"
+		"eternal":
+			return "VIII"
+		"transcendent":
+			return "IX"
+		"omega":
+			return "X"
 	return String(category).to_upper()
 
 
@@ -2137,7 +2241,7 @@ func _build_food_ui() -> void:
 	boost_inventory_empty.add_theme_stylebox_override("panel", _make_upgrade_style(Color(0.04, 0.055, 0.09, 0.94), Color(0.48, 0.76, 1.0, 0.55), 18, 1, -1, 3))
 	food_scroll_content.add_child(boost_inventory_empty)
 	var boost_empty_label := Label.new()
-	boost_empty_label.text = "NO BOOSTS YET\nBuy one in Shop, then drag its artwork onto the cat."
+	boost_empty_label.text = "NO BOOSTS YET\nBuy one in Shop. Then use it instantly or drag it onto the cat."
 	boost_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	boost_empty_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	boost_empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2173,7 +2277,7 @@ func _show_inventory_tab(tab_id: String) -> void:
 	food_empty_state.visible = showing_food and _get_owned_food_type_count() == 0
 	boost_inventory_grid.visible = not showing_food
 	boost_inventory_empty.visible = not showing_food and _get_owned_boost_count() == 0
-	food_status_label.text = "Drag food onto the cat." if showing_food else "Drag boost artwork onto the cat to activate it."
+	food_status_label.text = "Use instantly, or drag food onto the cat." if showing_food else "Use instantly, or drag a boost onto the cat."
 	for key in inventory_tab_buttons:
 		var button := inventory_tab_buttons[key] as Button
 		button.disabled = String(key) == inventory_active_tab
@@ -2197,10 +2301,13 @@ func _get_owned_boost_count() -> int:
 
 
 func _get_boost_inventory_key(boost_id: String, tier: int) -> String:
-	return "%s:%d" % [boost_id, clampi(tier, 1, 3)]
+	return "%s:%d" % [boost_id, clampi(tier, 1, BoostLogic.MAX_BOOST_TIER)]
 
 
 func _get_boost_icon(boost_data: Dictionary) -> Texture2D:
+	var boost_id := String(boost_data.get("id", ""))
+	if BOOST_ICONS.has(boost_id):
+		return BOOST_ICONS[boost_id] as Texture2D
 	return BOOST_TIER_ICONS.get(String(boost_data.get("category", "classical")), BOOST_TIER_ICONS["classical"]) as Texture2D
 
 
@@ -2213,17 +2320,17 @@ func _refresh_boost_inventory_ui() -> void:
 	boost_inventory_cards.clear()
 	for data in BoostLogic.BOOST_DATA:
 		var boost_id := String(data["id"])
-		for tier in range(1, 4):
+		for tier in range(1, BoostLogic.MAX_BOOST_TIER + 1):
 			var key := _get_boost_inventory_key(boost_id, tier)
 			var count := int(boost_inventory.get(key, 0))
 			if count <= 0:
 				continue
 			var card := PanelContainer.new()
-			card.custom_minimum_size = Vector2(0.0, 190.0)
+			card.custom_minimum_size = Vector2(0.0, 230.0)
 			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			card.mouse_filter = Control.MOUSE_FILTER_STOP
 			card.mouse_default_cursor_shape = Control.CURSOR_DRAG
-			card.tooltip_text = "Drag onto the cat to activate"
+			card.tooltip_text = "Use instantly, or drag onto the cat"
 			card.add_theme_stylebox_override("panel", _make_upgrade_card_style(data["accent"] as Color, false))
 			card.gui_input.connect(_on_boost_icon_gui_input.bind(key))
 			boost_inventory_grid.add_child(card)
@@ -2258,6 +2365,16 @@ func _refresh_boost_inventory_ui() -> void:
 			count_label.add_theme_color_override("font_color", data["accent"] as Color)
 			count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			items.add_child(count_label)
+			var use_button := Button.new()
+			var is_active: bool = bool(boost_logic.is_active(boost_id))
+			var is_recharging: bool = bool(boost_logic.is_recharging(boost_id))
+			use_button.text = "ACTIVE" if is_active else ("RECHARGING" if is_recharging else "USE NOW")
+			use_button.custom_minimum_size.y = 38.0
+			use_button.mouse_filter = Control.MOUSE_FILTER_STOP
+			use_button.disabled = is_active or is_recharging
+			use_button.pressed.connect(_use_owned_boost.bind(key))
+			_style_upgrade_button(use_button, data["accent"] as Color)
+			items.add_child(use_button)
 	boost_inventory_empty.visible = inventory_active_tab == "boosts" and _get_owned_boost_count() == 0
 
 
@@ -2706,6 +2823,7 @@ func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			boost_drag_candidate_key = ""
 			food_drag_candidate_id = food_id
 			food_drag_candidate_start = event.global_position
 			food_drag_candidate_touch_index = -1
@@ -2723,6 +2841,7 @@ func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenTouch:
 		if event.pressed:
+			boost_drag_candidate_key = ""
 			food_drag_candidate_id = food_id
 			food_drag_candidate_start = event.position
 			food_drag_candidate_touch_index = event.index
@@ -2738,12 +2857,9 @@ func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
 			_update_food_drag_preview(event.position)
 			get_viewport().set_input_as_handled()
 		elif food_drag_candidate_id == food_id and event.index == food_drag_candidate_touch_index and event.position.distance_to(food_drag_candidate_start) >= 18.0:
-			if Time.get_ticks_msec() - food_drag_candidate_started_msec >= 180:
-				dragged_food_touch_index = event.index
-				_start_food_drag(food_id, event.position)
-				get_viewport().set_input_as_handled()
-			else:
-				_clear_food_drag_candidate()
+			dragged_food_touch_index = event.index
+			_start_food_drag(food_id, event.position)
+			get_viewport().set_input_as_handled()
 
 
 func _on_boost_icon_gui_input(event: InputEvent, boost_key: String) -> void:
@@ -2751,6 +2867,7 @@ func _on_boost_icon_gui_input(event: InputEvent, boost_key: String) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			_clear_food_drag_candidate()
 			boost_drag_candidate_key = boost_key
 			food_drag_candidate_start = event.global_position
 		else:
@@ -2766,6 +2883,7 @@ func _on_boost_icon_gui_input(event: InputEvent, boost_key: String) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenTouch:
 		if event.pressed:
+			_clear_food_drag_candidate()
 			boost_drag_candidate_key = boost_key
 			food_drag_candidate_start = event.position
 			food_drag_candidate_touch_index = event.index
@@ -2787,6 +2905,7 @@ func _start_boost_drag(boost_key: String, start_position: Vector2) -> void:
 		return
 	dragged_boost_key = boost_key
 	boost_drag_candidate_key = ""
+	dragged_food_touch_index = food_drag_candidate_touch_index
 	var boost_data: Dictionary = boost_logic.get_data(boost_key.get_slice(":", 0))
 	if boost_data.is_empty():
 		dragged_boost_key = ""
@@ -2795,9 +2914,9 @@ func _start_boost_drag(boost_key: String, start_position: Vector2) -> void:
 		dragged_food_preview = TextureRect.new()
 		dragged_food_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		dragged_food_preview.z_index = 80
-		dragged_food_preview.size = Vector2(92.0, 92.0)
-		dragged_food_preview.pivot_offset = dragged_food_preview.size * 0.5
 		click_popup_layer.add_child(dragged_food_preview)
+	dragged_food_preview.size = Vector2(92.0, 92.0)
+	dragged_food_preview.pivot_offset = dragged_food_preview.size * 0.5
 	dragged_food_preview.texture = _get_boost_icon(boost_data)
 	dragged_food_preview.modulate = Color.WHITE
 	dragged_food_preview.show()
@@ -2818,28 +2937,41 @@ func _finish_boost_drag(global_position: Vector2) -> void:
 		return
 	var boost_key := dragged_boost_key
 	dragged_boost_key = ""
+	boost_drag_candidate_key = ""
+	dragged_food_touch_index = -1
 	if is_instance_valid(dragged_food_preview):
 		dragged_food_preview.hide()
 	if is_instance_valid(food_drag_drop_target):
 		food_drag_drop_target.hide()
 	if is_instance_valid(telegram_navigation):
 		telegram_navigation.set_interaction_enabled(true)
-	if not cat_button.get_global_rect().has_point(global_position):
+	if not _is_cat_drop_position(global_position):
 		food_status_label.text = "Boost returned to your backpack."
-		_show_inventory()
+		_on_telegram_destination_requested("inventory", 0)
 		return
+	if not _use_owned_boost(boost_key):
+		food_status_label.text = "That boost is already active or recharging."
+		_on_telegram_destination_requested("inventory", 0)
+
+
+func _use_owned_boost(boost_key: String) -> bool:
+	if int(boost_inventory.get(boost_key, 0)) <= 0:
+		food_status_label.text = "That boost is no longer in your inventory."
+		return false
 	var boost_id := boost_key.get_slice(":", 0)
-	var tier := clampi(int(boost_key.get_slice(":", 1)), 1, 3)
+	var tier := clampi(int(boost_key.get_slice(":", 1)), 1, BoostLogic.MAX_BOOST_TIER)
 	if not boost_logic.activate_owned(boost_id, tier):
 		food_status_label.text = "That boost is already active or recharging."
-		_show_inventory()
-		return
+		return false
 	boost_inventory[boost_key] = maxi(0, int(boost_inventory.get(boost_key, 0)) - 1)
 	_refresh_boost_inventory_ui()
+	_update_food_ui()
 	_queue_save()
 	var data: Dictionary = boost_logic.get_data(boost_id)
+	food_status_label.text = "%s activated." % String(data.get("name", "Boost"))
 	_animate_cat_feed()
 	_spawn_floating_text(cat_button.get_global_rect().get_center(), String(data.get("name", "BOOST")), data.get("accent", Color.CYAN) as Color)
+	return true
 
 
 func _clear_food_drag_candidate() -> void:
@@ -2868,16 +3000,19 @@ func _start_food_drag(food_id: String, start_position := Vector2.INF) -> void:
 	if int(food_inventory.get(food_id, 0)) <= 0:
 		food_status_label.text = "Buy this food in the shop first."
 		return
+	var drag_touch_index := food_drag_candidate_touch_index
 	_clear_food_drag_candidate()
+	boost_drag_candidate_key = ""
 	dragged_food_id = food_id
+	dragged_food_touch_index = drag_touch_index
 	food_drag_return_to_inventory = food_panel_mode == "inventory" and menu_overlay.visible
 	if not is_instance_valid(dragged_food_preview):
 		dragged_food_preview = TextureRect.new()
 		dragged_food_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		dragged_food_preview.z_index = 80
-		dragged_food_preview.size = Vector2(78.0, 78.0)
-		dragged_food_preview.pivot_offset = dragged_food_preview.size * 0.5
 		click_popup_layer.add_child(dragged_food_preview)
+	dragged_food_preview.size = Vector2(78.0, 78.0)
+	dragged_food_preview.pivot_offset = dragged_food_preview.size * 0.5
 	dragged_food_preview.texture = _get_food_icon(_get_food_index(food_id))
 	dragged_food_preview.modulate = Color(1.0, 1.0, 1.0, 0.92)
 	dragged_food_preview.show()
@@ -2899,11 +3034,16 @@ func _start_food_drag(food_id: String, start_position := Vector2.INF) -> void:
 
 func _update_food_drag_preview(global_position: Vector2) -> void:
 	if is_instance_valid(dragged_food_preview):
-		dragged_food_preview.global_position = global_position - dragged_food_preview.pivot_offset
+		var preview_offset := Vector2(dragged_food_preview.pivot_offset.x, dragged_food_preview.size.y + 16.0)
+		dragged_food_preview.global_position = global_position - preview_offset
 	if is_instance_valid(food_drag_drop_target):
 		var cat_rect := cat_button.get_global_rect()
 		food_drag_drop_target.global_position = Vector2(cat_rect.get_center().x - food_drag_drop_target.size.x * 0.5, cat_rect.position.y - food_drag_drop_target.size.y - 12.0)
-		food_drag_drop_target.text = "RELEASE TO FEED" if cat_rect.has_point(global_position) else "DROP FOOD HERE"
+		food_drag_drop_target.text = "RELEASE TO USE" if _is_cat_drop_position(global_position) else "DROP ITEM HERE"
+
+
+func _is_cat_drop_position(global_position: Vector2) -> bool:
+	return cat_button.get_global_rect().grow(42.0).has_point(global_position)
 
 
 func _show_food_drop_target() -> void:
@@ -2927,6 +3067,7 @@ func _finish_food_drag(global_position: Vector2) -> void:
 		return
 	var food_id := dragged_food_id
 	dragged_food_id = ""
+	boost_drag_candidate_key = ""
 	dragged_food_touch_index = -1
 	if is_instance_valid(dragged_food_preview):
 		dragged_food_preview.hide()
@@ -2934,7 +3075,7 @@ func _finish_food_drag(global_position: Vector2) -> void:
 		food_drag_drop_target.hide()
 	if is_instance_valid(telegram_navigation):
 		telegram_navigation.set_interaction_enabled(true)
-	if cat_button.get_global_rect().has_point(global_position):
+	if _is_cat_drop_position(global_position):
 		food_drag_return_to_inventory = false
 		_feed_cat(food_id)
 	else:
@@ -3021,7 +3162,7 @@ func _update_food_ui() -> void:
 		card.visible = food_panel_mode == "shop" or count > 0
 		card.mouse_filter = Control.MOUSE_FILTER_PASS
 		card.mouse_default_cursor_shape = Control.CURSOR_DRAG if food_panel_mode == "inventory" else Control.CURSOR_ARROW
-		card.tooltip_text = "Hold briefly, then drag onto the cat" if food_panel_mode == "inventory" else "Buy this food boost"
+		card.tooltip_text = "Drag onto the cat, or use instantly" if food_panel_mode == "inventory" else "Buy this food boost"
 		var button := card.get_meta("action_button") as Button
 		if button == null:
 			continue
@@ -3030,7 +3171,7 @@ func _update_food_ui() -> void:
 			button.disabled = coins < int(data["cost"])
 		else:
 			var boost: Dictionary = _get_food_boost(index)
-			button.text = "USE  %s" % String(boost["text"])
+			button.text = "USE NOW"
 			button.disabled = count <= 0
 	if food_panel_mode == "inventory":
 		food_wallet_label.text = "%d FOOD  /  %d BOOSTS" % [owned_items, _get_owned_boost_count()]
@@ -3147,12 +3288,19 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	var duration := float(boost_data["duration"])
 	var tier_info := Label.new()
 	tier_info.name = "TierInfo"
+	var tier_values: PackedStringArray = []
 	if duration > 0.0:
-		tier_info.text = "TIME: %ds  |  %ds  |  %ds" % [roundi(duration), roundi(duration * 2.0), roundi(duration * 3.0)]
+		for tier in range(1, BoostLogic.MAX_BOOST_TIER + 1):
+			tier_values.append("%ds" % roundi(duration * tier))
+		tier_info.text = "TIME: %s" % "  |  ".join(tier_values)
 	elif boost_id == "nine_lives":
-		tier_info.text = "TAPS: 3  |  6  |  9"
+		for tier in range(1, BoostLogic.MAX_BOOST_TIER + 1):
+			tier_values.append(str(3 * tier))
+		tier_info.text = "TAPS: %s" % "  |  ".join(tier_values)
 	else:
-		tier_info.text = "NORMAL  |  DOUBLE  |  TRIPLE"
+		for tier in range(1, BoostLogic.MAX_BOOST_TIER + 1):
+			tier_values.append(boost_logic.get_tier_name(tier))
+		tier_info.text = "  |  ".join(tier_values)
 	tier_info.add_theme_font_size_override("font_size", 13)
 	tier_info.add_theme_color_override("font_color", Color(0.58, 0.64, 0.74, 1.0))
 	card_items.add_child(tier_info)
@@ -3163,7 +3311,7 @@ func _add_boost_card(boost_data: Dictionary) -> void:
 	card_items.add_child(actions)
 
 	var buttons: Array[Button] = []
-	for tier in range(1, 4):
+	for tier in range(1, BoostLogic.MAX_BOOST_TIER + 1):
 		var action := Button.new()
 		action.custom_minimum_size = Vector2(0.0, 58.0)
 		action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -4239,12 +4387,14 @@ func _complete_slider_motion(slider: Slider) -> void:
 
 func _build_extended_upgrades_ui() -> void:
 	var back_index := upgrades_back_button.get_index()
-	var tabs := HBoxContainer.new()
+	var tabs := GridContainer.new()
 	tabs.name = "UpgradeCategoryTabs"
-	tabs.add_theme_constant_override("separation", 10)
+	tabs.columns = 5
+	tabs.add_theme_constant_override("h_separation", 10)
+	tabs.add_theme_constant_override("v_separation", 8)
 	upgrades_items.add_child(tabs)
 	upgrades_items.move_child(tabs, 1)
-	for category in ["classical", "advanced", "legendary", "mythic"]:
+	for category in UPGRADE_CATEGORIES:
 		var tab := Button.new()
 		tab.text = _get_upgrade_category_label(category)
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -4256,6 +4406,18 @@ func _build_extended_upgrades_ui() -> void:
 			accent = Color(1.0, 0.72, 0.24)
 		elif category == "mythic":
 			accent = Color(0.45, 0.95, 0.82)
+		elif category == "ascendant":
+			accent = Color(1.0, 0.48, 0.82)
+		elif category == "divine":
+			accent = Color(1.0, 0.88, 0.42)
+		elif category == "cosmic":
+			accent = Color(0.48, 0.86, 1.0)
+		elif category == "eternal":
+			accent = Color(0.55, 1.0, 0.68)
+		elif category == "transcendent":
+			accent = Color(1.0, 0.45, 0.7)
+		elif category == "omega":
+			accent = Color(0.72, 1.0, 0.42)
 		_style_upgrade_button(tab, accent)
 		tab.set_meta("telegram_segment_accent", accent)
 		tab.pressed.connect(_show_upgrade_category.bind(category))
@@ -4911,6 +5073,7 @@ func _show_tutorial_prompt(force_replay: bool = false) -> void:
 	tutorial_active = false
 	tutorial_step_index = -1
 	tutorial_step_completing = false
+	tutorial_step_generation += 1
 	tutorial_target = null
 	tutorial_overlay.show()
 	tutorial_highlight.hide()
@@ -4935,7 +5098,7 @@ func _start_tutorial(force_replay: bool) -> void:
 	tutorial_active = true
 	tutorial_step_index = -1
 	tutorial_clicks_this_step = 0
-	tutorial_step_completing = false
+	tutorial_step_completing = true
 	tutorial_highlight.show()
 	tutorial_arrow.show()
 	tutorial_reward_given = tutorial_completed and force_replay
@@ -4961,6 +5124,8 @@ func _on_tutorial_next_pressed() -> void:
 	if tutorial_prompt_visible:
 		_start_tutorial(tutorial_prompt_replay)
 		return
+	if tutorial_step_completing:
+		return
 	var step := _get_tutorial_step(tutorial_step_index)
 	var wait_for := String(step.get("wait_for", ""))
 	if _perform_tutorial_action(step):
@@ -4970,7 +5135,7 @@ func _on_tutorial_next_pressed() -> void:
 
 
 func _tutorial_notify(event_name: String) -> void:
-	if not tutorial_active:
+	if not tutorial_active or tutorial_step_completing:
 		return
 	var step := _get_tutorial_step(tutorial_step_index)
 	var wait_for := String(step.get("wait_for", ""))
@@ -5041,11 +5206,12 @@ func _tutorial_notify(event_name: String) -> void:
 func _advance_tutorial() -> void:
 	tutorial_step_index += 1
 	tutorial_clicks_this_step = 0
-	tutorial_step_completing = false
+	tutorial_step_completing = true
+	tutorial_step_generation += 1
 	if tutorial_step_index >= _get_tutorial_step_count():
 		_finish_tutorial(false)
 		return
-	_enter_tutorial_step()
+	call_deferred("_enter_tutorial_step", tutorial_step_index, tutorial_step_generation)
 
 
 func _complete_tutorial_step() -> void:
@@ -5071,6 +5237,7 @@ func _finish_tutorial(skipped: bool) -> void:
 	tutorial_active = false
 	tutorial_step_index = -1
 	tutorial_step_completing = false
+	tutorial_step_generation += 1
 	tutorial_target = null
 	tutorial_overlay.hide()
 	tutorial_highlight.show()
@@ -5083,28 +5250,61 @@ func _finish_tutorial(skipped: bool) -> void:
 	_show_tutorial_feedback("Tutorial skipped" if skipped else "Tutorial complete")
 
 
-func _enter_tutorial_step() -> void:
+func _enter_tutorial_step(expected_step: int, expected_generation: int) -> void:
+	if not tutorial_active or tutorial_step_index != expected_step or tutorial_step_generation != expected_generation:
+		return
 	var step := _get_tutorial_step(tutorial_step_index)
-	var target_id := String(step.get("target", ""))
-	var keep_overlay_open := target_id in [
-		"buy_click_power",
-		"boosts_panel",
-		"shop_panel",
-		"inventory_panel",
-		"skins_panel",
-		"crates_panel",
-		"background_panel",
-		"missions_panel",
-		"event_banner",
-		"pause_replay",
-	]
-	if not keep_overlay_open and menu_overlay.visible:
-		_hide_menu()
-	tutorial_target = _get_tutorial_target(target_id)
+	tutorial_next_button.disabled = true
+	var destination := String(step.get("destination", ""))
+	var shop_section := String(step.get("shop_section", ""))
+	var transition_delay := 0.0
+	if not destination.is_empty():
+		transition_delay = _prepare_tutorial_destination(destination, shop_section)
+	elif String(step.get("target", "")) in ["shop_button", "inventory_button", "skins_button", "missions_button"]:
+		if pause_popup_open:
+			_hide_pause_popup(false, true)
+	if transition_delay > 0.0:
+		get_tree().create_timer(transition_delay).timeout.connect(
+			_finish_tutorial_step_entry.bind(expected_step, expected_generation),
+			CONNECT_ONE_SHOT
+		)
+	else:
+		call_deferred("_finish_tutorial_step_entry", expected_step, expected_generation)
+
+
+func _prepare_tutorial_destination(destination: String, shop_section: String) -> float:
+	if pause_popup_open:
+		_hide_pause_popup(false, true)
+	if not is_instance_valid(telegram_navigation):
+		return 0.0
+	if destination == "main":
+		if telegram_navigation.current_destination != "main" or menu_overlay.visible:
+			_on_telegram_destination_requested("main", 0)
+			return 0.34
+		return 0.0
+	if destination == "shop" and not shop_section.is_empty():
+		if telegram_navigation.current_destination != "shop" or active_shop_section != shop_section:
+			_show_shop_section(shop_section)
+			return 0.34
+	elif telegram_navigation.current_destination != destination:
+		_on_telegram_destination_requested(destination, 0)
+		return 0.34
+	# A user-triggered page transition can already be moving when its completion
+	# advances the tutorial. Wait before measuring the new target.
+	return 0.34
+
+
+func _finish_tutorial_step_entry(expected_step: int, expected_generation: int) -> void:
+	if not tutorial_active or tutorial_step_index != expected_step or tutorial_step_generation != expected_generation:
+		return
+	var step := _get_tutorial_step(tutorial_step_index)
+	tutorial_target = _get_tutorial_target(String(step.get("target", "")))
 	_update_tutorial_text()
 	_update_tutorial_layout()
 	_animate_tutorial_card()
 	_pulse_tutorial_highlight()
+	tutorial_step_completing = false
+	tutorial_next_button.disabled = false
 
 
 func _update_tutorial_text() -> void:
@@ -5356,18 +5556,20 @@ func _get_tutorial_target(target_id: String) -> Control:
 			return boosts_button
 		"boosts_panel":
 			return boosts_panel
+		"upgrades_panel":
+			return upgrades_panel
 		"shop_button":
-			return shop_button
+			return telegram_navigation.call("get_destination_button", "shop") as Control if is_instance_valid(telegram_navigation) else shop_button
 		"shop_panel":
 			return food_panel
 		"inventory_button":
-			return inventory_button
+			return telegram_navigation.call("get_destination_button", "inventory") as Control if is_instance_valid(telegram_navigation) else inventory_button
 		"inventory_panel":
-			return compact_inventory_panel
+			return food_panel
 		"menu_button":
 			return menu_button
 		"skins_button":
-			return skins_button
+			return telegram_navigation.call("get_destination_button", "skins") as Control if is_instance_valid(telegram_navigation) else skins_button
 		"skins_panel":
 			return skins_panel
 		"crates_tab":
@@ -5379,9 +5581,13 @@ func _get_tutorial_target(target_id: String) -> Control:
 		"background_panel":
 			return skins_section_panels.get("background") as Control
 		"missions_button":
-			return mission_logic.button if mission_logic != null else null
+			return telegram_navigation.call("get_destination_button", "missions") as Control if is_instance_valid(telegram_navigation) else (mission_logic.button if mission_logic != null else null)
 		"missions_panel":
 			return mission_logic.panel if mission_logic != null else null
+		"pause_button":
+			return telegram_navigation.call("get_destination_button", "pause") as Control if is_instance_valid(telegram_navigation) else menu_button
+		"pause_panel":
+			return menu_panel
 		"event_banner":
 			return random_event_logic.banner if random_event_logic != null else null
 		"pause_replay":
@@ -5398,8 +5604,13 @@ func _update_tutorial_layout() -> void:
 	tutorial_card.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
 	var target_rect := Rect2(viewport_size * 0.5 - Vector2(80.0, 60.0), Vector2(160.0, 120.0))
-	if is_instance_valid(tutorial_target) and tutorial_target.visible and tutorial_target.is_inside_tree():
+	if is_instance_valid(tutorial_target) and tutorial_target.is_visible_in_tree():
 		target_rect = tutorial_target.get_global_rect()
+		if target_rect.size.x * target_rect.size.y > viewport_size.x * viewport_size.y * 0.42:
+			target_rect = Rect2(
+				Vector2(maxf(12.0, target_rect.position.x + 12.0), maxf(12.0, target_rect.position.y + 12.0)),
+				Vector2(maxf(120.0, target_rect.size.x - 24.0), minf(92.0, target_rect.size.y))
+			)
 	var padding := 12.0
 	var highlight_rect := target_rect.grow(padding)
 	tutorial_highlight.position = highlight_rect.position
@@ -6133,7 +6344,6 @@ func _animate_pause_menu() -> void:
 		tutorial_menu_replay_button,
 		achievements_button,
 		stats_button,
-		exit_button,
 	]
 	_animate_control_sequence(entrance_nodes, 0.045, 30.0)
 
@@ -6809,10 +7019,11 @@ func _apply_upgrades_responsive_layout(viewport_width: float = -1.0) -> void:
 		upgrade_coins_label.clip_text = true
 		upgrade_coins_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		upgrade_coins_label.add_theme_font_size_override("font_size", 20 if compact else 23)
-	var tabs := upgrades_items.find_child("UpgradeCategoryTabs", false, false) as HBoxContainer
+	var tabs := upgrades_items.find_child("UpgradeCategoryTabs", false, false) as GridContainer
 	if tabs != null:
 		tabs.custom_minimum_size.x = 0.0
-		tabs.add_theme_constant_override("separation", 6 if compact else 10)
+		tabs.add_theme_constant_override("h_separation", 6 if compact else 10)
+		tabs.add_theme_constant_override("v_separation", 6 if compact else 8)
 		for tab_node in tabs.get_children():
 			var tab := tab_node as Button
 			if tab == null:
@@ -6901,10 +7112,11 @@ func _apply_boosts_responsive_layout(viewport_width: float = -1.0) -> void:
 	if subtitle != null:
 		subtitle.custom_minimum_size.x = 0.0
 		subtitle.add_theme_font_size_override("font_size", 15 if compact else 18)
-	var tabs := boosts_panel.find_child("BoostCategoryTabs", true, false) as HBoxContainer
+	var tabs := boosts_panel.find_child("BoostCategoryTabs", true, false) as GridContainer
 	if tabs != null:
 		tabs.custom_minimum_size.x = 0.0
-		tabs.add_theme_constant_override("separation", 6 if compact else 10)
+		tabs.add_theme_constant_override("h_separation", 6 if compact else 10)
+		tabs.add_theme_constant_override("v_separation", 6 if compact else 8)
 		for tab_node in tabs.get_children():
 			var tab := tab_node as Button
 			if tab == null:
@@ -7328,7 +7540,7 @@ func _show_boosts() -> void:
 func _show_inventory() -> void:
 	_play_ui_sound()
 	food_panel_mode = "inventory"
-	food_status_label.text = "Choose Food or Boosts, then drag an item onto the cat."
+	food_status_label.text = "Choose Food or Boosts. Use now, or drag onto the cat."
 	_update_food_ui()
 	_show_overlay_panel(food_panel)
 	call_deferred("_animate_food_screen")
@@ -7476,7 +7688,7 @@ func _build_telegram_navigation() -> void:
 	upgrade_alert_badge.hide()
 	skins_button.hide()
 	boosts_button.hide()
-	inventory_shop_bar.show()
+	inventory_shop_bar.hide()
 	shop_button.hide()
 	museum_button.hide()
 	if mission_logic != null and is_instance_valid(mission_logic.button):
@@ -8395,7 +8607,8 @@ func _show_pause_popup() -> void:
 		telegram_navigation.set_interaction_enabled(false)
 		telegram_navigation.set_pause_active(true)
 	_apply_telegram_pause_style()
-	resume_button.show()
+	resume_button.hide()
+	exit_button.hide()
 	_layout_pause_popup()
 	pause_popup_open = true
 	pause_opened_over_page = (
@@ -8481,10 +8694,10 @@ func _layout_pause_popup() -> void:
 	var content_bottom := viewport_size.y - telegram_bottom_height - 12.0
 	var available_height := maxf(280.0, content_bottom - content_top)
 	var popup_width := minf(520.0, viewport_size.x - horizontal_margin * 2.0)
-	var desired_height := 740.0
+	var desired_height := 610.0
 	var menu_items := menu_panel.find_child("MenuItems", true, false) as VBoxContainer
 	if menu_items != null:
-		desired_height = clampf(menu_items.get_combined_minimum_size().y + 28.0, 600.0, 740.0)
+		desired_height = clampf(menu_items.get_combined_minimum_size().y + 28.0, 480.0, 640.0)
 	var popup_height := minf(desired_height, available_height)
 	var popup_left := (viewport_size.x - popup_width) * 0.5
 	var popup_top := content_top + (available_height - popup_height) * 0.5
@@ -8518,7 +8731,7 @@ func _sync_main_pause_button(destination: String) -> void:
 	if is_instance_valid(menu_button):
 		menu_button.hide()
 	if is_instance_valid(inventory_shop_bar):
-		inventory_shop_bar.visible = destination == "main"
+		inventory_shop_bar.hide()
 
 
 func _notify_telegram_destination(destination: String) -> void:
@@ -8750,7 +8963,7 @@ func _prepare_telegram_destination(destination: String, play_sound := true) -> C
 			return _prepare_shop_section(active_shop_section)
 		"inventory":
 			food_panel_mode = "inventory"
-			food_status_label.text = "Your collected food and active consumables."
+			food_status_label.text = "Use an item now, or drag it onto the cat."
 			_update_food_ui()
 			_apply_telegram_page_style(food_panel)
 			_apply_food_grid_responsive_style()
@@ -9070,7 +9283,7 @@ func _apply_telegram_pause_style() -> void:
 		else:
 			header_label.add_theme_font_size_override("font_size", 16 if compact else 18)
 			header_label.add_theme_color_override("font_color", NORMAL_SHELL_MUTED)
-	for button in [settings_button, achievements_button, stats_button, resume_button, exit_button]:
+	for button in [settings_button, achievements_button, stats_button]:
 		button.custom_minimum_size.x = 0.0
 		button.custom_minimum_size.y = 52.0 if compact else 60.0
 		button.add_theme_font_size_override("font_size", 18 if compact else 20)
