@@ -122,6 +122,7 @@ var settings_page_tween: Tween
 var settings_shell_tween: Tween
 var settings_swipe_start := Vector2.ZERO
 var settings_swipe_tracking := false
+var settings_swipe_touch_index := -1
 var settings_swipe_dragging := false
 var settings_swipe_direction := 0
 var settings_swipe_neighbor := -1
@@ -622,8 +623,10 @@ var ui_sound_variant_index := 0
 var mobile_panels_wrapped := false
 var touch_scroll_index := -1
 var touch_scroll_dragging := false
-var touch_scroll_distance := 0.0
-var touch_scroll: ScrollContainer
+var touch_scroll_start := Vector2.ZERO
+var touch_scroll_origin := Vector2.ZERO
+var touch_scroll_mouse_block_until := 0
+var touch_scroll: Control
 var touch_slider_index := -1
 var touch_slider: Slider
 var mouse_slider_dragging := false
@@ -1039,6 +1042,9 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _handle_menu_touch_scroll(event):
+		get_viewport().set_input_as_handled()
+		return
 	if _handle_slider_touch(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -1168,10 +1174,6 @@ func _input(event: InputEvent) -> void:
 			_set_admin_overlay_text_selected(false)
 
 	if not menu_overlay.visible:
-		touch_scroll_index = -1
-		touch_scroll_dragging = false
-		touch_scroll_distance = 0.0
-		touch_scroll = null
 		return
 
 	if event.is_action_pressed("ui_cancel"):
@@ -1179,38 +1181,14 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	if event is InputEventScreenTouch:
-		if event.pressed:
-			touch_scroll_index = event.index
-			touch_scroll_dragging = false
-			touch_scroll_distance = 0.0
-			touch_scroll = _get_scroll_at_position(event.position)
-		elif event.index == touch_scroll_index:
-			if touch_scroll_dragging:
-				get_viewport().set_input_as_handled()
-			touch_scroll_index = -1
-			touch_scroll_dragging = false
-			touch_scroll_distance = 0.0
-			touch_scroll = null
-		return
-
-	if event is InputEventScreenDrag and event.index == touch_scroll_index:
-		var scroll := touch_scroll if is_instance_valid(touch_scroll) else _get_visible_menu_scroll()
-		if scroll == null:
-			return
-		touch_scroll_distance += absf(event.relative.y)
-		if touch_scroll_distance >= 8.0:
-			touch_scroll_dragging = true
-		if touch_scroll_dragging:
-			scroll.scroll_vertical -= roundi(event.relative.y)
-			get_viewport().set_input_as_handled()
-
 
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			_exit_game()
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
+			_reset_touch_scroll()
+			_reset_settings_drag()
 			app_has_focus = false
 			_apply_volume()
 			_apply_runtime_quality()
@@ -2819,6 +2797,8 @@ func _on_food_card_action_pressed(food_id: String) -> void:
 
 
 func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
 	if food_panel_mode != "inventory":
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -2863,12 +2843,15 @@ func _on_food_icon_gui_input(event: InputEvent, food_id: String) -> void:
 
 
 func _on_boost_icon_gui_input(event: InputEvent, boost_key: String) -> void:
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
 	if food_panel_mode != "inventory" or inventory_active_tab != "boosts":
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_clear_food_drag_candidate()
 			boost_drag_candidate_key = boost_key
+			food_drag_candidate_started_msec = Time.get_ticks_msec()
 			food_drag_candidate_start = event.global_position
 		else:
 			if dragged_boost_key == boost_key:
@@ -2885,6 +2868,7 @@ func _on_boost_icon_gui_input(event: InputEvent, boost_key: String) -> void:
 		if event.pressed:
 			_clear_food_drag_candidate()
 			boost_drag_candidate_key = boost_key
+			food_drag_candidate_started_msec = Time.get_ticks_msec()
 			food_drag_candidate_start = event.position
 			food_drag_candidate_touch_index = event.index
 		elif event.index == food_drag_candidate_touch_index:
@@ -4340,9 +4324,20 @@ func _get_slider_at_position(global_position: Vector2) -> Slider:
 	var sliders := find_children("*", "Slider", true, false)
 	for index in range(sliders.size() - 1, -1, -1):
 		var slider := sliders[index] as Slider
-		if slider != null and slider.is_visible_in_tree() and slider.get_global_rect().has_point(global_position):
+		if slider != null and slider.is_visible_in_tree() and _control_contains_visible_point(slider, global_position):
 			return slider
 	return null
+
+
+func _control_contains_visible_point(control: Control, point: Vector2) -> bool:
+	if not control.get_global_rect().has_point(point):
+		return false
+	var parent := control.get_parent()
+	while parent != null:
+		if parent is Control and parent.clip_contents and not parent.get_global_rect().has_point(point):
+			return false
+		parent = parent.get_parent()
+	return true
 
 
 func _set_slider_from_touch(slider: Slider, global_position: Vector2) -> void:
@@ -6703,70 +6698,114 @@ func _configure_touch_scroll(scroll: ScrollContainer) -> void:
 	scroll.follow_focus = true
 
 
-func _get_scroll_at_position(global_position: Vector2) -> ScrollContainer:
-	var candidate_scrolls: Array[ScrollContainer] = []
-	if skins_panel.visible:
-		if skins_active_section == "background" and is_instance_valid(room_skins_scroll):
-			candidate_scrolls.append(room_skins_scroll)
-		elif skins_active_section == "crates" and is_instance_valid(crates_scroll):
-			candidate_scrolls.append(crates_scroll)
-		elif is_instance_valid(skins_scroll):
-			candidate_scrolls.append(skins_scroll)
-		if is_instance_valid(room_skins_scroll):
-			candidate_scrolls.append(room_skins_scroll)
-		if is_instance_valid(crates_scroll):
-			candidate_scrolls.append(crates_scroll)
-		if is_instance_valid(skins_scroll):
-			candidate_scrolls.append(skins_scroll)
-	if boosts_panel.visible and is_instance_valid(boosts_scroll):
-		candidate_scrolls.append(boosts_scroll)
-	if food_panel.visible and is_instance_valid(food_scroll):
-		candidate_scrolls.append(food_scroll)
-	if stats_panel.visible and is_instance_valid(stats_cards):
-		candidate_scrolls.append(stats_cards.get_parent() as ScrollContainer)
-	if crate_logic != null and is_instance_valid(crate_logic.panel) and crate_logic.panel.visible and is_instance_valid(crate_logic.scroll):
-		candidate_scrolls.append(crate_logic.scroll)
-	if mission_logic != null and is_instance_valid(mission_logic.panel) and mission_logic.panel.visible:
-		var mission_scroll := _find_scroll_container(mission_logic.panel)
-		if mission_scroll != null:
-			candidate_scrolls.append(mission_scroll)
-	if museum_panel.visible and is_instance_valid(museum_scroll):
-		candidate_scrolls.append(museum_scroll)
-	if bottomless_bowl_logic != null and is_instance_valid(bottomless_bowl_logic.panel) and bottomless_bowl_logic.panel.visible:
-		var bowl_scroll := _find_scroll_container(bottomless_bowl_logic.panel)
-		if bowl_scroll != null:
-			candidate_scrolls.append(bowl_scroll)
-	for panel in [menu_panel, settings_panel, upgrades_panel, achievements_panel]:
-		if panel.visible:
-			var panel_scroll := _find_scroll_container(panel)
-			if panel_scroll != null:
-				candidate_scrolls.append(panel_scroll)
-
-	for scroll in candidate_scrolls:
-		if scroll != null and scroll.is_visible_in_tree() and scroll.get_global_rect().has_point(global_position):
-			return scroll
-	return _get_visible_menu_scroll()
+func _get_scroll_at_position(global_position: Vector2) -> Control:
+	# Search the active shell, including nested lists and horizontal tab strips.
+	# Respect ancestor clipping so offscreen settings controls cannot capture input.
+	var shell: Control = telegram_navigation
+	if is_instance_valid(settings_shell) and settings_shell.visible:
+		shell = settings_shell
+	elif is_instance_valid(pause_detail_shell) and pause_detail_shell.visible:
+		shell = pause_detail_shell
+	elif menu_overlay.visible:
+		shell = menu_panel if pause_popup_open else menu_overlay
+	var found := _find_scroll_at_point(shell, global_position)
+	if found == null and shell == menu_overlay:
+		found = _find_scroll_at_point(telegram_navigation, global_position)
+	return found
 
 
-func _get_visible_menu_scroll() -> ScrollContainer:
-	if stats_panel.visible:
-		return stats_cards.get_parent() as ScrollContainer
-	if skins_panel.visible:
-		if skins_active_section == "background" and is_instance_valid(room_skins_scroll):
-			return room_skins_scroll
-		if skins_active_section == "crates" and is_instance_valid(crates_scroll):
-			return crates_scroll
-		return skins_scroll
-	if boosts_panel.visible:
-		return boosts_scroll
-	if food_panel.visible:
-		return food_scroll
-	if crate_logic != null and is_instance_valid(crate_logic.panel) and crate_logic.panel.visible:
-		return crate_logic.scroll
-	for panel in [menu_panel, settings_panel, upgrades_panel, achievements_panel]:
-		if panel.visible and panel.get_child_count() > 0:
-			return panel.get_child(0) as ScrollContainer
+func _find_scroll_at_point(node: Node, point: Vector2) -> Control:
+	if not is_instance_valid(node):
+		return null
+	if node is Control:
+		if not node.is_visible_in_tree():
+			return null
+		if node.clip_contents and not node.get_global_rect().has_point(point):
+			return null
+	var children := node.get_children()
+	children.reverse()
+	for child in children:
+		var found := _find_scroll_at_point(child, point)
+		if found != null:
+			return found
+	if node is ItemList and node.get_global_rect().has_point(point):
+		return node as ItemList
+	if node is ScrollContainer and node.get_global_rect().has_point(point):
+		return node as ScrollContainer
 	return null
+
+
+func _reset_touch_scroll() -> void:
+	if touch_scroll_dragging and is_instance_valid(touch_scroll):
+		touch_scroll.propagate_notification(Control.NOTIFICATION_SCROLL_END)
+		touch_scroll_mouse_block_until = Time.get_ticks_msec() + 100
+	touch_scroll_index = -1
+	touch_scroll_dragging = false
+	touch_scroll = null
+
+
+func _is_inventory_drag_reserved() -> bool:
+	if not dragged_food_id.is_empty() or not dragged_boost_key.is_empty():
+		return true
+	# A quick swipe scrolls; holding an item first reserves its drag gesture.
+	return (
+		(not food_drag_candidate_id.is_empty() or not boost_drag_candidate_key.is_empty())
+		and Time.get_ticks_msec() - food_drag_candidate_started_msec >= 250
+	)
+
+
+func _handle_menu_touch_scroll(event: InputEvent) -> bool:
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return touch_scroll_dragging or Time.get_ticks_msec() < touch_scroll_mouse_block_until
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			if touch_scroll_index >= 0 or _get_slider_at_position(event.position) != null:
+				return false
+			touch_scroll = _get_scroll_at_position(event.position)
+			if touch_scroll == null:
+				return false
+			touch_scroll_index = event.index
+			touch_scroll_start = event.position
+			touch_scroll_origin = (
+				Vector2(0, touch_scroll.get_v_scroll_bar().value) if touch_scroll is ItemList
+				else Vector2(touch_scroll.scroll_horizontal, touch_scroll.scroll_vertical)
+			)
+			touch_scroll_dragging = false
+		elif event.index == touch_scroll_index:
+			var consumed := touch_scroll_dragging
+			_reset_touch_scroll()
+			return consumed
+	elif event is InputEventScreenDrag and event.index == touch_scroll_index:
+		if not is_instance_valid(touch_scroll) or not touch_scroll.is_visible_in_tree():
+			_reset_touch_scroll()
+			return false
+		if _is_inventory_drag_reserved():
+			_reset_touch_scroll()
+			return false
+		var delta: Vector2 = event.position - touch_scroll_start
+		var horizontal: bool = touch_scroll is ScrollContainer and touch_scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED
+		var vertical: bool = touch_scroll is ItemList or touch_scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED
+		if not touch_scroll_dragging:
+			if delta.length() < 8.0:
+				return false
+			if (absf(delta.x) > absf(delta.y) and not horizontal) or (absf(delta.y) >= absf(delta.x) and not vertical):
+				_reset_touch_scroll()
+				return false
+			touch_scroll_dragging = true
+			touch_scroll.propagate_notification(Control.NOTIFICATION_SCROLL_BEGIN)
+			settings_swipe_tracking = false
+			settings_swipe_touch_index = -1
+			_clear_food_drag_candidate()
+			boost_drag_candidate_key = ""
+		if horizontal:
+			touch_scroll.scroll_horizontal = roundi(touch_scroll_origin.x - delta.x)
+		if vertical:
+			if touch_scroll is ItemList:
+				touch_scroll.get_v_scroll_bar().value = touch_scroll_origin.y - delta.y
+			else:
+				touch_scroll.scroll_vertical = roundi(touch_scroll_origin.y - delta.y)
+		return true
+	return false
 
 
 func _apply_mobile_layout() -> void:
@@ -7668,6 +7707,8 @@ func _build_telegram_navigation() -> void:
 
 	telegram_navigation = TelegramNavigation.new()
 	telegram_navigation.name = "TelegramNavigation"
+	telegram_navigation.pager_start_allowed = func(point: Vector2) -> bool: return _get_slider_at_position(point) == null
+	telegram_navigation.pager_drag_allowed = func() -> bool: return not _is_inventory_drag_reserved()
 	add_child(telegram_navigation)
 	telegram_navigation.destination_requested.connect(_on_telegram_destination_requested)
 	telegram_navigation.pause_requested.connect(_show_menu)
@@ -8447,16 +8488,27 @@ func _move_settings_tab_indicator_progress(from_index: int, to_index: int, progr
 
 
 func _handle_settings_shell_swipe(event: InputEvent) -> bool:
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return false
 	if not menu_swipe_enabled:
 		if settings_swipe_tracking or settings_swipe_dragging:
 			_reset_settings_drag()
 		return false
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			if settings_swipe_touch_index >= 0:
+				return false
+			settings_swipe_touch_index = event.index
 			settings_swipe_start = event.position
 			settings_swipe_tracking = event.position.y >= telegram_top_height and _get_slider_at_position(event.position) == null
 			settings_swipe_dragging = false
 			settings_swipe_velocity_x = 0.0
+			return false
+		if event.index != settings_swipe_touch_index:
+			return false
+		settings_swipe_touch_index = -1
+		if event.canceled:
+			_reset_settings_drag()
 			return false
 		if settings_swipe_tracking:
 			settings_swipe_tracking = false
@@ -8464,7 +8516,7 @@ func _handle_settings_shell_swipe(event: InputEvent) -> bool:
 				_settle_settings_drag()
 				return true
 			return false
-	elif event is InputEventScreenDrag and settings_swipe_tracking:
+	elif event is InputEventScreenDrag and settings_swipe_tracking and event.index == settings_swipe_touch_index:
 		var delta: Vector2 = event.position - settings_swipe_start
 		settings_swipe_velocity_x = event.velocity.x
 		return _update_settings_drag(delta)
@@ -8490,6 +8542,9 @@ func _handle_settings_shell_swipe(event: InputEvent) -> bool:
 
 func _update_settings_drag(delta: Vector2) -> bool:
 	if not settings_swipe_dragging:
+		if absf(delta.y) >= 8.0 and absf(delta.y) >= absf(delta.x):
+			settings_swipe_tracking = false
+			return false
 		if absf(delta.x) < 16.0 or absf(delta.x) <= absf(delta.y):
 			return false
 		_begin_settings_drag(1 if delta.x < 0.0 else -1)
@@ -8588,6 +8643,7 @@ func _cancel_settings_drag() -> void:
 
 
 func _reset_settings_drag(hide_other_pages := true) -> void:
+	settings_swipe_touch_index = -1
 	settings_swipe_tracking = false
 	settings_swipe_dragging = false
 	settings_swipe_direction = 0
@@ -8751,6 +8807,9 @@ func _notify_telegram_destination(destination: String) -> void:
 
 
 func _on_telegram_pager_drag_started(direction: int) -> void:
+	_reset_touch_scroll()
+	_clear_food_drag_candidate()
+	boost_drag_candidate_key = ""
 	if telegram_swipe_dragging:
 		return
 	_cancel_cat_press_for_navigation()
@@ -8963,7 +9022,7 @@ func _prepare_telegram_destination(destination: String, play_sound := true) -> C
 			return _prepare_shop_section(active_shop_section)
 		"inventory":
 			food_panel_mode = "inventory"
-			food_status_label.text = "Use an item now, or drag it onto the cat."
+			food_status_label.text = "Use an item now, or hold it to drag onto the cat."
 			_update_food_ui()
 			_apply_telegram_page_style(food_panel)
 			_apply_food_grid_responsive_style()
@@ -9489,10 +9548,7 @@ func _hide_menu() -> void:
 	_stop_entrance_animations()
 	if modal_decoration_tween != null and modal_decoration_tween.is_valid():
 		modal_decoration_tween.kill()
-	touch_scroll_index = -1
-	touch_scroll_dragging = false
-	touch_scroll_distance = 0.0
-	touch_scroll = null
+	_reset_touch_scroll()
 	upgrade_alert_elapsed = 0.0
 	modal_close_button.disabled = true
 	var panel := _get_visible_overlay_panel()

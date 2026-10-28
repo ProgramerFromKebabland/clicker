@@ -66,6 +66,9 @@ var safe_top_inset := 0.0
 var touch_start := Vector2.ZERO
 var touch_last := Vector2.ZERO
 var tracking_swipe := false
+var swipe_touch_index := -1
+var pager_start_allowed: Callable
+var pager_drag_allowed: Callable
 var swipe_consumed := false
 var swipe_dragging := false
 var swipe_direction := 0
@@ -379,8 +382,13 @@ func get_destination_button(destination: String) -> Button:
 func _input(event: InputEvent) -> void:
 	if not interaction_enabled:
 		return
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			if swipe_touch_index >= 0:
+				return
+			swipe_touch_index = event.index
 			touch_start = event.position
 			touch_last = event.position
 			tracking_swipe = _is_in_pager_area(event.position)
@@ -388,9 +396,14 @@ func _input(event: InputEvent) -> void:
 			swipe_dragging = false
 			swipe_direction = 0
 			swipe_velocity_x = 0.0
-		elif tracking_swipe:
-			_release_pager_drag(event.position)
-	elif event is InputEventScreenDrag and tracking_swipe:
+		elif event.index == swipe_touch_index:
+			swipe_touch_index = -1
+			if event.canceled:
+				swipe_velocity_x = 0.0
+				_release_pager_drag(touch_start)
+			else:
+				_release_pager_drag(event.position)
+	elif event is InputEventScreenDrag and tracking_swipe and event.index == swipe_touch_index:
 		touch_last = event.position
 		swipe_velocity_x = event.velocity.x
 		_update_pager_drag()
@@ -412,12 +425,21 @@ func _input(event: InputEvent) -> void:
 
 
 func _is_in_pager_area(position: Vector2) -> bool:
-	return position.y > top_height and position.y < size.y - bottom_height
+	return (
+		position.y > top_height and position.y < size.y - bottom_height
+		and (not pager_start_allowed.is_valid() or pager_start_allowed.call(position))
+	)
 
 
 func _update_pager_drag() -> void:
 	var delta := touch_last - touch_start
 	if not swipe_dragging:
+		if pager_drag_allowed.is_valid() and not pager_drag_allowed.call():
+			tracking_swipe = false
+			return
+		if absf(delta.y) >= 8.0 and absf(delta.y) >= absf(delta.x):
+			tracking_swipe = false
+			return
 		if absf(delta.x) < 14.0 or absf(delta.x) <= absf(delta.y):
 			return
 		swipe_dragging = true
@@ -469,6 +491,10 @@ func set_destination(destination: String, animated := true) -> void:
 
 func set_interaction_enabled(enabled: bool) -> void:
 	interaction_enabled = enabled
+	if not enabled:
+		tracking_swipe = false
+		swipe_touch_index = -1
+		swipe_dragging = false
 	set_process_input(enabled)
 
 
@@ -653,3 +679,12 @@ func _game_style(
 		style.shadow_size = shadow_size
 		style.shadow_offset = Vector2(0.0, 3.0)
 	return style
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
+		if swipe_dragging:
+			swipe_velocity_x = 0.0
+			_release_pager_drag(touch_start)
+		tracking_swipe = false
+		swipe_touch_index = -1

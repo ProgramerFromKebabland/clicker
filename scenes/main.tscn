@@ -300,7 +300,7 @@ horizontal_alignment = 1
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.76, 1)
 theme_override_font_sizes/font_size = 14
-text = "Your click empire is waiting."
+text = "Quick controls • tap outside to return"
 horizontal_alignment = 1
 
 [node name="MenuWallet" type="PanelContainer" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=1255514461]
@@ -407,6 +407,7 @@ text = "STATS"
 
 [node name="ResumeButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=1283971882]
 unique_name_in_owner = true
+visible = false
 custom_minimum_size = Vector2(0, 62)
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
@@ -414,6 +415,7 @@ text = "RESUME GAME"
 
 [node name="ExitButton" type="Button" parent="MenuOverlay/MenuCenter/MenuPanel/MenuMargin/MenuItems" unique_id=133149255]
 unique_name_in_owner = true
+visible = false
 custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
 theme_override_font_sizes/font_size = 19
